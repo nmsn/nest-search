@@ -1,0 +1,30 @@
+[
+  {
+    "productId": "P001",
+    "name": "海信 65 寸 4K 商用显示器",
+    "category": "商显",
+    "brand": "海信",
+    "model": "H65E3A",
+    "spec": "65英寸/4K/300nit/16:9",
+    "price": 4799.00,
+    "unit": "台",
+    "stock": 45,
+    "imageUrl": "https://example.com/p001.jpg",
+    "attributes": { "resolution": "3840x2160", "brightness": "300cd/m2" },
+    "businessLine": "ds"
+  },
+  {
+    "productId": "P006",
+    "name": "大华 高速道闸",
+    "category": "道闸",
+    "brand": "大华",
+    "model": "DH-IPMBG-1000",
+    "spec": "4.5米杆/高速通行/防砸",
+    "price": 12000.00,
+    "unit": "套",
+    "stock": 10,
+    "imageUrl": "https://example.com/p006.jpg",
+    "attributes": { "barLength": "4.5m", "openTime": "0.4s" },
+    "businessLine": "zk"
+  }
+]

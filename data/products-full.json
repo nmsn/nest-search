@@ -1,0 +1,72 @@
+[
+  {
+    "productId": "P001",
+    "name": "海信 65 寸 4K 商用显示器",
+    "category": "商显",
+    "brand": "海信",
+    "model": "H65E3A",
+    "spec": "65英寸/4K/300nit/16:9",
+    "price": 4999.00,
+    "unit": "台",
+    "stock": 50,
+    "imageUrl": "https://example.com/p001.jpg",
+    "attributes": { "resolution": "3840x2160", "brightness": "300cd/m2" },
+    "businessLine": "ds"
+  },
+  {
+    "productId": "P002",
+    "name": "创维 55 寸 商用广告机",
+    "category": "商显",
+    "brand": "创维",
+    "model": "55A5",
+    "spec": "55英寸/1080P/350nit",
+    "price": 3299.00,
+    "unit": "台",
+    "stock": 80,
+    "imageUrl": "https://example.com/p002.jpg",
+    "attributes": { "resolution": "1920x1080", "brightness": "350cd/m2" },
+    "businessLine": "ds"
+  },
+  {
+    "productId": "P003",
+    "name": "海康威视 道闸一体机",
+    "category": "道闸",
+    "brand": "海康威视",
+    "model": "DS-TMG300",
+    "spec": "3米杆/快速通行/车牌识别",
+    "price": 8500.00,
+    "unit": "套",
+    "stock": 20,
+    "imageUrl": "https://example.com/p003.jpg",
+    "attributes": { "barLength": "3m", "openTime": "0.6s" },
+    "businessLine": "zk"
+  },
+  {
+    "productId": "P004",
+    "name": "MAXHUB 75 寸 会议平板",
+    "category": "会议平板",
+    "brand": "MAXHUB",
+    "model": "V75",
+    "spec": "75英寸/4K/触控/无线投屏",
+    "price": 12999.00,
+    "unit": "台",
+    "stock": 15,
+    "imageUrl": "https://example.com/p004.jpg",
+    "attributes": { "touchPoints": "20", "os": "Android 11" },
+    "businessLine": "meeting"
+  },
+  {
+    "productId": "P005",
+    "name": "TCL 86 寸 智能交互平板",
+    "category": "会议平板",
+    "brand": "TCL",
+    "model": "M86A",
+    "spec": "86英寸/4K/红外触控/内置音箱",
+    "price": 18999.00,
+    "unit": "台",
+    "stock": 8,
+    "imageUrl": "https://example.com/p005.jpg",
+    "attributes": { "touchPoints": "20", "speaker": "2x15W" },
+    "businessLine": "meeting"
+  }
+]
