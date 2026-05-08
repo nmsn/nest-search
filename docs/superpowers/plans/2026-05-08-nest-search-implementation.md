@@ -801,7 +801,7 @@ export class UpdateSchemeDto {
 ```typescript
 // apps/form-service/src/scheme/scheme.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { DrizzleService } from '../database/dizzle.service';
+import { DrizzleService } from '../database/drizzle.service';
 import { getBusinessLineTables } from '../database/schema/schema-factory';
 import { eq } from 'drizzle-orm';
 import { CreateSchemeDto, UpdateSchemeDto } from './dto/create-scheme.dto';
@@ -994,7 +994,7 @@ export class UpdateFormStatusDto {
 ```typescript
 // apps/form-service/src/form/form.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { DrizzleService } from '../database/dizzle.service';
+import { DrizzleService } from '../database/drizzle.service';
 import { getBusinessLineTables } from '../database/schema/schema-factory';
 import { eq } from 'drizzle-orm';
 import { CreateFormDto, UpdateFormStatusDto } from './dto/create-form.dto';
