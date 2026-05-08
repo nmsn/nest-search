@@ -3,7 +3,7 @@ import { Client } from '@elastic/elasticsearch';
 
 @Injectable()
 export class ElasticsearchService implements OnModuleInit {
-  public client: Client;
+  public client!: Client;
 
   onModuleInit() {
     this.client = new Client({
@@ -16,8 +16,8 @@ export class ElasticsearchService implements OnModuleInit {
     if (!exists) {
       await this.client.indices.create({
         index: indexName,
-        body: { mappings },
-      });
+        mappings,
+      } as any);
       console.log(`Created ES index: ${indexName}`);
     }
   }
@@ -46,13 +46,13 @@ export class ElasticsearchService implements OnModuleInit {
     try {
       const result = await this.client.get({ index: indexName, id });
       return result._source;
-    } catch (error) {
+    } catch (error: any) {
       if (error.meta?.statusCode === 404) return null;
       throw error;
     }
   }
 
   async deleteByQuery(indexName: string, query: any) {
-    return this.client.deleteByQuery({ index: indexName, body: { query } });
+    return this.client.deleteByQuery({ index: indexName, query } as any);
   }
 }

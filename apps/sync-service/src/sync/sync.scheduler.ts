@@ -16,7 +16,7 @@ export class SyncScheduler {
     for (const code of Object.keys(BUSINESS_LINES)) {
       try {
         await this.syncService.triggerIncrementalSync(code as BusinessLineCode);
-      } catch (error) {
+      } catch (error: any) {
         this.logger.error(`Incremental sync failed for ${code}: ${error.message}`);
       }
     }
@@ -29,7 +29,7 @@ export class SyncScheduler {
     for (const code of Object.keys(BUSINESS_LINES)) {
       try {
         await this.syncService.triggerFullSync(code as BusinessLineCode);
-      } catch (error) {
+      } catch (error: any) {
         this.logger.error(`Full sync failed for ${code}: ${error.message}`);
       }
     }

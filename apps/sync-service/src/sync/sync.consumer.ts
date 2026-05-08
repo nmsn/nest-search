@@ -63,7 +63,7 @@ export class SyncConsumer {
 
       await this.esClient.deleteByQuery({
         index,
-        body: { query: { match_all: {} } },
+        query: { match_all: {} } as any,
       });
 
       const operations = filtered.flatMap((doc: any) => [
@@ -75,7 +75,7 @@ export class SyncConsumer {
       this.logger.log(`Full sync complete for ${businessLine}: ${filtered.length} products indexed`);
 
       this.retryCount.delete(pattern);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Full sync failed for ${businessLine}: ${error.message}`);
       this.handleRetry(context, pattern);
     }
@@ -105,7 +105,7 @@ export class SyncConsumer {
       this.logger.log(`Incremental sync complete for ${businessLine}: ${filtered.length} products`);
 
       this.retryCount.delete(pattern);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Incremental sync failed for ${businessLine}: ${error.message}`);
       this.handleRetry(context, pattern);
     }

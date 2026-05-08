@@ -10,16 +10,16 @@ export class SchemeService {
 
   async create(businessLine: string, dto: CreateSchemeDto) {
     const tables = getBusinessLineTables(businessLine);
-    const [result] = await this.drizzle.db
+    const insertResult = await this.drizzle.db
       .insert(tables.schemes)
       .values({
         name: dto.name,
         description: dto.description,
         status: dto.status as any,
         config: dto.config,
-      })
-      .returning();
-    return result;
+      });
+    const insertedId = insertResult[0].insertId;
+    return this.findOne(businessLine, Number(insertedId));
   }
 
   async findAll(businessLine: string) {
@@ -43,15 +43,14 @@ export class SchemeService {
     const tables = getBusinessLineTables(businessLine);
     await this.findOne(businessLine, id);
 
-    const [result] = await this.drizzle.db
+    await this.drizzle.db
       .update(tables.schemes)
       .set({
         ...dto,
         status: dto.status as any,
       })
-      .where(eq(tables.schemes.id, id))
-      .returning();
-    return result;
+      .where(eq(tables.schemes.id, id));
+    return this.findOne(businessLine, id);
   }
 
   async remove(businessLine: string, id: number) {

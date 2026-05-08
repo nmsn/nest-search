@@ -39,7 +39,7 @@ export class ProxyService {
       });
 
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
       if (error.response) {
         this.logger.error(`Downstream error: ${error.response.status} ${error.response.data?.message}`);
         throw error.response.data;

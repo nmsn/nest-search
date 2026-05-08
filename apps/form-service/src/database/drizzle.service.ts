@@ -1,20 +1,20 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { drizzle } from 'drizzle-orm/mysql2';
-import { createConnection } from 'mysql2';
+import { createPool } from 'mysql2';
 import * as schema from './schema/schema-factory';
 import { businessLines } from './schema/business-lines';
 import { syncRecords } from '@app/shared';
 
 @Injectable()
 export class DrizzleService implements OnModuleInit {
-  public db: ReturnType<typeof drizzle>;
+  public db!: ReturnType<typeof drizzle>;
 
   async onModuleInit() {
-    const connection = createConnection({
+    const pool = createPool({
       uri: process.env.DATABASE_URL || 'mysql://root:root123@localhost:3306/nest_search',
     });
 
-    this.db = drizzle(connection, {
+    this.db = drizzle(pool, {
       schema: { ...schema, businessLines, syncRecords },
       mode: 'default',
     });

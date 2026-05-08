@@ -1,8 +1,9 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "outDir": "../../dist/apps/search-service"
+    "outDir": "../../dist/apps/search-service",
+    "rootDir": "../.."
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "../../libs/shared/src/**/*"],
   "exclude": ["node_modules", "dist", "test", "**/*spec.ts"]
 }

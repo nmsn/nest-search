@@ -16,7 +16,7 @@ export class SyncService implements OnModuleInit {
       queueOptions: { durable: false },
     },
   })
-  private client: ClientProxy;
+  private client!: ClientProxy;
 
   async onModuleInit() {
     await this.client.connect();

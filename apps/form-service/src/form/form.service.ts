@@ -20,7 +20,7 @@ export class FormService {
       0,
     );
 
-    const [result] = await this.drizzle.db
+    const insertResult = await this.drizzle.db
       .insert(tables.forms)
       .values({
         schemeId: dto.schemeId,
@@ -28,10 +28,9 @@ export class FormService {
         totalAmount: totalAmount.toString(),
         totalQuantity,
         formData: dto.formData,
-      })
-      .returning();
-
-    return result;
+      });
+    const insertedId = insertResult[0].insertId;
+    return this.findOne(businessLine, Number(insertedId));
   }
 
   async findAll(businessLine: string) {
@@ -55,12 +54,11 @@ export class FormService {
     const tables = getBusinessLineTables(businessLine);
     await this.findOne(businessLine, id);
 
-    const [result] = await this.drizzle.db
+    await this.drizzle.db
       .update(tables.forms)
       .set({ status: dto.status as any })
-      .where(eq(tables.forms.id, id))
-      .returning();
+      .where(eq(tables.forms.id, id));
 
-    return result;
+    return this.findOne(businessLine, id);
   }
 }

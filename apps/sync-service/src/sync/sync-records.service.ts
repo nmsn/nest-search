@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { drizzle } from 'drizzle-orm/mysql2';
-import { createConnection } from 'mysql2';
+import { createPool } from 'mysql2';
 import { syncRecords } from '@app/shared';
 import { desc } from 'drizzle-orm';
 
@@ -9,10 +9,10 @@ export class SyncRecordsService {
   private db: ReturnType<typeof drizzle>;
 
   constructor() {
-    const connection = createConnection({
+    const pool = createPool({
       uri: process.env.DATABASE_URL || 'mysql://root:root123@localhost:3306/nest_search',
     });
-    this.db = drizzle(connection);
+    this.db = drizzle(pool);
   }
 
   async findAll() {

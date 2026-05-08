@@ -48,7 +48,7 @@ export class SearchService {
   async getAggregations(businessLine: string) {
     const index = this.getIndex(businessLine);
     const query = buildAggregationQuery();
-    const result = await this.esService.search(index, query);
+    const result: any = await this.esService.search(index, query);
 
     return {
       categories: result.aggregations.categories.buckets,
