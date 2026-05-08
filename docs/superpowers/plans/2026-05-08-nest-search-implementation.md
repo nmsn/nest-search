@@ -21,7 +21,9 @@ nest-search/
 │   │   ├── main.ts
 │   │   ├── app.module.ts
 │   │   ├── app.controller.ts
-│   │   └── guards/api-key.guard.ts
+│   │   ├── guards/api-key.guard.ts
+│   │   ├── filters/all-exceptions.filter.ts
+│   │   └── proxy/proxy.service.ts
 │   ├── sync-service/src/
 │   │   ├── main.ts
 │   │   ├── app.module.ts
@@ -30,7 +32,8 @@ nest-search/
 │   │   │   ├── sync.controller.ts
 │   │   │   ├── sync.service.ts
 │   │   │   ├── sync.scheduler.ts
-│   │   │   └── sync.consumer.ts
+│   │   │   ├── sync.consumer.ts
+│   │   │   └── sync-records.service.ts
 │   │   └── mock/
 │   │       ├── products-full.json
 │   │       └── products-incremental.json
@@ -565,7 +568,7 @@ git commit -m "feat: add shared library with constants, interfaces, DTOs"
 - Create: `apps/form-service/src/database/schema/business-lines.ts`
 - Create: `apps/form-service/src/database/schema/sync-records.ts`
 - Create: `apps/form-service/src/database/schema/schema-factory.ts`
-- Create: `apps/form-service/src/database/dizzle.service.ts`
+- Create: `apps/form-service/src/database/drizzle.service.ts`
 - Create: `apps/form-service/src/database/drizzle.module.ts`
 - Create: `apps/form-service/tsconfig.app.json`
 
@@ -675,7 +678,7 @@ export function getBusinessLineTables(businessLine: string) {
 - [ ] **Step 5: Create Drizzle service**
 
 ```typescript
-// apps/form-service/src/database/dizzle.service.ts
+// apps/form-service/src/database/drizzle.service.ts
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { drizzle } from 'drizzle-orm/mysql2';
 import { createConnection } from 'mysql2';
@@ -1585,11 +1588,17 @@ export class AppModule implements OnModuleInit {
 ```typescript
 // apps/search-service/src/main.ts
 import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.enableCors();
+
+  app.useGlobalPipes(new ValidationPipe({
+    whitelist: true,
+    transform: true,
+  }));
 
   const port = process.env.SEARCH_SERVICE_PORT || 3002;
   await app.listen(port);
@@ -1780,14 +1789,14 @@ git commit -m "feat: add mock product data for sync service"
 
 ```typescript
 // apps/sync-service/src/sync/sync.service.ts
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ClientProxy, Client, Transport } from '@nestjs/microservices';
 import { RABBITMQ_CONFIG, BUSINESS_LINES, BusinessLineCode } from '@app/shared';
 import * as fs from 'fs';
 import * as path from 'path';
 
 @Injectable()
-export class SyncService {
+export class SyncService implements OnModuleInit {
   private readonly logger = new Logger(SyncService.name);
 
   @Client({
@@ -1814,6 +1823,7 @@ export class SyncService {
       timestamp: new Date(),
     };
 
+    // emit sends to exchange with routing key; consumer binds its queue to this key
     this.client.emit(RABBITMQ_CONFIG.routingKeys.syncFull(businessLine), message);
     return { status: 'queued', type: 'full', businessLine };
   }
@@ -1850,9 +1860,9 @@ export class SyncService {
 ```typescript
 // apps/sync-service/src/sync/sync.consumer.ts
 import { Injectable, Logger } from '@nestjs/common';
-import { Ctx, MessagePattern, Payload, RmqContext } from '@nestjs/microservices';
+import { Ctx, EventPattern, Payload, RmqContext } from '@nestjs/microservices';
 import { Client } from '@elastic/elasticsearch';
-import { RABBITMQ_CONFIG, BUSINESS_LINES, isValidBusinessLine } from '@app/shared';
+import { RABBITMQ_CONFIG, BUSINESS_LINES, BusinessLineCode } from '@app/shared';
 import { SyncService } from './sync.service';
 
 @Injectable()
@@ -1867,12 +1877,40 @@ export class SyncConsumer {
     });
   }
 
-  @MessagePattern(RABBITMQ_CONFIG.routingKeys.syncFull('*'))
-  async handleFullSync(@Payload() data: any, @Ctx() context: RmqContext) {
-    const pattern = context.getPattern();
-    const businessLine = pattern.split('.').pop();
+  // Listen on individual routing keys per business line (not wildcards)
+  @EventPattern('sync.full.ds')
+  async handleFullSyncDs(@Payload() data: any, @Ctx() context: RmqContext) {
+    await this.processFullSync('ds', data, context);
+  }
 
+  @EventPattern('sync.full.zk')
+  async handleFullSyncZk(@Payload() data: any, @Ctx() context: RmqContext) {
+    await this.processFullSync('zk', data, context);
+  }
+
+  @EventPattern('sync.full.meeting')
+  async handleFullSyncMeeting(@Payload() data: any, @Ctx() context: RmqContext) {
+    await this.processFullSync('meeting', data, context);
+  }
+
+  @EventPattern('sync.incremental.ds')
+  async handleIncrementalSyncDs(@Payload() data: any, @Ctx() context: RmqContext) {
+    await this.processIncrementalSync('ds', data, context);
+  }
+
+  @EventPattern('sync.incremental.zk')
+  async handleIncrementalSyncZk(@Payload() data: any, @Ctx() context: RmqContext) {
+    await this.processIncrementalSync('zk', data, context);
+  }
+
+  @EventPattern('sync.incremental.meeting')
+  async handleIncrementalSyncMeeting(@Payload() data: any, @Ctx() context: RmqContext) {
+    await this.processIncrementalSync('meeting', data, context);
+  }
+
+  private async processFullSync(businessLine: BusinessLineCode, data: any, context: RmqContext) {
     this.logger.log(`Processing full sync for ${businessLine}`);
+    const pattern = `sync.full.${businessLine}`;
 
     try {
       const products = this.syncService.loadMockData('full');
@@ -1883,11 +1921,7 @@ export class SyncConsumer {
         return;
       }
 
-      const index = BUSINESS_LINES[businessLine as keyof typeof BUSINESS_LINES]?.esIndex;
-      if (!index) {
-        this.logger.error(`Invalid business line: ${businessLine}`);
-        return;
-      }
+      const index = BUSINESS_LINES[businessLine].esIndex;
 
       // Clear existing data for full sync
       await this.esClient.deleteByQuery({
@@ -1901,24 +1935,19 @@ export class SyncConsumer {
         doc,
       ]);
 
-      const result = await this.esClient.bulk({ operations });
+      await this.esClient.bulk({ operations });
       this.logger.log(`Full sync complete for ${businessLine}: ${filtered.length} products indexed`);
 
       this.retryCount.delete(pattern);
-      return { success: true, count: filtered.length };
     } catch (error) {
       this.logger.error(`Full sync failed for ${businessLine}: ${error.message}`);
       this.handleRetry(context, pattern);
-      throw error;
     }
   }
 
-  @MessagePattern(RABBITMQ_CONFIG.routingKeys.syncIncremental('*'))
-  async handleIncrementalSync(@Payload() data: any, @Ctx() context: RmqContext) {
-    const pattern = context.getPattern();
-    const businessLine = pattern.split('.').pop();
-
+  private async processIncrementalSync(businessLine: BusinessLineCode, data: any, context: RmqContext) {
     this.logger.log(`Processing incremental sync for ${businessLine}`);
+    const pattern = `sync.incremental.${businessLine}`;
 
     try {
       const products = this.syncService.loadMockData('incremental');
@@ -1929,8 +1958,7 @@ export class SyncConsumer {
         return;
       }
 
-      const index = BUSINESS_LINES[businessLine as keyof typeof BUSINESS_LINES]?.esIndex;
-      if (!index) return;
+      const index = BUSINESS_LINES[businessLine].esIndex;
 
       const operations = filtered.flatMap((doc: any) => [
         { index: { _index: index, _id: doc.productId } },
@@ -1941,11 +1969,9 @@ export class SyncConsumer {
       this.logger.log(`Incremental sync complete for ${businessLine}: ${filtered.length} products`);
 
       this.retryCount.delete(pattern);
-      return { success: true, count: filtered.length };
     } catch (error) {
       this.logger.error(`Incremental sync failed for ${businessLine}: ${error.message}`);
       this.handleRetry(context, pattern);
-      throw error;
     }
   }
 
@@ -2014,14 +2040,17 @@ export class SyncScheduler {
 
 ```typescript
 // apps/sync-service/src/sync/sync.controller.ts
-import { Controller, Post, Param } from '@nestjs/common';
+import { Controller, Post, Get, Param, BadRequestException } from '@nestjs/common';
 import { SyncService } from './sync.service';
-import { isValidBusinessLine, BusinessLineCode } from '@app/shared';
-import { BadRequestException } from '@nestjs/common';
+import { SyncRecordsService } from './sync-records.service';
+import { isValidBusinessLine } from '@app/shared';
 
 @Controller('api/sync')
 export class SyncController {
-  constructor(private readonly syncService: SyncService) {}
+  constructor(
+    private readonly syncService: SyncService,
+    private readonly syncRecordsService: SyncRecordsService,
+  ) {}
 
   @Post('full/:businessLine')
   triggerFullSync(@Param('businessLine') businessLine: string) {
@@ -2038,7 +2067,42 @@ export class SyncController {
     }
     return this.syncService.triggerIncrementalSync(businessLine);
   }
+
+  @Get('records')
+  getSyncRecords() {
+    return this.syncRecordsService.findAll();
+  }
 }
+```
+
+Also create the SyncRecordsService:
+
+```typescript
+// apps/sync-service/src/sync/sync-records.service.ts
+import { Injectable } from '@nestjs/common';
+import { drizzle } from 'drizzle-orm/mysql2';
+import { createConnection } from 'mysql2';
+import { syncRecords } from '../../form-service/src/database/schema/sync-records';
+import { desc } from 'drizzle-orm';
+
+@Injectable()
+export class SyncRecordsService {
+  private db: ReturnType<typeof drizzle>;
+
+  constructor() {
+    const connection = createConnection({
+      uri: process.env.DATABASE_URL || 'mysql://root:root123@localhost:3306/nest_search',
+    });
+    this.db = drizzle(connection);
+  }
+
+  async findAll() {
+    return this.db.select().from(syncRecords).orderBy(desc(syncRecords.createdAt)).limit(50);
+  }
+}
+```
+
+Note: In a real project, the sync_records schema would be in the shared library. For this learning project, we import directly from form-service.
 ```
 
 - [ ] **Step 5: Create Sync module**
@@ -2051,22 +2115,17 @@ import { SyncController } from './sync.controller';
 import { SyncService } from './sync.service';
 import { SyncConsumer } from './sync.consumer';
 import { SyncScheduler } from './sync.scheduler';
+import { SyncRecordsService } from './sync-records.service';
 
 @Module({
   imports: [ScheduleModule.forRoot()],
   controllers: [SyncController],
-  providers: [SyncService, SyncConsumer, SyncScheduler],
+  providers: [SyncService, SyncConsumer, SyncScheduler, SyncRecordsService],
 })
 export class SyncModule {}
 ```
 
-- [ ] **Step 6: Install schedule package**
-
-```bash
-npm install @nestjs/schedule
-```
-
-- [ ] **Step 7: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add apps/sync-service/src/sync/ package.json
@@ -2103,6 +2162,7 @@ export class AppModule {}
 ```typescript
 // apps/sync-service/src/main.ts
 import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
 import { Transport, MicroserviceOptions } from '@nestjs/microservices';
 import { AppModule } from './app.module';
 import { RABBITMQ_CONFIG } from '@app/shared';
@@ -2110,6 +2170,11 @@ import { RABBITMQ_CONFIG } from '@app/shared';
 async function bootstrap() {
   // Start as hybrid: HTTP + Microservice
   const app = await NestFactory.create(AppModule);
+
+  app.useGlobalPipes(new ValidationPipe({
+    whitelist: true,
+    transform: true,
+  }));
 
   // Connect to RabbitMQ as microservice
   app.connectMicroservice<MicroserviceOptions>({
@@ -2151,6 +2216,8 @@ git commit -m "feat: add Sync Service app module with hybrid HTTP+RabbitMQ"
 
 **Files:**
 - Create: `apps/gateway/src/guards/api-key.guard.ts`
+- Create: `apps/gateway/src/filters/all-exceptions.filter.ts`
+- Create: `apps/gateway/src/proxy/proxy.service.ts`
 - Create: `apps/gateway/src/app.controller.ts`
 - Create: `apps/gateway/src/app.module.ts`
 - Create: `apps/gateway/src/main.ts`
@@ -2208,45 +2275,243 @@ export class ApiKeyGuard implements CanActivate {
 }
 ```
 
-- [ ] **Step 3: Create Gateway controller (health check)**
+- [ ] **Step 3: Create global exception filter**
 
 ```typescript
-// apps/gateway/src/app.controller.ts
-import { Controller, Get } from '@nestjs/common';
+// apps/gateway/src/filters/all-exceptions.filter.ts
+import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus } from '@nestjs/common';
+import { Request, Response } from 'express';
 
-@Controller()
-export class AppController {
-  @Get('health')
-  health() {
-    return { status: 'ok', service: 'gateway', timestamp: new Date().toISOString() };
+@Catch()
+export class AllExceptionsFilter implements ExceptionFilter {
+  catch(exception: unknown, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
+
+    const status = exception instanceof HttpException
+      ? exception.getStatus()
+      : HttpStatus.INTERNAL_SERVER_ERROR;
+
+    const message = exception instanceof HttpException
+      ? exception.getResponse()
+      : 'Internal server error';
+
+    response.status(status).json({
+      statusCode: status,
+      message: typeof message === 'string' ? message : (message as any).message || message,
+      error: typeof message === 'string' ? message : (message as any).error || 'Error',
+      timestamp: new Date().toISOString(),
+      path: request.url,
+    });
   }
 }
 ```
 
-- [ ] **Step 4: Create Gateway app module**
+- [ ] **Step 4: Create Proxy service for routing to downstream services**
+
+```typescript
+// apps/gateway/src/proxy/proxy.service.ts
+import { Injectable, Logger } from '@nestjs/common';
+import axios, { Method } from 'axios';
+
+const SERVICE_MAP: Record<string, string> = {
+  sync: process.env.SYNC_SERVICE_URL || 'http://localhost:3001',
+  search: process.env.SEARCH_SERVICE_URL || 'http://localhost:3002',
+  form: process.env.FORM_SERVICE_URL || 'http://localhost:3003',
+};
+
+@Injectable()
+export class ProxyService {
+  private readonly logger = new Logger(ProxyService.name);
+
+  async forward(
+    service: string,
+    method: Method,
+    path: string,
+    body?: any,
+    headers?: Record<string, string>,
+  ) {
+    const baseUrl = SERVICE_MAP[service];
+    if (!baseUrl) {
+      throw new Error(`Unknown service: ${service}`);
+    }
+
+    const url = `${baseUrl}${path}`;
+    this.logger.log(`Proxying ${method} ${path} → ${service}-service`);
+
+    try {
+      const response = await axios({
+        method,
+        url,
+        data: body,
+        headers: {
+          'Content-Type': 'application/json',
+          ...headers,
+        },
+        timeout: 30000,
+      });
+
+      return response.data;
+    } catch (error) {
+      if (error.response) {
+        this.logger.error(`Downstream error: ${error.response.status} ${error.response.data?.message}`);
+        throw error.response.data;
+      }
+      this.logger.error(`Proxy error: ${error.message}`);
+      throw error;
+    }
+  }
+}
+```
+
+Install axios:
+
+```bash
+npm install axios
+```
+
+- [ ] **Step 5: Create Gateway controller with proxy routing**
+
+```typescript
+// apps/gateway/src/app.controller.ts
+import { Controller, Get, Post, Patch, Delete, Req, Res, Param, Body, Query } from '@nestjs/common';
+import { Request, Response } from 'express';
+import { ProxyService } from './proxy/proxy.service';
+
+@Controller()
+export class AppController {
+  constructor(private readonly proxyService: ProxyService) {}
+
+  @Get('health')
+  health() {
+    return { status: 'ok', service: 'gateway', timestamp: new Date().toISOString() };
+  }
+
+  // Sync Service routes
+  @Post('api/sync/full/:businessLine')
+  async syncFull(@Param('businessLine') bl: string, @Req() req: Request) {
+    return this.proxyService.forward('sync', 'POST', `/api/sync/full/${bl}`);
+  }
+
+  @Post('api/sync/incremental/:businessLine')
+  async syncIncremental(@Param('businessLine') bl: string, @Req() req: Request) {
+    return this.proxyService.forward('sync', 'POST', `/api/sync/incremental/${bl}`);
+  }
+
+  @Get('api/sync/records')
+  async syncRecords() {
+    return this.proxyService.forward('sync', 'GET', '/api/sync/records');
+  }
+
+  // Search Service routes
+  @Get('api/search/:businessLine/products')
+  async searchProducts(
+    @Param('businessLine') bl: string,
+    @Query() query: Record<string, string>,
+  ) {
+    const qs = new URLSearchParams(query).toString();
+    return this.proxyService.forward('search', 'GET', `/api/search/${bl}/products?${qs}`);
+  }
+
+  @Get('api/search/:businessLine/products/:id')
+  async getProduct(@Param('businessLine') bl: string, @Param('id') id: string) {
+    return this.proxyService.forward('search', 'GET', `/api/search/${bl}/products/${id}`);
+  }
+
+  @Get('api/search/:businessLine/aggregations')
+  async getAggregations(@Param('businessLine') bl: string) {
+    return this.proxyService.forward('search', 'GET', `/api/search/${bl}/aggregations`);
+  }
+
+  // Form Service routes - Schemes
+  @Post('api/form/:businessLine/schemes')
+  async createScheme(@Param('businessLine') bl: string, @Body() body: any) {
+    return this.proxyService.forward('form', 'POST', `/api/form/${bl}/schemes`, body);
+  }
+
+  @Get('api/form/:businessLine/schemes')
+  async listSchemes(@Param('businessLine') bl: string) {
+    return this.proxyService.forward('form', 'GET', `/api/form/${bl}/schemes`);
+  }
+
+  @Get('api/form/:businessLine/schemes/:id')
+  async getScheme(@Param('businessLine') bl: string, @Param('id') id: string) {
+    return this.proxyService.forward('form', 'GET', `/api/form/${bl}/schemes/${id}`);
+  }
+
+  @Patch('api/form/:businessLine/schemes/:id')
+  async updateScheme(
+    @Param('businessLine') bl: string,
+    @Param('id') id: string,
+    @Body() body: any,
+  ) {
+    return this.proxyService.forward('form', 'PATCH', `/api/form/${bl}/schemes/${id}`, body);
+  }
+
+  @Delete('api/form/:businessLine/schemes/:id')
+  async deleteScheme(@Param('businessLine') bl: string, @Param('id') id: string) {
+    return this.proxyService.forward('form', 'DELETE', `/api/form/${bl}/schemes/${id}`);
+  }
+
+  // Form Service routes - Forms
+  @Post('api/form/:businessLine/forms')
+  async createForm(@Param('businessLine') bl: string, @Body() body: any) {
+    return this.proxyService.forward('form', 'POST', `/api/form/${bl}/forms`, body);
+  }
+
+  @Get('api/form/:businessLine/forms')
+  async listForms(@Param('businessLine') bl: string) {
+    return this.proxyService.forward('form', 'GET', `/api/form/${bl}/forms`);
+  }
+
+  @Get('api/form/:businessLine/forms/:id')
+  async getForm(@Param('businessLine') bl: string, @Param('id') id: string) {
+    return this.proxyService.forward('form', 'GET', `/api/form/${bl}/forms/${id}`);
+  }
+
+  @Patch('api/form/:businessLine/forms/:id')
+  async updateForm(
+    @Param('businessLine') bl: string,
+    @Param('id') id: string,
+    @Body() body: any,
+  ) {
+    return this.proxyService.forward('form', 'PATCH', `/api/form/${bl}/forms/${id}`, body);
+  }
+}
+```
+
+- [ ] **Step 6: Create Gateway app module**
 
 ```typescript
 // apps/gateway/src/app.module.ts
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_FILTER } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { ApiKeyGuard } from './guards/api-key.guard';
+import { AllExceptionsFilter } from './filters/all-exceptions.filter';
+import { ProxyService } from './proxy/proxy.service';
 
 @Module({
   imports: [ConfigModule.forRoot({ isGlobal: true })],
   controllers: [AppController],
   providers: [
+    ProxyService,
     {
       provide: APP_GUARD,
       useClass: ApiKeyGuard,
+    },
+    {
+      provide: APP_FILTER,
+      useClass: AllExceptionsFilter,
     },
   ],
 })
 export class AppModule {}
 ```
 
-- [ ] **Step 5: Create Gateway main.ts**
+- [ ] **Step 7: Create Gateway main.ts**
 
 ```typescript
 // apps/gateway/src/main.ts
@@ -2264,7 +2529,7 @@ async function bootstrap() {
 bootstrap();
 ```
 
-- [ ] **Step 6: Test Gateway starts**
+- [ ] **Step 8: Test Gateway starts**
 
 ```bash
 npm run start:gateway
@@ -2272,11 +2537,11 @@ npm run start:gateway
 
 Expected: "Gateway running on port 3000"
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
 git add apps/gateway/
-git commit -m "feat: add Gateway with API key authentication"
+git commit -m "feat: add Gateway with API key auth, proxy routing, and error filter"
 ```
 
 ---
