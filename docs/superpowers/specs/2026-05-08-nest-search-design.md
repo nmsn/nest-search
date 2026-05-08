@@ -6,6 +6,13 @@ A backend service for IoT product warehouse management, designed as a learning p
 
 **Architecture:** Microservices + CQRS (read/write service separation)
 
+## Non-Goals (Out of Scope)
+
+- Real remote API integration (using local JSON mock data)
+- User authentication system (using static API keys per business line)
+- Production deployment configuration
+- Real-time data streaming
+
 ## Tech Stack
 
 | Component | Technology | Version |
@@ -47,6 +54,28 @@ A backend service for IoT product warehouse management, designed as a learning p
 | **Sync Service** | Scheduled data sync from remote sources → ES | ES |
 | **Search Service** | ES query API: full-text search, filter, aggregation | ES (read-only) |
 | **Form Service** | Scheme configuration + form CRUD, submit summary data | MySQL |
+
+### Authentication Strategy
+
+For this learning project, we use **static API keys** per business line:
+
+- Each business line has a unique API key (e.g., `ds_key_123`, `zk_key_456`)
+- Gateway middleware validates `X-API-Key` header against registered keys
+- No user authentication (out of scope for learning backend flows)
+- Keys stored in environment variables, not in code
+
+```typescript
+// Gateway middleware: api-key.guard.ts
+@Injectable()
+export class ApiKeyGuard implements CanActivate {
+  canActivate(context: ExecutionContext): boolean {
+    const request = context.switchToHttp().getRequest();
+    const apiKey = request.headers['x-api-key'];
+    const businessLine = request.params.businessLine;
+    return validateApiKey(businessLine, apiKey);
+  }
+}
+```
 
 ### CQRS Mapping
 
@@ -191,14 +220,20 @@ CREATE TABLE ds_schemes (
 CREATE TABLE ds_forms (
   id            INT PRIMARY KEY AUTO_INCREMENT,
   scheme_id     INT NOT NULL,
-  product_ids   JSON NOT NULL,                    -- ES product ID list
+  product_ids   JSON NOT NULL,                    -- ES product ID list (source of truth for product references)
   total_amount  DECIMAL(12, 2) NOT NULL,
   total_quantity INT NOT NULL,
   status        ENUM('draft', 'submitted', 'approved') DEFAULT 'draft',
-  form_data     JSON NOT NULL,                    -- Complete form data
+  form_data     JSON NOT NULL,                    -- Complete form data (snapshot at submission time)
   created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (scheme_id) REFERENCES ds_schemes(id) ON DELETE RESTRICT
 );
+
+-- Note: product_ids stores ES product IDs as the source of truth.
+-- form_data stores a snapshot of product details at submission time.
+-- If products are deleted from ES, the form still retains the snapshot data.
+-- This design separates product references (ES) from form snapshots (MySQL).
 
 -- Global: sync task records
 CREATE TABLE sync_records (
@@ -215,8 +250,16 @@ CREATE TABLE sync_records (
 
 ### Drizzle Dynamic Table Prefix
 
+**Challenge:** Drizzle needs static schema references for type-safe queries, but we need dynamic table names per business line.
+
+**Solution:** Pre-register all business line tables at startup, use factory pattern to get the correct table reference.
+
 ```typescript
-export function createSchemesTable(prefix: string) {
+// form-service/src/database/drizzle/schema-factory.ts
+import { mysqlTable, int, varchar, text, json, decimal, timestamp, mysqlEnum } from 'drizzle-orm/mysql-core';
+
+// Table definition factory
+function createSchemesTable(prefix: string) {
   return mysqlTable(`${prefix}schemes`, {
     id: int('id').primaryKey().autoincrement(),
     name: varchar('name', { length: 200 }).notNull(),
@@ -226,6 +269,79 @@ export function createSchemesTable(prefix: string) {
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow().onUpdateNow(),
   });
+}
+
+function createFormsTable(prefix: string) {
+  return mysqlTable(`${prefix}forms`, {
+    id: int('id').primaryKey().autoincrement(),
+    schemeId: int('scheme_id').notNull(),
+    productIds: json('product_ids').$type<string[]>().notNull(),
+    totalAmount: decimal('total_amount', { precision: 12, scale: 2 }).notNull(),
+    totalQuantity: int('total_quantity').notNull(),
+    status: mysqlEnum('status', ['draft', 'submitted', 'approved']).default('draft'),
+    formData: json('form_data').notNull(),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow().onUpdateNow(),
+  });
+}
+
+// Pre-registered tables for all business lines
+export const TABLES = {
+  ds: {
+    schemes: createSchemesTable('ds_'),
+    forms: createFormsTable('ds_'),
+  },
+  zk: {
+    schemes: createSchemesTable('zk_'),
+    forms: createFormsTable('zk_'),
+  },
+  meeting: {
+    schemes: createSchemesTable('mt_'),
+    forms: createFormsTable('mt_'),
+  },
+} as const;
+
+// Type-safe accessor
+export function getBusinessLineTables(businessLine: string) {
+  const tables = TABLES[businessLine as keyof typeof TABLES];
+  if (!tables) throw new Error(`Unknown business line: ${businessLine}`);
+  return tables;
+}
+```
+
+**Usage in Service:**
+
+```typescript
+// form-service/src/scheme/scheme.service.ts
+@Injectable()
+export class SchemeService {
+  constructor(private drizzle: DrizzleService) {}
+
+  async create(businessLine: string, data: CreateSchemeDto) {
+    const tables = getBusinessLineTables(businessLine);
+    return this.drizzle.db.insert(tables.schemes).values(data).returning();
+  }
+
+  async findAll(businessLine: string) {
+    const tables = getBusinessLineTables(businessLine);
+    return this.drizzle.db.select().from(tables.schemes);
+  }
+}
+```
+
+**Migrations:** Use Drizzle Kit with a custom migration script that generates per-business-line tables. Run once at startup or via CLI.
+
+```typescript
+// scripts/migrate.ts
+import { TABLES } from '../form-service/src/database/drizzle/schema-factory';
+import { drizzle } from 'drizzle-orm/mysql2';
+
+async function migrate() {
+  const db = drizzle(process.env.DATABASE_URL);
+  for (const [bl, tables] of Object.entries(TABLES)) {
+    await db.execute(`CREATE TABLE IF NOT EXISTS ${bl}_schemes (...)`);
+    await db.execute(`CREATE TABLE IF NOT EXISTS ${bl}_forms (...)`);
+  }
 }
 ```
 
@@ -266,17 +382,31 @@ Per-business-line indices: `products_ds`, `products_zk`, `products_meeting`
 ```
 Exchanges:
   sync.exchange (topic)
-    ├── sync.full.{businessLine}        # Full sync
-    └── sync.incremental.{businessLine} # Incremental sync
+    ├── sync.full.ds            # Full sync for 商显
+    ├── sync.full.zk            # Full sync for 道闸
+    ├── sync.full.meeting       # Full sync for 会议平板
+    ├── sync.incremental.ds     # Incremental sync for 商显
+    ├── sync.incremental.zk     # Incremental sync for 道闸
+    └── sync.incremental.meeting # Incremental sync for 会议平板
 
   event.exchange (fanout)
-    └── form.submitted                  # Form submission event
+    └── form.submitted          # Form submission event
 
-Queues:
-  sync.full.queue              → Sync Service Consumer
-  sync.incremental.queue       → Sync Service Consumer
+Queues (per business line):
+  sync.full.ds.queue           → Sync Service Consumer
+  sync.full.zk.queue           → Sync Service Consumer
+  sync.full.meeting.queue      → Sync Service Consumer
+  sync.incremental.ds.queue    → Sync Service Consumer
+  sync.incremental.zk.queue    → Sync Service Consumer
+  sync.incremental.meeting.queue → Sync Service Consumer
   event.form.submitted.queue   → optional: other service listeners
 ```
+
+**Routing Logic:**
+- Producer publishes to `sync.exchange` with routing key `sync.full.{businessLine}`
+- Each business line has its own queue, bound with specific routing key
+- Consumer processes messages independently per business line
+- No message competition between business lines
 
 ### Message Formats
 
@@ -312,9 +442,40 @@ interface FormSubmittedEvent {
 
 ## API Design
 
+### Standard Error Response
+
+All error responses follow this format:
+
+```typescript
+interface ErrorResponse {
+  statusCode: number;        // HTTP status code
+  message: string;           // Human-readable error message
+  error: string;             // Error type (e.g., 'Bad Request', 'Not Found')
+  timestamp: string;         // ISO 8601 timestamp
+  path: string;              // Request path
+}
+
+// Example: 400 Bad Request
+{
+  "statusCode": 400,
+  "message": "Invalid business line: invalid_code",
+  "error": "Bad Request",
+  "timestamp": "2026-05-08T10:30:00.000Z",
+  "path": "/api/search/invalid_code/products"
+}
+```
+
+Common HTTP status codes:
+- `200`: Success
+- `201`: Created
+- `400`: Bad Request (validation error)
+- `401`: Unauthorized (invalid API key)
+- `404`: Not Found
+- `500`: Internal Server Error
+
 ### Gateway
 
-All requests routed through Gateway with `X-Business-Line` header.
+All requests routed through Gateway with `X-Business-Line` header and `X-API-Key` header.
 
 ### Sync Service
 
@@ -436,6 +597,10 @@ volumes:
   es_data:
   rabbitmq_data:
 ```
+
+**Note:** Docker Compose only defines infrastructure services. NestJS applications run locally during development (`nest start:dev`). For production, add app services to docker-compose with proper Dockerfiles.
+
+## Business Lines
 
 ## Business Lines
 
