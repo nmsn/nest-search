@@ -391,6 +391,7 @@ git commit -m "chore: add Docker Compose for MySQL, ES, RabbitMQ"
 - Create: `libs/shared/src/interfaces/sync-message.interface.ts`
 - Create: `libs/shared/src/interfaces/product.interface.ts`
 - Create: `libs/shared/src/dto/pagination.dto.ts`
+- Create: `libs/shared/src/schemas/sync-records.ts`
 - Create: `libs/shared/tsconfig.lib.json`
 
 - [ ] **Step 1: Create shared constants - business lines**
@@ -527,7 +528,25 @@ export interface PaginatedResponse<T> {
 }
 ```
 
-- [ ] **Step 6: Create shared index**
+- [ ] **Step 6: Create shared schema - sync records**
+
+```typescript
+// libs/shared/src/schemas/sync-records.ts
+import { mysqlTable, int, text, timestamp, mysqlEnum } from 'drizzle-orm/mysql-core';
+
+export const syncRecords = mysqlTable('sync_records', {
+  id: int('id').primaryKey().autoincrement(),
+  type: mysqlEnum('type', ['incremental', 'full']).notNull(),
+  status: mysqlEnum('status', ['pending', 'running', 'success', 'failed']).default('pending'),
+  recordsCount: int('records_count').default(0),
+  errorMessage: text('error_message'),
+  startedAt: timestamp('started_at'),
+  completedAt: timestamp('completed_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+```
+
+- [ ] **Step 7: Create shared index**
 
 ```typescript
 // libs/shared/src/index.ts
@@ -536,9 +555,10 @@ export * from './constants/rabbitmq';
 export * from './interfaces/sync-message.interface';
 export * from './interfaces/product.interface';
 export * from './dto/pagination.dto';
+export * from './schemas/sync-records';
 ```
 
-- [ ] **Step 7: Create shared tsconfig**
+- [ ] **Step 8: Create shared tsconfig**
 
 ```json
 // libs/shared/tsconfig.lib.json
@@ -553,11 +573,11 @@ export * from './dto/pagination.dto';
 }
 ```
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
 git add libs/
-git commit -m "feat: add shared library with constants, interfaces, DTOs"
+git commit -m "feat: add shared library with constants, interfaces, DTOs, schemas"
 ```
 
 ---
@@ -566,11 +586,12 @@ git commit -m "feat: add shared library with constants, interfaces, DTOs"
 
 **Files:**
 - Create: `apps/form-service/src/database/schema/business-lines.ts`
-- Create: `apps/form-service/src/database/schema/sync-records.ts`
 - Create: `apps/form-service/src/database/schema/schema-factory.ts`
 - Create: `apps/form-service/src/database/drizzle.service.ts`
 - Create: `apps/form-service/src/database/drizzle.module.ts`
 - Create: `apps/form-service/tsconfig.app.json`
+
+Note: `syncRecords` schema is in `libs/shared/src/schemas/sync-records.ts` (Task 3).
 
 - [ ] **Step 1: Create form service tsconfig**
 
@@ -601,25 +622,7 @@ export const businessLines = mysqlTable('business_lines', {
 });
 ```
 
-- [ ] **Step 3: Create sync-records schema**
-
-```typescript
-// apps/form-service/src/database/schema/sync-records.ts
-import { mysqlTable, int, varchar, text, timestamp, mysqlEnum } from 'drizzle-orm/mysql-core';
-
-export const syncRecords = mysqlTable('sync_records', {
-  id: int('id').primaryKey().autoincrement(),
-  type: mysqlEnum('type', ['incremental', 'full']).notNull(),
-  status: mysqlEnum('status', ['pending', 'running', 'success', 'failed']).default('pending'),
-  recordsCount: int('records_count').default(0),
-  errorMessage: text('error_message'),
-  startedAt: timestamp('started_at'),
-  completedAt: timestamp('completed_at'),
-  createdAt: timestamp('created_at').defaultNow(),
-});
-```
-
-- [ ] **Step 4: Create schema factory for dynamic tables**
+- [ ] **Step 3: Create schema factory for dynamic tables**
 
 ```typescript
 // apps/form-service/src/database/schema/schema-factory.ts
@@ -675,7 +678,7 @@ export function getBusinessLineTables(businessLine: string) {
 }
 ```
 
-- [ ] **Step 5: Create Drizzle service**
+- [ ] **Step 4: Create Drizzle service**
 
 ```typescript
 // apps/form-service/src/database/drizzle.service.ts
@@ -684,7 +687,7 @@ import { drizzle } from 'drizzle-orm/mysql2';
 import { createConnection } from 'mysql2';
 import * as schema from './schema/schema-factory';
 import { businessLines } from './schema/business-lines';
-import { syncRecords } from './schema/sync-records';
+import { syncRecords } from '@app/shared';
 
 @Injectable()
 export class DrizzleService implements OnModuleInit {
@@ -719,12 +722,12 @@ export class DrizzleService implements OnModuleInit {
 }
 ```
 
-- [ ] **Step 6: Create Drizzle module**
+- [ ] **Step 5: Create Drizzle module**
 
 ```typescript
 // apps/form-service/src/database/drizzle.module.ts
 import { Global, Module } from '@nestjs/common';
-import { DrizzleService } from './dizzle.service';
+import { DrizzleService } from './drizzle.service';
 
 @Global()
 @Module({
@@ -734,7 +737,7 @@ import { DrizzleService } from './dizzle.service';
 export class DrizzleModule {}
 ```
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add apps/form-service/
@@ -2082,7 +2085,7 @@ Also create the SyncRecordsService:
 import { Injectable } from '@nestjs/common';
 import { drizzle } from 'drizzle-orm/mysql2';
 import { createConnection } from 'mysql2';
-import { syncRecords } from '../../form-service/src/database/schema/sync-records';
+import { syncRecords } from '@app/shared';
 import { desc } from 'drizzle-orm';
 
 @Injectable()
@@ -2102,7 +2105,7 @@ export class SyncRecordsService {
 }
 ```
 
-Note: In a real project, the sync_records schema would be in the shared library. For this learning project, we import directly from form-service.
+Note: `syncRecords` schema is exported from `@app/shared` (libs/shared). See Task 3 where shared schemas are added.
 ```
 
 - [ ] **Step 5: Create Sync module**
