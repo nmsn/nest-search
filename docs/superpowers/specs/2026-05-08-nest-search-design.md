@@ -339,8 +339,33 @@ import { drizzle } from 'drizzle-orm/mysql2';
 async function migrate() {
   const db = drizzle(process.env.DATABASE_URL);
   for (const [bl, tables] of Object.entries(TABLES)) {
-    await db.execute(`CREATE TABLE IF NOT EXISTS ${bl}_schemes (...)`);
-    await db.execute(`CREATE TABLE IF NOT EXISTS ${bl}_forms (...)`);
+    // Tables are created via Drizzle Kit push or SQL migration files
+    // This script ensures they exist at startup
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS ${bl}_schemes (
+        id INT PRIMARY KEY AUTO_INCREMENT,
+        name VARCHAR(200) NOT NULL,
+        description TEXT,
+        status ENUM('draft', 'published', 'archived') DEFAULT 'draft',
+        config JSON,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS ${bl}_forms (
+        id INT PRIMARY KEY AUTO_INCREMENT,
+        scheme_id INT NOT NULL,
+        product_ids JSON NOT NULL,
+        total_amount DECIMAL(12, 2) NOT NULL,
+        total_quantity INT NOT NULL,
+        status ENUM('draft', 'submitted', 'approved') DEFAULT 'draft',
+        form_data JSON NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (scheme_id) REFERENCES ${bl}_schemes(id) ON DELETE RESTRICT
+      )
+    `);
   }
 }
 ```
@@ -374,6 +399,11 @@ Per-business-line indices: `products_ds`, `products_zk`, `products_meeting`
 - `name`: IK analyzer for Chinese full-text search
 - `attributes`: stored but not indexed (reduces memory)
 - Per-business-line index isolation
+
+**ES Index Initialization:**
+- Search Service creates indices on startup if they don't exist
+- Uses `esClient.indices.exists()` check before `esClient.indices.create()`
+- Mapping defined in code, not in external files
 
 ## RabbitMQ Design
 
@@ -473,9 +503,37 @@ Common HTTP status codes:
 - `404`: Not Found
 - `500`: Internal Server Error
 
+### DTO Validation
+
+All DTOs use `class-validator` decorators for automatic request validation:
+
+```typescript
+// form-service/src/scheme/dto/create-scheme.dto.ts
+import { IsString, IsOptional, IsEnum, IsObject } from 'class-validator';
+
+export class CreateSchemeDto {
+  @IsString()
+  name: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsEnum(['draft', 'published', 'archived'])
+  status?: string;
+
+  @IsOptional()
+  @IsObject()
+  config?: Record<string, any>;
+}
+```
+
+NestJS `ValidationPipe` automatically validates incoming requests against DTO decorators.
+
 ### Gateway
 
-All requests routed through Gateway with `X-Business-Line` header and `X-API-Key` header.
+All requests routed through Gateway. Business line is identified from URL path param `{businessLine}` (authoritative). `X-API-Key` header is required for authentication.
 
 ### Sync Service
 
@@ -599,8 +657,6 @@ volumes:
 ```
 
 **Note:** Docker Compose only defines infrastructure services. NestJS applications run locally during development (`nest start:dev`). For production, add app services to docker-compose with proper Dockerfiles.
-
-## Business Lines
 
 ## Business Lines
 
