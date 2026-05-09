@@ -13,7 +13,7 @@
     "start:search": "nest start search-service",
     "start:form": "nest start form-service",
     "start:auth": "nest start auth-service",
-    "start:all": "concurrently \"npm run start:gateway\" \"npm run start:sync\" \"npm run start:search\" \"npm run start:form\"",
+    "start:all": "concurrently \"npm run start:gateway\" \"npm run start:sync\" \"npm run start:search\" \"npm run start:form\" \"npm run start:auth\"",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down"
   },
