@@ -8,5 +8,6 @@ import { CasModule } from '../cas/cas.module';
   imports: [UserModule, CasModule],
   controllers: [AuthController],
   providers: [AuthService],
+  exports: [AuthService],
 })
 export class AuthModule {}

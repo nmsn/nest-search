@@ -1,14 +1,17 @@
 import { Injectable, UnauthorizedException, ForbiddenException } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import * as jwt from 'jsonwebtoken';
 import { CAS_CONFIG, JwtPayload } from '@app/shared';
 import { UserService } from '../user/user.service';
 import { CasService } from '../cas/cas.service';
+import { RedisService } from '../redis/redis.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly userService: UserService,
     private readonly casService: CasService,
+    private readonly redisService: RedisService,
   ) {}
 
   async login(username: string, password: string) {
@@ -16,28 +19,100 @@ export class AuthService {
     if (!user) throw new UnauthorizedException('Invalid credentials');
     if (user.status === 'disabled') throw new ForbiddenException('User account is disabled');
 
-    return this.generateToken(user);
+    const accessToken = this.generateAccessToken(user);
+    const refreshToken = await this.createRefreshToken(user.id);
+
+    return {
+      accessToken,
+      refreshToken,
+      user: { id: user.id, username: user.username, role: user.role },
+    };
   }
 
   async validateTicket(ticket: string, service: string) {
     const user = await this.casService.validateSt(ticket, service);
-    return this.generateToken(user);
+    const accessToken = this.generateAccessToken(user);
+    const refreshToken = await this.createRefreshToken(user.id);
+
+    return {
+      accessToken,
+      refreshToken,
+      user: { id: user.id, username: user.username, role: user.role },
+    };
   }
 
-  private generateToken(user: any) {
+  async refresh(refreshToken: string) {
+    const tokenData = await this.redisService.get(`refresh_token:${refreshToken}`);
+    if (!tokenData) {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+
+    const { userId } = JSON.parse(tokenData);
+    const user = await this.userService.findById(userId);
+    if (!user) throw new UnauthorizedException('User not found');
+    if (user.status === 'disabled') throw new ForbiddenException('User account is disabled');
+
+    // Rotate: delete old refresh token, issue new pair
+    await this.redisService.del(`refresh_token:${refreshToken}`);
+    await this.redisService.del(`refresh_whitelist:${refreshToken}`);
+
+    const accessToken = this.generateAccessToken(user);
+    const newRefreshToken = await this.createRefreshToken(user.id);
+
+    return {
+      accessToken,
+      refreshToken: newRefreshToken,
+    };
+  }
+
+  async logout(refreshToken: string) {
+    // Blacklist the refresh token
+    const ttl = parseInt(process.env.REFRESH_TOKEN_EXPIRES_IN || '604800');
+    await this.redisService.set(`refresh_blacklist:${refreshToken}`, '1', ttl);
+
+    // Remove from whitelist
+    await this.redisService.del(`refresh_whitelist:${refreshToken}`);
+    await this.redisService.del(`refresh_token:${refreshToken}`);
+  }
+
+  private generateAccessToken(user: any): string {
     const payload: JwtPayload = {
       sub: user.id,
       username: user.username,
       role: user.role,
     };
 
-    const token = jwt.sign(payload, CAS_CONFIG.jwtSecret, {
+    return jwt.sign(payload, CAS_CONFIG.jwtSecret, {
       expiresIn: CAS_CONFIG.jwtExpiresIn,
     } as any);
+  }
 
-    return {
-      token,
-      user: { id: user.id, username: user.username, role: user.role },
-    };
+  private async createRefreshToken(userId: number): Promise<string> {
+    const tokenId = randomUUID();
+    const ttl = parseInt(process.env.REFRESH_TOKEN_EXPIRES_IN || '604800');
+
+    // Store token -> userId mapping
+    await this.redisService.set(
+      `refresh_token:${tokenId}`,
+      JSON.stringify({ userId }),
+      ttl,
+    );
+
+    // Mark as valid in whitelist
+    await this.redisService.set(`refresh_whitelist:${tokenId}`, '1', ttl);
+
+    return tokenId;
+  }
+
+  async validateToken(token: string) {
+    try {
+      return jwt.verify(token, CAS_CONFIG.jwtSecret) as unknown as { sub: number; username: string; role: string };
+    } catch {
+      return null;
+    }
+  }
+
+  async getMe(userId: number) {
+    return this.userService.findById(userId);
   }
 }

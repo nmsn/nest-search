@@ -1,4 +1,5 @@
-import { Controller, Post, Get, Body, Headers } from '@nestjs/common';
+import { Controller, Post, Get, Body, Headers, Res, UnauthorizedException } from '@nestjs/common';
+import { Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from '../user/dto/login.dto';
 import { CreateUserDto } from '../user/dto/create-user.dto';
@@ -21,8 +22,10 @@ export class AuthController {
   }
 
   @Post('login')
-  async login(@Body() dto: LoginDto) {
-    return this.authService.login(dto.username, dto.password);
+  async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
+    const result = await this.authService.login(dto.username, dto.password);
+    this.setRefreshTokenCookie(res, result.refreshToken);
+    return { accessToken: result.accessToken, user: result.user };
   }
 
   @Post('validate')
@@ -30,9 +33,33 @@ export class AuthController {
     return this.authService.validateTicket(body.ticket, body.service);
   }
 
+  @Post('refresh')
+  async refresh(
+    @Body() body: { refreshToken?: string },
+    @Headers('cookie') cookie: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const refreshToken = body.refreshToken || this.extractRefreshTokenFromCookie(cookie);
+    if (!refreshToken) {
+      throw new UnauthorizedException('Refresh token not provided');
+    }
+
+    const result = await this.authService.refresh(refreshToken);
+    this.setRefreshTokenCookie(res, result.refreshToken);
+    return { accessToken: result.accessToken };
+  }
+
   @Post('logout')
-  async logout() {
-    // JWT is stateless — client discards token. No server-side session to destroy.
+  async logout(
+    @Body() body: { refreshToken?: string },
+    @Headers('cookie') cookie: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const refreshToken = body.refreshToken || this.extractRefreshTokenFromCookie(cookie);
+    if (refreshToken) {
+      await this.authService.logout(refreshToken);
+    }
+    this.clearRefreshTokenCookie(res);
     return { message: 'Logged out' };
   }
 
@@ -50,5 +77,38 @@ export class AuthController {
     } catch {
       return { user: null };
     }
+  }
+
+  private setRefreshTokenCookie(res: Response, refreshToken: string) {
+    const isProduction = process.env.NODE_ENV === 'production';
+    const domain = process.env.CAS_COOKIE_DOMAIN || '.localhost';
+
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      sameSite: 'lax',
+      maxAge: parseInt(process.env.REFRESH_TOKEN_EXPIRES_IN || '604800') * 1000,
+      domain,
+      path: '/',
+      secure: isProduction,
+    });
+  }
+
+  private clearRefreshTokenCookie(res: Response) {
+    const isProduction = process.env.NODE_ENV === 'production';
+    const domain = process.env.CAS_COOKIE_DOMAIN || '.localhost';
+
+    res.clearCookie('refreshToken', {
+      httpOnly: true,
+      sameSite: 'lax',
+      domain,
+      path: '/',
+      secure: isProduction,
+    });
+  }
+
+  private extractRefreshTokenFromCookie(cookie: string | undefined): string | undefined {
+    if (!cookie) return undefined;
+    const match = cookie.match(/refreshToken=([^;]+)/);
+    return match ? match[1] : undefined;
   }
 }
