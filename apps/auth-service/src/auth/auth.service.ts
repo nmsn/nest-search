@@ -68,7 +68,7 @@ export class AuthService {
   async logout(refreshToken: string) {
     // Blacklist the refresh token
     const ttl = parseInt(process.env.REFRESH_TOKEN_EXPIRES_IN || '604800');
-    await this.redisService.set(`refresh_blacklist:${refreshToken}`, '1', ttl);
+    await this.redisService.set(`refresh_token_blacklist:${refreshToken}`, '1', ttl);
 
     // Remove from whitelist
     await this.redisService.del(`refresh_whitelist:${refreshToken}`);
