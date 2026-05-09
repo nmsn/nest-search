@@ -1,6 +1,7 @@
 {
   "name": "nest-search",
   "version": "1.0.0",
+  "packageManager": "pnpm@9.15.0",
   "description": "",
   "main": "index.js",
   "directories": {
