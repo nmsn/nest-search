@@ -29,6 +29,16 @@ nest-search/
 └── package.json           (modify)
 ```
 
+**Build order:** `frontend-shared` must be built first (other packages reference it via `workspace:*`). The 4 apps can then build in parallel.
+
+pnpm-workspace.yaml:
+```yaml
+packages:
+  - 'apps/*'
+  - 'libs/*'
+```
+```
+
 ### Tech Stack
 
 - **Framework**: TanStack Start (React 19, Vite 6)
@@ -60,7 +70,7 @@ Replace the current single JWT with a dual-token mechanism for cross-system logo
 
 **Token Types:**
 - **Access Token**: 15 minutes, stored in localStorage, contains `{ sub, username, role }`
-- **Refresh Token**: 7 days, stored in httpOnly cookie (domain=.localhost), contains `{ sub, tokenId }`
+- **Refresh Token**: 7 days, stored in httpOnly cookie with attributes: `Path=/; Domain=.localhost; SameSite=Lax; Secure=false` (dev), `Secure=true` (prod), contains `{ sub, tokenId }`
 
 **Storage:**
 - Access Token: localStorage (per-domain, each frontend stores its own)
@@ -82,10 +92,11 @@ Replace the current single JWT with a dual-token mechanism for cross-system logo
    → Returns { accessToken, user }
 
 3. auth-frontend receives response
-   → Stores accessToken in localStorage
+   → auth-frontend does NOT store accessToken (it only issues tokens)
    → Redirects back to service URL with accessToken in URL fragment (#access_token=xxx)
+   → Service URL is validated against registered cas_services before redirect
 
-4. ds.localhost:3101/callback
+4. ds.localhost:3101/auth-callback
    → Reads accessToken from URL fragment
    → Stores in localStorage
    → Redirects to original page /products
@@ -139,6 +150,18 @@ Replace the current single JWT with a dual-token mechanism for cross-system logo
    → Redirect to login page
 ```
 
+## Implementation Phases
+
+### Phase 1: Backend Auth Service Changes (Prerequisite)
+
+The auth-service must be extended with Redis and dual-token support before any frontend work begins. This is a backend-only phase.
+
+### Phase 2: Frontend Implementation
+
+Build the 4 frontend apps and shared library, consuming the updated auth-service APIs.
+
+---
+
 ## Backend Changes Required
 
 ### Auth Service Modifications
@@ -186,7 +209,9 @@ apps/auth-frontend/
 └── app.config.ts                   # TanStack Start config
 ```
 
-### Business Line Frontend (ds/zk/meeting - identical structure)
+### Business Line Frontend (ds/zk/meeting)
+
+All 3 business line frontends share identical page structure (products, schemes, forms) and component layout. The only difference is the API endpoint — each passes its business line identifier (e.g., `ds`, `zk`, `meeting`) as a path parameter or header when calling backend services. This means the same frontend code is deployed 3 times with different environment configuration.
 
 ```
 apps/{ds,zk,meeting}-frontend/
@@ -201,7 +226,7 @@ apps/{ds,zk,meeting}-frontend/
 │   │   │   ├── schemes.$id.tsx     # Scheme detail/edit
 │   │   │   ├── forms.tsx           # Form list page
 │   │   │   └── forms.$id.tsx       # Form detail/edit
-│   │   └── callback.tsx            # CAS callback
+│   │   └── auth-callback.tsx       # CAS callback (receives access_token from URL fragment)
 │   ├── components/
 │   │   ├── layout/
 │   │   │   ├── sidebar.tsx         # Navigation sidebar
