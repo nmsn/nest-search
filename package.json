@@ -52,6 +52,30 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2"
   },
+  "pnpm": {
+    "overrides": {
+      "@tanstack/router-generator": "1.120.20",
+      "@tanstack/router-plugin": "1.120.20",
+      "@tanstack/router-core": "1.120.19",
+      "@tanstack/history": "1.120.17",
+      "@tanstack/react-start-plugin": "1.120.17",
+      "@tanstack/start-plugin-core": "1.120.4-alpha.13",
+      "@tanstack/server-functions-plugin": "1.120.17",
+      "@tanstack/start-client-core": "1.120.19",
+      "@tanstack/start-server-core": "1.120.19",
+      "@tanstack/react-start-client": "1.120.20",
+      "@tanstack/react-start-server": "1.120.20",
+      "@tanstack/start-api-routes": "1.120.19",
+      "@tanstack/start-server-functions-ssr": "1.120.19",
+      "@tanstack/react-start-router-manifest": "1.120.19",
+      "@tanstack/start-server-functions-client": "1.120.19",
+      "@tanstack/start-server-functions-server": "1.120.17",
+      "@tanstack/start-server-functions-handler": "1.120.19",
+      "@tanstack/start-config": "1.120.20",
+      "@tanstack/router-utils": "1.120.17",
+      "@tanstack/virtual-file-routes": "1.120.17"
+    }
+  },
   "devDependencies": {
     "@nestjs/cli": "^11.0.21",
     "@nestjs/testing": "^11.1.19",
