@@ -177,6 +177,144 @@ importers:
         specifier: ^4.3.0
         version: 4.3.2(typescript@5.9.3)(vite@6.4.2(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.47.1)(tsx@4.21.0))
 
+  apps/ds-frontend:
+    dependencies:
+      '@nest-search/frontend-shared':
+        specifier: workspace:*
+        version: link:../../libs/frontend-shared
+      '@tanstack/react-query':
+        specifier: ^5.60.0
+        version: 5.100.9(react@19.2.6)
+      '@tanstack/react-router':
+        specifier: 1.120.20
+        version: 1.120.20(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@tanstack/start':
+        specifier: 1.120.20
+        version: 1.120.20(@types/node@25.6.2)(db0@0.3.4(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(mysql2@3.22.3(@types/node@25.6.2)))(mysql2@3.22.3(@types/node@25.6.2)))(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(mysql2@3.22.3(@types/node@25.6.2)))(ioredis@5.10.1)(jiti@2.7.0)(lightningcss@1.32.0)(mysql2@3.22.3(@types/node@25.6.2))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(terser@5.47.1)(tsx@4.21.0)(vite@6.4.2(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.47.1)(tsx@4.21.0))(webpack@5.106.0(lightningcss@1.32.0))
+      react:
+        specifier: ^19.0.0
+        version: 19.2.6
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.6(react@19.2.6)
+      vinxi:
+        specifier: 0.5.3
+        version: 0.5.3(@types/node@25.6.2)(db0@0.3.4(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(mysql2@3.22.3(@types/node@25.6.2)))(mysql2@3.22.3(@types/node@25.6.2)))(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(mysql2@3.22.3(@types/node@25.6.2)))(ioredis@5.10.1)(jiti@2.7.0)(lightningcss@1.32.0)(mysql2@3.22.3(@types/node@25.6.2))(terser@5.47.1)(tsx@4.21.0)
+    devDependencies:
+      '@tailwindcss/vite':
+        specifier: ^4.0.0
+        version: 4.3.0(vite@6.4.2(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.47.1)(tsx@4.21.0))
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: ^19.0.0
+        version: 19.2.3(@types/react@19.2.14)
+      tailwindcss:
+        specifier: ^4.0.0
+        version: 4.3.0
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.2(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.47.1)(tsx@4.21.0)
+      vite-tsconfig-paths:
+        specifier: ^4.3.0
+        version: 4.3.2(typescript@5.9.3)(vite@6.4.2(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.47.1)(tsx@4.21.0))
+
+  apps/meeting-frontend:
+    dependencies:
+      '@nest-search/frontend-shared':
+        specifier: workspace:*
+        version: link:../../libs/frontend-shared
+      '@tanstack/react-query':
+        specifier: ^5.60.0
+        version: 5.100.9(react@19.2.6)
+      '@tanstack/react-router':
+        specifier: 1.120.20
+        version: 1.120.20(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@tanstack/start':
+        specifier: 1.120.20
+        version: 1.120.20(@types/node@25.6.2)(db0@0.3.4(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(mysql2@3.22.3(@types/node@25.6.2)))(mysql2@3.22.3(@types/node@25.6.2)))(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(mysql2@3.22.3(@types/node@25.6.2)))(ioredis@5.10.1)(jiti@2.7.0)(lightningcss@1.32.0)(mysql2@3.22.3(@types/node@25.6.2))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(terser@5.47.1)(tsx@4.21.0)(vite@6.4.2(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.47.1)(tsx@4.21.0))(webpack@5.106.0(lightningcss@1.32.0))
+      react:
+        specifier: ^19.0.0
+        version: 19.2.6
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.6(react@19.2.6)
+      vinxi:
+        specifier: 0.5.3
+        version: 0.5.3(@types/node@25.6.2)(db0@0.3.4(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(mysql2@3.22.3(@types/node@25.6.2)))(mysql2@3.22.3(@types/node@25.6.2)))(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(mysql2@3.22.3(@types/node@25.6.2)))(ioredis@5.10.1)(jiti@2.7.0)(lightningcss@1.32.0)(mysql2@3.22.3(@types/node@25.6.2))(terser@5.47.1)(tsx@4.21.0)
+    devDependencies:
+      '@tailwindcss/vite':
+        specifier: ^4.0.0
+        version: 4.3.0(vite@6.4.2(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.47.1)(tsx@4.21.0))
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: ^19.0.0
+        version: 19.2.3(@types/react@19.2.14)
+      tailwindcss:
+        specifier: ^4.0.0
+        version: 4.3.0
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.2(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.47.1)(tsx@4.21.0)
+      vite-tsconfig-paths:
+        specifier: ^4.3.0
+        version: 4.3.2(typescript@5.9.3)(vite@6.4.2(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.47.1)(tsx@4.21.0))
+
+  apps/zk-frontend:
+    dependencies:
+      '@nest-search/frontend-shared':
+        specifier: workspace:*
+        version: link:../../libs/frontend-shared
+      '@tanstack/react-query':
+        specifier: ^5.60.0
+        version: 5.100.9(react@19.2.6)
+      '@tanstack/react-router':
+        specifier: 1.120.20
+        version: 1.120.20(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@tanstack/start':
+        specifier: 1.120.20
+        version: 1.120.20(@types/node@25.6.2)(db0@0.3.4(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(mysql2@3.22.3(@types/node@25.6.2)))(mysql2@3.22.3(@types/node@25.6.2)))(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(mysql2@3.22.3(@types/node@25.6.2)))(ioredis@5.10.1)(jiti@2.7.0)(lightningcss@1.32.0)(mysql2@3.22.3(@types/node@25.6.2))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(terser@5.47.1)(tsx@4.21.0)(vite@6.4.2(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.47.1)(tsx@4.21.0))(webpack@5.106.0(lightningcss@1.32.0))
+      react:
+        specifier: ^19.0.0
+        version: 19.2.6
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.6(react@19.2.6)
+      vinxi:
+        specifier: 0.5.3
+        version: 0.5.3(@types/node@25.6.2)(db0@0.3.4(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(mysql2@3.22.3(@types/node@25.6.2)))(mysql2@3.22.3(@types/node@25.6.2)))(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(mysql2@3.22.3(@types/node@25.6.2)))(ioredis@5.10.1)(jiti@2.7.0)(lightningcss@1.32.0)(mysql2@3.22.3(@types/node@25.6.2))(terser@5.47.1)(tsx@4.21.0)
+    devDependencies:
+      '@tailwindcss/vite':
+        specifier: ^4.0.0
+        version: 4.3.0(vite@6.4.2(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.47.1)(tsx@4.21.0))
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: ^19.0.0
+        version: 19.2.3(@types/react@19.2.14)
+      tailwindcss:
+        specifier: ^4.0.0
+        version: 4.3.0
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.2(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.47.1)(tsx@4.21.0)
+      vite-tsconfig-paths:
+        specifier: ^4.3.0
+        version: 4.3.2(typescript@5.9.3)(vite@6.4.2(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.47.1)(tsx@4.21.0))
+
   libs/frontend-shared:
     dependencies:
       '@tanstack/react-query':
