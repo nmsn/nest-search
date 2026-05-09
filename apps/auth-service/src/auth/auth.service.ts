@@ -33,7 +33,7 @@ export class AuthService {
 
     const token = jwt.sign(payload, CAS_CONFIG.jwtSecret, {
       expiresIn: CAS_CONFIG.jwtExpiresIn,
-    });
+    } as any);
 
     return {
       token,

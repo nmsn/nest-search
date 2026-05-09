@@ -43,7 +43,7 @@ export class AuthController {
     }
     try {
       const token = auth.slice(7);
-      const payload = jwt.verify(token, CAS_CONFIG.jwtSecret) as JwtPayload;
+      const payload = jwt.verify(token, CAS_CONFIG.jwtSecret) as unknown as JwtPayload;
       const user = await this.userService.findById(payload.sub);
       const { passwordHash, ...result } = user as any;
       return { user: result };
