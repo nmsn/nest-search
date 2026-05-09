@@ -64,38 +64,74 @@ GET  /cas/logout                → Destroy TGT, redirect to login page
 ### User Endpoints
 
 ```
-POST /api/auth/register         → Register new user
-POST /api/auth/login            → Login (returns JWT/session for API calls)
+POST /api/auth/register         → Register new user (admin only)
+POST /api/auth/login            → Login (returns JWT for API calls)
 POST /api/auth/logout           → Logout
 GET  /api/auth/me               → Get current user info
+POST /api/auth/validate         → Validate ST ticket, return JWT (called by frontend after CAS redirect)
 ```
+
+**`POST /api/auth/validate` contract:**
+
+Request:
+```json
+{ "ticket": "ST-xxxxx", "service": "http://ds.example.local/callback" }
+```
+
+Response (200):
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIs...",
+  "user": { "id": 1, "username": "admin", "role": "admin" }
+}
+```
+
+Response (401):
+```json
+{ "statusCode": 401, "message": "Invalid or expired service ticket" }
+```
+
+## Domain Structure
+
+All services share a common parent domain for cookie-based SSO:
+
+```
+*.example.local (shared parent domain)
+├── auth.example.local    → Auth Service (CAS Server)
+├── ds.example.local      → 商显前端
+├── zk.example.local      → 道闸前端
+├── meeting.example.local → 会议平板前端
+└── api.example.local     → Gateway
+```
+
+TGC cookie is set on `.example.local` domain, making it readable by all subdomains. In development, use `*.localhost` with different ports or `/etc/hosts` entries.
 
 ## CAS Login Flow
 
 ### First Login
 
 ```
-1. Frontend accesses http://ds.example.com/products
+1. Frontend accesses http://ds.example.local/products
 2. Frontend checks: no local session → redirect to:
-   http://auth-service:3004/cas/login?service=http://ds.example.com/callback
+   http://auth.example.local/cas/login?service=http://ds.example.local/callback
 3. CAS Server returns login page (username/password form)
 4. User submits credentials
-5. CAS Server validates → issues TGT (sets TGC cookie)
-   → redirects to http://ds.example.com/callback?ST=ST-xxxxx
+5. CAS Server validates → issues TGT (sets TGC cookie on .example.local domain)
+   → redirects to http://ds.example.local/callback?ST=ST-xxxxx
 6. Frontend receives ST → POST /api/auth/validate { ticket: "ST-xxxxx", service: "..." }
-7. Backend validates ST with CAS Server → valid → creates session/JWT
-8. Frontend stores session → accesses business APIs normally
+7. Gateway validates ST with CAS Server → valid → returns JWT
+8. Frontend stores JWT → accesses business APIs with Authorization header
 ```
 
 ### Cross-System Auto-Login
 
 ```
-1. User is logged into 商显 system (CAS Server has TGT)
-2. User visits 道闸 system http://zk.example.com/dashboard
-3. Frontend checks: no session → redirects to CAS Server
-4. CAS Server finds TGC cookie (user already logged in)
+1. User is logged into 商显 system (CAS Server has TGT on .example.local)
+2. User visits 道闸 system http://zk.example.local/dashboard
+3. Frontend checks: no JWT → redirects to CAS Server
+4. CAS Server finds TGC cookie (shared parent domain, user already logged in)
    → auto-issues ST → redirects back to 道闸 system
-5. 道闸 system exchanges ST for session → user doesn't need to enter password
+5. 道闸 system exchanges ST for JWT → user doesn't need to enter password
 ```
 
 ## Gateway Integration
@@ -115,13 +151,32 @@ New guard coexisting with ApiKeyGuard:
 - `/api/sync/*` — Requires admin role
 - `/health` — No auth required
 
+### JWT Configuration
+
+Gateway self-verifies JWTs (no round-trip to auth-service for every request):
+
+- **Secret**: Shared via env var `JWT_SECRET` (same value in auth-service and gateway)
+- **Algorithm**: HS256
+- **Expiration**: 2 hours (configurable via `JWT_EXPIRES_IN`)
+- **Payload**:
+```json
+{
+  "sub": 1,
+  "username": "admin",
+  "role": "admin",
+  "iat": 1715200000,
+  "exp": 1715207200
+}
+```
+
 ### CasGuard Implementation
 
 ```typescript
-// Extract JWT from Authorization header
-// Verify token validity (JWT self-verification or call auth-service)
-// Parse user info (userId, username, roles, businessLines)
-// Attach to request object for downstream services
+// Extract JWT from Authorization: Bearer <token> header
+// Verify JWT using JWT_SECRET (self-verification, no auth-service call)
+// Parse payload: { sub, username, role }
+// Attach { userId, username, role } to request object
+// If role check needed (e.g., /api/sync/*), verify role === 'admin'
 ```
 
 ## Database Schema
@@ -223,6 +278,8 @@ apps/auth-service/
 - Passwords hashed with bcrypt (salt rounds: 10)
 - TGT expires after 8 hours
 - ST expires after 10 seconds (one-time use)
-- TGC cookie is HttpOnly, Secure (in production)
+- TGC cookie is HttpOnly, Secure (in production), domain: `.example.local`
+- JWT secret stored in `.env` (not in code)
 - CSRF protection on login form
 - Rate limiting on login endpoint (5 attempts per minute)
+- Admin role check is simple `role === 'admin'` — no complex permission model
