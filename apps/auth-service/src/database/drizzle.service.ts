@@ -24,9 +24,10 @@ export class DrizzleService implements OnModuleInit {
 
   private async seedServices() {
     const services = [
-      { serviceId: 'ds-frontend', serviceUrl: 'http://ds.example.local/callback', name: '商显前端' },
-      { serviceId: 'zk-frontend', serviceUrl: 'http://zk.example.local/callback', name: '道闸前端' },
-      { serviceId: 'meeting-frontend', serviceUrl: 'http://meeting.example.local/callback', name: '会议平板前端' },
+      { serviceId: 'auth-frontend', serviceUrl: 'http://auth.localhost:3100/auth-callback', name: '认证中心' },
+      { serviceId: 'ds-frontend', serviceUrl: 'http://ds.localhost:3101/auth-callback', name: '商显前端' },
+      { serviceId: 'zk-frontend', serviceUrl: 'http://zk.localhost:3102/auth-callback', name: '道闸前端' },
+      { serviceId: 'meeting-frontend', serviceUrl: 'http://meeting.localhost:3103/auth-callback', name: '会议前端' },
     ];
 
     for (const svc of services) {
