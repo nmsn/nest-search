@@ -42,6 +42,12 @@ export class AuthService {
   }
 
   async refresh(refreshToken: string) {
+    // Check blacklist first
+    const isBlacklisted = await this.redisService.get(`refresh_token_blacklist:${refreshToken}`);
+    if (isBlacklisted) {
+      throw new UnauthorizedException('Refresh token has been revoked');
+    }
+
     const tokenData = await this.redisService.get(`refresh_token:${refreshToken}`);
     if (!tokenData) {
       throw new UnauthorizedException('Invalid or expired refresh token');
@@ -54,7 +60,6 @@ export class AuthService {
 
     // Rotate: delete old refresh token, issue new pair
     await this.redisService.del(`refresh_token:${refreshToken}`);
-    await this.redisService.del(`refresh_whitelist:${refreshToken}`);
 
     const accessToken = this.generateAccessToken(user);
     const newRefreshToken = await this.createRefreshToken(user.id);
@@ -70,8 +75,7 @@ export class AuthService {
     const ttl = parseInt(process.env.REFRESH_TOKEN_EXPIRES_IN || '604800');
     await this.redisService.set(`refresh_token_blacklist:${refreshToken}`, '1', ttl);
 
-    // Remove from whitelist
-    await this.redisService.del(`refresh_whitelist:${refreshToken}`);
+    // Remove token data
     await this.redisService.del(`refresh_token:${refreshToken}`);
   }
 
@@ -97,9 +101,6 @@ export class AuthService {
       JSON.stringify({ userId }),
       ttl,
     );
-
-    // Mark as valid in whitelist
-    await this.redisService.set(`refresh_whitelist:${tokenId}`, '1', ttl);
 
     return tokenId;
   }
