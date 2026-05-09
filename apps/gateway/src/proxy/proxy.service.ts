@@ -5,6 +5,7 @@ const SERVICE_MAP: Record<string, string> = {
   sync: process.env.SYNC_SERVICE_URL || 'http://localhost:3001',
   search: process.env.SEARCH_SERVICE_URL || 'http://localhost:3002',
   form: process.env.FORM_SERVICE_URL || 'http://localhost:3003',
+  auth: process.env.AUTH_SERVICE_URL || 'http://localhost:3004',
 };
 
 @Injectable()

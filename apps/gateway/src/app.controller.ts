@@ -1,6 +1,7 @@
-import { Controller, Get, Post, Patch, Delete, Req, Res, Param, Body, Query } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Req, Res, Param, Body, Query, UseGuards } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { ProxyService } from './proxy/proxy.service';
+import { AdminGuard } from './guards/cas.guard';
 
 @Controller()
 export class AppController {
@@ -11,12 +12,42 @@ export class AppController {
     return { status: 'ok', service: 'gateway', timestamp: new Date().toISOString() };
   }
 
+  // Auth Service routes
+  @Post('api/auth/register')
+  async register(@Body() body: any) {
+    return this.proxyService.forward('auth', 'POST', '/api/auth/register', body);
+  }
+
+  @Post('api/auth/login')
+  async login(@Body() body: any) {
+    return this.proxyService.forward('auth', 'POST', '/api/auth/login', body);
+  }
+
+  @Post('api/auth/validate')
+  async validate(@Body() body: any) {
+    return this.proxyService.forward('auth', 'POST', '/api/auth/validate', body);
+  }
+
+  @Post('api/auth/logout')
+  async logout() {
+    return this.proxyService.forward('auth', 'POST', '/api/auth/logout');
+  }
+
+  @Get('api/auth/me')
+  async me(@Req() req: Request) {
+    return this.proxyService.forward('auth', 'GET', '/api/auth/me', undefined, {
+      authorization: req.headers.authorization || '',
+    });
+  }
+
   // Sync Service routes
+  @UseGuards(AdminGuard)
   @Post('api/sync/full/:businessLine')
   async syncFull(@Param('businessLine') bl: string, @Req() req: Request) {
     return this.proxyService.forward('sync', 'POST', `/api/sync/full/${bl}`);
   }
 
+  @UseGuards(AdminGuard)
   @Post('api/sync/incremental/:businessLine')
   async syncIncremental(@Param('businessLine') bl: string, @Req() req: Request) {
     return this.proxyService.forward('sync', 'POST', `/api/sync/incremental/${bl}`);

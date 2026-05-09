@@ -11,11 +11,18 @@ const API_KEYS: Record<string, string> = {
 export class ApiKeyGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest();
+
+    // If user is already authenticated via CasGuard, skip API key check
+    if (request.user) {
+      return true;
+    }
+
     const apiKey = request.headers['x-api-key'];
     const businessLine = request.params.businessLine;
 
+    // If no API key and no user, reject
     if (!apiKey) {
-      throw new UnauthorizedException('Missing X-API-Key header');
+      throw new UnauthorizedException('Missing X-API-Key or Authorization header');
     }
 
     if (!businessLine || !isValidBusinessLine(businessLine)) {
