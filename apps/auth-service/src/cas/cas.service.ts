@@ -24,7 +24,7 @@ export class CasService {
     return ticket;
   }
 
-  async issueSt(tgtTicket: string, serviceUrl: string): Promise<string> {
+  async issueSt(tgtTicket: string, serviceUrl: string): Promise<{ ticket: string; serviceUrl: string }> {
     // Validate TGT
     const tgt = await this.validateTgt(tgtTicket);
     if (!tgt) throw new UnauthorizedException('Invalid or expired TGT');
@@ -53,7 +53,7 @@ export class CasService {
       expiresAt,
     });
 
-    return ticket;
+    return { ticket, serviceUrl: service.serviceUrl };
   }
 
   async validateSt(ticket: string, serviceUrl: string) {

@@ -23,8 +23,8 @@ export class CasController {
       if (tgt) {
         // Auto-issue ST and redirect
         try {
-          const st = await this.casService.issueSt(tgc, service);
-          return res.redirect(`${service}?ST=${st}`);
+          const { ticket: st, serviceUrl } = await this.casService.issueSt(tgc, service);
+          return res.redirect(`${serviceUrl}?ST=${st}`);
         } catch {
           // TGT valid but service issue — show login page
         }
@@ -32,6 +32,7 @@ export class CasController {
     }
 
     // Return login page (simple HTML form)
+    const escapedService = service?.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;') || '';
     res.send(`
       <!DOCTYPE html>
       <html>
@@ -39,7 +40,7 @@ export class CasController {
       <body>
         <h2>CAS 单点登录</h2>
         <form method="POST" action="/cas/login">
-          <input type="hidden" name="service" value="${service}" />
+          <input type="hidden" name="service" value="${escapedService}" />
           <div><label>用户名: <input type="text" name="username" required /></label></div>
           <div><label>密&nbsp;&nbsp;码: <input type="password" name="password" required /></label></div>
           <div><button type="submit">登录</button></div>
@@ -63,13 +64,15 @@ export class CasController {
     // Set TGC cookie
     res.cookie('TGC', tgt, {
       httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
       domain: process.env.CAS_COOKIE_DOMAIN || '.example.local',
       maxAge: 8 * 60 * 60 * 1000, // 8 hours
     });
 
     // Issue ST and redirect
-    const st = await this.casService.issueSt(tgt, body.service);
-    res.redirect(`${body.service}?ST=${st}`);
+    const { ticket: st, serviceUrl } = await this.casService.issueSt(tgt, body.service);
+    res.redirect(`${serviceUrl}?ST=${st}`);
   }
 
   @Get('validate')
@@ -100,6 +103,8 @@ export class CasController {
     }
     res.clearCookie('TGC', {
       domain: process.env.CAS_COOKIE_DOMAIN || '.example.local',
+      secure: true,
+      sameSite: 'lax',
     });
     res.send('已退出登录');
   }
