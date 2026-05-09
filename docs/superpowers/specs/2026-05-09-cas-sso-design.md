@@ -65,10 +65,23 @@ GET  /cas/logout                → Destroy TGT, redirect to login page
 
 ```
 POST /api/auth/register         → Register new user (admin only)
-POST /api/auth/login            → Login (returns JWT for API calls)
+POST /api/auth/login            → Direct API login (returns JWT, same response as validate)
 POST /api/auth/logout           → Logout
 GET  /api/auth/me               → Get current user info
 POST /api/auth/validate         → Validate ST ticket, return JWT (called by frontend after CAS redirect)
+```
+
+**`POST /api/auth/register` contract:**
+
+Request:
+```json
+{ "username": "zhangsan", "password": "pass123", "email": "zhangsan@example.com", "role": "user" }
+```
+Fields: `username` (required), `password` (required), `email` (optional), `role` (optional, default `'user'`)
+
+Response (201):
+```json
+{ "id": 2, "username": "zhangsan", "email": "zhangsan@example.com", "role": "user", "status": "active" }
 ```
 
 **`POST /api/auth/validate` contract:**
@@ -89,6 +102,11 @@ Response (200):
 Response (401):
 ```json
 { "statusCode": 401, "message": "Invalid or expired service ticket" }
+```
+
+Response (403 — disabled user):
+```json
+{ "statusCode": 403, "message": "User account is disabled" }
 ```
 
 ## Domain Structure
@@ -277,9 +295,10 @@ apps/auth-service/
 
 - Passwords hashed with bcrypt (salt rounds: 10)
 - TGT expires after 8 hours
-- ST expires after 10 seconds (one-time use)
+- ST expires after 30 seconds (one-time use, generous for slow networks)
 - TGC cookie is HttpOnly, Secure (in production), domain: `.example.local`
 - JWT secret stored in `.env` (not in code)
+- cas_services seeded via migration (pre-register all business line frontends)
 - CSRF protection on login form
 - Rate limiting on login endpoint (5 attempts per minute)
 - Admin role check is simple `role === 'admin'` — no complex permission model
