@@ -3,3 +3,5 @@ node_modules/
 *.js.map
 libs/**/*.js
 libs/**/*.d.ts
+apps/**/src/libs/**/*.js
+apps/**/src/libs/**/*.d.ts
