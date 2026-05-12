@@ -1,6 +1,7 @@
 import { Injectable, CanActivate, ExecutionContext, UnauthorizedException, ForbiddenException } from '@nestjs/common';
 import * as jwt from 'jsonwebtoken';
-import { CAS_CONFIG, JwtPayload, AuthUser } from '@app/shared';
+import { CAS_CONFIG } from '../libs/shared/constants/cas';
+import { JwtPayload, AuthUser } from '../libs/shared/interfaces/user.interface';
 
 declare global {
   namespace Express {

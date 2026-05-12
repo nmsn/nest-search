@@ -2,7 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { Transport, MicroserviceOptions } from '@nestjs/microservices';
 import { AppModule } from './app.module';
-import { RABBITMQ_CONFIG } from '@app/shared';
+import { RABBITMQ_CONFIG } from './libs/shared/index';
 
 async function bootstrap() {
   // Start as hybrid: HTTP + Microservice

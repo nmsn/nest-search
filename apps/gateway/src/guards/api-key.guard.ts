@@ -1,5 +1,5 @@
 import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
-import { isValidBusinessLine } from '@app/shared';
+import { isValidBusinessLine } from '../libs/shared/constants/business-lines';
 
 const API_KEYS: Record<string, string> = {
   ds: process.env.API_KEY_DS || 'ds_key_123',

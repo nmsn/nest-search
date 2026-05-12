@@ -1,7 +1,8 @@
 import { Injectable, UnauthorizedException, ForbiddenException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import * as jwt from 'jsonwebtoken';
-import { CAS_CONFIG, JwtPayload } from '@app/shared';
+import { CAS_CONFIG } from '../libs/shared/constants/cas';
+import { JwtPayload } from '../libs/shared/interfaces/user.interface';
 import { UserService } from '../user/user.service';
 import { CasService } from '../cas/cas.service';
 import { RedisService } from '../redis/redis.service';

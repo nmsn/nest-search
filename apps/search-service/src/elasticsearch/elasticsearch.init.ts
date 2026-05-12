@@ -1,5 +1,5 @@
 import { ElasticsearchService } from './elasticsearch.service';
-import { BUSINESS_LINES } from '@app/shared';
+import { BUSINESS_LINES } from '../libs/shared/index';
 
 const PRODUCT_MAPPINGS = {
   properties: {

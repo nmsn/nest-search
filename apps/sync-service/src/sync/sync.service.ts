@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ClientProxy, Client, Transport } from '@nestjs/microservices';
-import { RABBITMQ_CONFIG, BUSINESS_LINES, BusinessLineCode } from '@app/shared';
+import { RABBITMQ_CONFIG, BUSINESS_LINES, BusinessLineCode } from '../libs/shared/index';
 import * as fs from 'fs';
 import * as path from 'path';
 

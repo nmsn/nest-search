@@ -5,7 +5,7 @@ import { LoginDto } from '../user/dto/login.dto';
 import { CreateUserDto } from '../user/dto/create-user.dto';
 import { UserService } from '../user/user.service';
 import * as jwt from 'jsonwebtoken';
-import { CAS_CONFIG, JwtPayload } from '@app/shared';
+import { CAS_CONFIG, JwtPayload } from '../libs/shared';
 
 @Controller('api/auth')
 export class AuthController {

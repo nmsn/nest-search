@@ -1,4 +1,4 @@
-import { BUSINESS_LINES } from '@app/shared';
+import { BUSINESS_LINES } from '../libs/shared/index';
 
 export function buildProductSearchQuery(params: {
   keyword?: string;

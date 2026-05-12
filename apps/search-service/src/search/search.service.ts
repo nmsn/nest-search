@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { ElasticsearchService } from '../elasticsearch/elasticsearch.service';
-import { BUSINESS_LINES, isValidBusinessLine } from '@app/shared';
+import { BUSINESS_LINES, isValidBusinessLine } from '../libs/shared/index';
 import { buildProductSearchQuery, buildAggregationQuery } from './search.queries';
 
 @Injectable()

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Ctx, EventPattern, Payload, RmqContext } from '@nestjs/microservices';
 import { Client } from '@elastic/elasticsearch';
-import { RABBITMQ_CONFIG, BUSINESS_LINES, BusinessLineCode } from '@app/shared';
+import { RABBITMQ_CONFIG, BUSINESS_LINES, BusinessLineCode } from '../libs/shared/index';
 import { SyncService } from './sync.service';
 
 @Injectable()

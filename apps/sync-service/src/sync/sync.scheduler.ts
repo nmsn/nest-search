@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { SyncService } from './sync.service';
-import { BUSINESS_LINES, BusinessLineCode } from '@app/shared';
+import { BUSINESS_LINES, BusinessLineCode } from '../libs/shared/index';
 
 @Injectable()
 export class SyncScheduler {

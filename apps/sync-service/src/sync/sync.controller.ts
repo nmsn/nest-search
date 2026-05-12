@@ -1,7 +1,7 @@
 import { Controller, Post, Get, Param, BadRequestException } from '@nestjs/common';
 import { SyncService } from './sync.service';
 import { SyncRecordsService } from './sync-records.service';
-import { isValidBusinessLine } from '@app/shared';
+import { isValidBusinessLine } from '../libs/shared/index';
 
 @Controller('api/sync')
 export class SyncController {

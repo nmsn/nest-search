@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/mysql2';
 import { createPool } from 'mysql2';
 import * as schema from './schema/schema-factory';
 import { businessLines } from './schema/business-lines';
-import { syncRecords } from '@app/shared';
+import { syncRecords } from '../libs/shared/index';
 
 @Injectable()
 export class DrizzleService implements OnModuleInit {

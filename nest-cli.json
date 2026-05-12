@@ -6,13 +6,14 @@
   "root": "apps/gateway",
   "compilerOptions": {
     "webpack": false,
-    "tsConfigPath": "apps/gateway/tsconfig.app.json"
+    "tsConfigPath": "apps/gateway/tsconfig.app.json",
+    "exclude": ["apps/*-frontend/**/*"]
   },
   "projects": {
     "gateway": {
       "type": "application",
       "root": "apps/gateway",
-      "entryFile": "main",
+      "entryFile": "src/main",
       "sourceRoot": "apps/gateway/src",
       "compilerOptions": {
         "tsConfigPath": "apps/gateway/tsconfig.app.json"
@@ -21,7 +22,7 @@
     "sync-service": {
       "type": "application",
       "root": "apps/sync-service",
-      "entryFile": "main",
+      "entryFile": "src/main",
       "sourceRoot": "apps/sync-service/src",
       "compilerOptions": {
         "tsConfigPath": "apps/sync-service/tsconfig.app.json"
@@ -30,7 +31,7 @@
     "search-service": {
       "type": "application",
       "root": "apps/search-service",
-      "entryFile": "main",
+      "entryFile": "src/main",
       "sourceRoot": "apps/search-service/src",
       "compilerOptions": {
         "tsConfigPath": "apps/search-service/tsconfig.app.json"
@@ -39,7 +40,7 @@
     "form-service": {
       "type": "application",
       "root": "apps/form-service",
-      "entryFile": "main",
+      "entryFile": "src/main",
       "sourceRoot": "apps/form-service/src",
       "compilerOptions": {
         "tsConfigPath": "apps/form-service/tsconfig.app.json"
@@ -57,7 +58,7 @@
     "auth-service": {
       "type": "application",
       "root": "apps/auth-service",
-      "entryFile": "main",
+      "entryFile": "src/main",
       "sourceRoot": "apps/auth-service/src",
       "compilerOptions": {
         "tsConfigPath": "apps/auth-service/tsconfig.app.json"

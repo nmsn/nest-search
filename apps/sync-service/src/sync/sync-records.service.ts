@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { drizzle } from 'drizzle-orm/mysql2';
 import { createPool } from 'mysql2';
-import { syncRecords } from '@app/shared';
+import { syncRecords } from '../libs/shared/index';
 import { desc } from 'drizzle-orm';
 
 @Injectable()

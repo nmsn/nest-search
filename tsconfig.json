@@ -17,9 +17,6 @@
     "strictBindCallApply": false,
     "forceConsistentCasingInFileNames": false,
     "noFallthroughCasesInSwitch": false,
-    "ignoreDeprecations": "6.0",
-    "paths": {
-      "@app/shared": ["libs/shared/src/index.ts"]
-    }
+    "ignoreDeprecations": "6.0"
   }
 }
