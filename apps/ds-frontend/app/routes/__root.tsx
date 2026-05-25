@@ -1,13 +1,21 @@
-import { createRootRouteWithContext, Outlet } from '@tanstack/react-router';
+/// <reference types="vite/client" />
+import { createRootRouteWithContext, Outlet, HeadContent } from '@tanstack/react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '~/components/auth/auth-provider';
 import { Sidebar } from '~/components/layout/sidebar';
 import { Header } from '~/components/layout/header';
-import '~/styles/app.css';
+import appCss from '~/styles/app.css?url';
 
 const queryClient = new QueryClient();
 
-export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+interface RouterContext {
+  queryClient: QueryClient;
+}
+
+export const Route = createRootRouteWithContext<RouterContext>()({
+  head: () => ({
+    links: [{ rel: 'stylesheet', href: appCss }],
+  }),
   component: RootComponent,
 });
 
