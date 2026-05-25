@@ -4,28 +4,6 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-overrides:
-  '@tanstack/router-generator': 1.120.20
-  '@tanstack/router-plugin': 1.120.20
-  '@tanstack/router-core': 1.120.19
-  '@tanstack/history': 1.120.17
-  '@tanstack/react-start-plugin': 1.120.17
-  '@tanstack/start-plugin-core': 1.120.4-alpha.13
-  '@tanstack/server-functions-plugin': 1.120.17
-  '@tanstack/start-client-core': 1.120.19
-  '@tanstack/start-server-core': 1.120.19
-  '@tanstack/react-start-client': 1.120.20
-  '@tanstack/react-start-server': 1.120.20
-  '@tanstack/start-api-routes': 1.120.19
-  '@tanstack/start-server-functions-ssr': 1.120.19
-  '@tanstack/react-start-router-manifest': 1.120.19
-  '@tanstack/start-server-functions-client': 1.120.19
-  '@tanstack/start-server-functions-server': 1.120.17
-  '@tanstack/start-server-functions-handler': 1.120.19
-  '@tanstack/start-config': 1.120.20
-  '@tanstack/router-utils': 1.120.17
-  '@tanstack/virtual-file-routes': 1.120.17
-
 importers:
 
   .:
@@ -2329,6 +2307,10 @@ packages:
     resolution: {integrity: sha512-k07LFI4Qo074IIaWzT/XjD0KlkGx2w1V3fnNtclKx0oAl8z4O9kCh6za+FPEIRe98xLgNFEiddDbJeAYGSlPtw==}
     engines: {node: '>=12'}
 
+  '@tanstack/history@1.131.2':
+    resolution: {integrity: sha512-cs1WKawpXIe+vSTeiZUuSBy8JFjEuDgdMKZFRLKwQysKo8y2q6Q1HvS74Yw+m5IhOW1nTZooa6rlgdfXcgFAaw==}
+    engines: {node: '>=12'}
+
   '@tanstack/query-core@5.100.9':
     resolution: {integrity: sha512-SJSFw1S8+kQ0+knv/XGfrbocWoAlT7vDKsSImtLx3ZPQmEcR46hkDjLSvynSy25N8Ms4tIEini1FuBd5k7IscQ==}
 
@@ -2374,6 +2356,10 @@ packages:
 
   '@tanstack/router-core@1.120.19':
     resolution: {integrity: sha512-5JUVgkxnIM3NxMwzKt0tfz2UopZVxwq6Kl7Rp33zlFJaPjpiRs46VuRjVeAvkpJd6samo1gcH1rWqmnPUmtGcw==}
+    engines: {node: '>=12'}
+
+  '@tanstack/router-core@1.131.50':
+    resolution: {integrity: sha512-eojd4JZ5ziUhGEmXZ4CaVX5mQdiTMiz56Sp8ZQ6r7deb55Q+5G4JQDkeuXpI7HMAvzr+4qlsFeLaDRXXjXyOqQ==}
     engines: {node: '>=12'}
 
   '@tanstack/router-generator@1.120.20':
@@ -2422,6 +2408,10 @@ packages:
     resolution: {integrity: sha512-MEv1+Yj5EjNmo5morrDLRF/O9n25XDiP6yU76JNa23NFtH0q+j9DkNPHJVRYe5OqRyy/IL0H4ncYbItVLhkocQ==}
     engines: {node: '>=12'}
 
+  '@tanstack/start-client-core@1.131.50':
+    resolution: {integrity: sha512-8fbwYca1NAu/5WyGvO3e341/FPpsiqdPrrzkoc0cXQimMN1DligoRjvHgP13q3n5w1tFMSqChGzXfOVJP9ndSw==}
+    engines: {node: '>=12'}
+
   '@tanstack/start-config@1.120.20':
     resolution: {integrity: sha512-oH/mfTSHV8Qbil74tWicPLW6+kKmT3esXCnDzvrkhi3+N8ZuVUDr01Qpil0Wxf9lLPfM5L6VX03nF4hSU8vljg==}
     engines: {node: '>=12'}
@@ -2452,6 +2442,10 @@ packages:
 
   '@tanstack/start-server-functions-ssr@1.120.19':
     resolution: {integrity: sha512-D4HGvJXWvVUssgkLDtdSJTFfWuT+nVv9GauPfVQTtMUUy+NbExNkFWKvF+XvCS81lBqnCKL7VrWqZMXiod0gTA==}
+    engines: {node: '>=12'}
+
+  '@tanstack/start-storage-context@1.131.50':
+    resolution: {integrity: sha512-qbVFdx/B5URJXzWjguaiCcQhJw2NL8qFGtSzLSGilxQnvtJdM+V9VBMizKIxhm9oiYnfqGsVfyMOBD7q9f8Y1Q==}
     engines: {node: '>=12'}
 
   '@tanstack/start@1.120.20':
@@ -5241,6 +5235,16 @@ packages:
     resolution: {integrity: sha512-F4LcB0UqUl1zErq+1nYEEzSHJnIwb3AF2XWB94b+afhrekOUijwooAYqFyRbjYkm2PAKBabx6oYv/xDxNi8IBw==}
     engines: {node: '>=20.0.0'}
 
+  seroval-plugins@1.5.4:
+    resolution: {integrity: sha512-S0xQPhUTefAhNvNWFg0c1J8qJArHt5KdtJ/cFAofo06KD1MVSeFWyl4iiu+ApDIuw0WhjpOfCdgConOfAnLgkw==}
+    engines: {node: '>=10'}
+    peerDependencies:
+      seroval: ^1.0
+
+  seroval@1.5.4:
+    resolution: {integrity: sha512-46uFvgrXTVxZcUorgSSRZ4y+ieqLLQRMlG4bnCZKW3qI6BZm7Rg4ntMW4p1mILEEBZWrFlcpp0AyIIlM6jD9iw==}
+    engines: {node: '>=10'}
+
   serve-placeholder@2.0.2:
     resolution: {integrity: sha512-/TMG8SboeiQbZJWRlfTCqMs2DD3SZgWp0kDQePz9yUuCnDfDh/92gf7/PxGhzXTKBIPASIHxFcZndoNbp6QOLQ==}
 
@@ -7729,6 +7733,8 @@ snapshots:
 
   '@tanstack/history@1.120.17': {}
 
+  '@tanstack/history@1.131.2': {}
+
   '@tanstack/query-core@5.100.9': {}
 
   '@tanstack/react-query@5.100.9(react@19.2.6)':
@@ -7913,6 +7919,16 @@ snapshots:
       '@tanstack/store': 0.7.7
       tiny-invariant: 1.3.3
 
+  '@tanstack/router-core@1.131.50':
+    dependencies:
+      '@tanstack/history': 1.131.2
+      '@tanstack/store': 0.7.7
+      cookie-es: 1.2.3
+      seroval: 1.5.4
+      seroval-plugins: 1.5.4(seroval@1.5.4)
+      tiny-invariant: 1.3.3
+      tiny-warning: 1.0.3
+
   '@tanstack/router-generator@1.120.20(@tanstack/react-router@1.120.20(react-dom@19.2.6(react@19.2.6))(react@19.2.6))':
     dependencies:
       '@tanstack/virtual-file-routes': 1.120.17
@@ -8042,6 +8058,14 @@ snapshots:
       tiny-invariant: 1.3.3
       tiny-warning: 1.0.3
 
+  '@tanstack/start-client-core@1.131.50':
+    dependencies:
+      '@tanstack/router-core': 1.131.50
+      '@tanstack/start-storage-context': 1.131.50
+      cookie-es: 1.2.3
+      tiny-invariant: 1.3.3
+      tiny-warning: 1.0.3
+
   '@tanstack/start-config@1.120.20(@types/node@25.6.2)(db0@0.3.4(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(mysql2@3.22.3(@types/node@25.6.2)))(mysql2@3.22.3(@types/node@25.6.2)))(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(mysql2@3.22.3(@types/node@25.6.2)))(ioredis@5.10.1)(jiti@2.7.0)(lightningcss@1.32.0)(mysql2@3.22.3(@types/node@25.6.2))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(terser@5.47.1)(tsx@4.21.0)(vite@6.4.2(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.47.1)(tsx@4.21.0))(webpack@5.106.0(lightningcss@1.32.0))':
     dependencies:
       '@tanstack/react-router': 1.120.20(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -8142,8 +8166,8 @@ snapshots:
 
   '@tanstack/start-server-functions-fetcher@1.131.50':
     dependencies:
-      '@tanstack/router-core': 1.120.19
-      '@tanstack/start-client-core': 1.120.19
+      '@tanstack/router-core': 1.131.50
+      '@tanstack/start-client-core': 1.131.50
 
   '@tanstack/start-server-functions-handler@1.120.19':
     dependencies:
@@ -8192,6 +8216,10 @@ snapshots:
       - terser
       - tsx
       - yaml
+
+  '@tanstack/start-storage-context@1.131.50':
+    dependencies:
+      '@tanstack/router-core': 1.131.50
 
   '@tanstack/start@1.120.20(@types/node@25.6.2)(db0@0.3.4(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(mysql2@3.22.3(@types/node@25.6.2)))(mysql2@3.22.3(@types/node@25.6.2)))(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(mysql2@3.22.3(@types/node@25.6.2)))(ioredis@5.10.1)(jiti@2.7.0)(lightningcss@1.32.0)(mysql2@3.22.3(@types/node@25.6.2))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(terser@5.47.1)(tsx@4.21.0)(vite@6.4.2(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.47.1)(tsx@4.21.0))(webpack@5.106.0(lightningcss@1.32.0))':
     dependencies:
@@ -11349,6 +11377,12 @@ snapshots:
       - supports-color
 
   serialize-javascript@7.0.5: {}
+
+  seroval-plugins@1.5.4(seroval@1.5.4):
+    dependencies:
+      seroval: 1.5.4
+
+  seroval@1.5.4: {}
 
   serve-placeholder@2.0.2:
     dependencies:
