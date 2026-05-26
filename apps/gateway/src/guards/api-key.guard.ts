@@ -11,6 +11,12 @@ const API_KEYS: Record<string, string> = {
 export class ApiKeyGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest();
+    const path = request.route?.path || request.url;
+
+    // Skip API key check for auth routes (no businessLine needed)
+    if (path.startsWith('/api/auth/')) {
+      return true;
+    }
 
     // If user is already authenticated via CasGuard, skip API key check
     if (request.user) {
