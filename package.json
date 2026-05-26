@@ -17,10 +17,10 @@
     "start:all": "concurrently \"npm run start:gateway\" \"npm run start:sync\" \"npm run start:search\" \"npm run start:form\" \"npm run start:auth\"",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
-    "dev:auth": "pnpm --filter auth-frontend exec vinxi dev",
-    "dev:ds": "pnpm --filter ds-frontend exec vinxi dev",
-    "dev:zk": "pnpm --filter zk-frontend exec vinxi dev",
-    "dev:meeting": "pnpm --filter meeting-frontend exec vinxi dev"
+    "dev:auth": "pnpm --filter auth-frontend exec vite dev",
+    "dev:ds": "pnpm --filter ds-frontend exec vite dev",
+    "dev:zk": "pnpm --filter zk-frontend exec vite dev",
+    "dev:meeting": "pnpm --filter meeting-frontend exec vite dev"
   },
   "repository": {
     "type": "git",
@@ -42,6 +42,7 @@
     "@nestjs/microservices": "^11.1.19",
     "@nestjs/platform-express": "^11.1.19",
     "@nestjs/schedule": "^6.1.3",
+    "@vitejs/plugin-react": "^6.0.2",
     "amqp-connection-manager": "^5.0.0",
     "amqplib": "^1.0.7",
     "axios": "^1.16.0",
@@ -55,7 +56,8 @@
     "jsonwebtoken": "^9.0.3",
     "mysql2": "^3.22.3",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.2"
+    "rxjs": "^7.8.2",
+    "vite": "^8.0.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.21",
