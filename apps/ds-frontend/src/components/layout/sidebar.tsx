@@ -12,7 +12,7 @@ export function Sidebar() {
       <div className="p-4 text-xl font-bold border-b border-gray-700">商显管理</div>
       <nav className="flex-1 p-4 space-y-2">
         {navItems.map((item) => (
-          <Link key={item.to} to={item.to} className="block px-3 py-2 rounded hover:bg-gray-700 [&.active]:bg-gray-700">
+          <Link key={item.to} to={item.to} preload="none" className="block px-3 py-2 rounded hover:bg-gray-700 [&.active]:bg-gray-700">
             {item.label}
           </Link>
         ))}

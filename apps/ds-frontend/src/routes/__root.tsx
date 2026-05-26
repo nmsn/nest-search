@@ -7,6 +7,8 @@ import {
 } from '@tanstack/react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider } from '~/components/auth/auth-provider'
+import { setLoginUrl } from '@nest-search/frontend-shared'
+import { getCasLoginUrl } from '~/lib/auth'
 import { Sidebar } from '~/components/layout/sidebar'
 import { Header } from '~/components/layout/header'
 import { DefaultCatchBoundary } from '~/components/DefaultCatchBoundary'
@@ -15,6 +17,8 @@ import appCss from '~/styles/app.css?url'
 import * as React from 'react'
 
 const queryClient = new QueryClient()
+
+setLoginUrl(getCasLoginUrl())
 
 export const Route = createRootRoute({
   head: () => ({
@@ -35,7 +39,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <div className="flex h-screen">
-              <Sidebar />
+              {/* <Sidebar /> */}
               <div className="flex-1 flex flex-col overflow-hidden">
                 <Header />
                 <main className="flex-1 overflow-auto p-6">
