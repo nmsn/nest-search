@@ -2,6 +2,13 @@ import { getAccessToken, setAccessToken, clearAccessToken } from './auth';
 
 const GATEWAY_URL = import.meta.env.VITE_GATEWAY_URL || 'http://localhost:3000';
 
+// Login URL - can be set by consuming apps via setLoginUrl()
+let LOGIN_URL = '/auth-callback?reason=unauthorized';
+
+export function setLoginUrl(url: string) {
+  LOGIN_URL = url;
+}
+
 async function refreshAccessToken(): Promise<string | null> {
   const res = await fetch(`${GATEWAY_URL}/api/auth/refresh`, {
     method: 'POST',
@@ -46,9 +53,14 @@ export async function apiFetch<T>(
       });
     } else {
       clearAccessToken();
-      window.location.href = `/auth-callback?reason=session_expired`;
+      window.location.href = LOGIN_URL;
       throw new Error('Session expired');
     }
+  } else if (res.status === 401) {
+    // No token - user not logged in, redirect to login
+    clearAccessToken();
+    window.location.href = LOGIN_URL;
+    throw new Error('Unauthorized');
   }
 
   if (!res.ok) {
