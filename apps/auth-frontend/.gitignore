@@ -1,4 +1,5 @@
 .vinxi/
 .output/
 app.config.timestamp_*.js
+.env
 node_modules/
