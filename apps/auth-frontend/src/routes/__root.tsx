@@ -21,7 +21,7 @@ export const Route = createRootRoute({
   }),
   errorComponent: DefaultCatchBoundary,
   notFoundComponent: () => <NotFound />,
-  component: RootDocument,
+  shellComponent: RootDocument,
 })
 
 function RootDocument({ children }: { children: React.ReactNode }) {
