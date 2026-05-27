@@ -25,7 +25,7 @@ function ProductsPage() {
     <div>
       <h2 className="text-2xl font-bold mb-4">产品搜索</h2>
       <ProductSearch onSearch={setSearchParams} />
-      {isLoading ? <div className="mt-6">加载中...</div> : <ProductList products={data as unknown[]} />}
+      {isLoading ? <div className="mt-6">加载中...</div> : <ProductList products={(data as any)?.items ?? []} />}
     </div>
   );
 }

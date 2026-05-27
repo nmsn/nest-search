@@ -7,14 +7,12 @@
   "scripts": {
     "dev": "vite dev",
     "build": "vite build && tsc --noEmit",
-    "preview": "vite preview",
-    "start": "node .output/server/index.mjs"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@nest-search/frontend-shared": "workspace:*",
     "@tanstack/react-query": "^5.60.0",
     "@tanstack/react-router": "^1.170.8",
-    "@tanstack/react-start": "^1.168.13",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tailwind-merge": "^3.6.0"
@@ -24,8 +22,8 @@
     "@types/node": "^22.5.4",
     "@types/react": "^19.0.8",
     "@types/react-dom": "^19.0.3",
+    "@tanstack/router-plugin": "^1.168.11",
     "@vitejs/plugin-react": "^6.0.1",
-    "nitro": "^3.0.260311-beta",
     "tailwindcss": "^4.2.2",
     "typescript": "^6.0.2",
     "vite": "^8.0.14"

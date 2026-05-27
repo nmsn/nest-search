@@ -1,12 +1,13 @@
-import { createFileRoute, Outlet, redirect } from '@tanstack/react-router';
+import { createFileRoute, Outlet } from '@tanstack/react-router';
 import { useAuth } from '@nest-search/frontend-shared';
 import { getCasLoginUrl } from '~/lib/auth';
 
 export const Route = createFileRoute('/_authenticated')({
   beforeLoad: () => {
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('nest_access_token');
-      if (!token) throw redirect({ to: getCasLoginUrl() });
+    const token = localStorage.getItem('nest_access_token');
+    console.log(111);
+    if (!token) {
+      window.location.href = getCasLoginUrl();
     }
   },
   component: AuthenticatedLayout,
