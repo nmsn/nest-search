@@ -14,6 +14,7 @@ async function bootstrap() {
   });
 
   const port = process.env.GATEWAY_PORT || 3000;
+  console.log('cwd:', process.cwd(), 'env.PORT:', process.env.PORT);
   await app.listen(port);
   console.log(`Gateway running on port ${port}`);
 }
