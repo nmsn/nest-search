@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>0001 · Node.js 运行时:从浏览器到服务器</title>
+<style>
+  :root {
+    --bg: #fbfaf7;
+    --ink: #1d1d1d;
+    --ink-soft: #4a4a4a;
+    --ink-faint: #8a8a8a;
+    --rule: #d6d2c4;
+    --accent: #b04a2f;
+    --code-bg: #f1efe8;
+    --code-inline: #ece8db;
+    --good: #2c6e3e;
+    --bad: #b04a2f;
+    --pad: 2.4rem;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "SF Pro Text", "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: var(--pad);
+  }
+  /* Typography */
+  h1, h2, h3, h4 {
+    font-family: Georgia, "Source Han Serif SC", "Songti SC", serif;
+    font-weight: 600;
+    color: var(--ink);
+    letter-spacing: -0.01em;
+  }
+  h1 {
+    font-size: 2.1rem;
+    line-height: 1.15;
+    margin: 0 0 0.4rem 0;
+  }
+  h2 {
+    font-size: 1.45rem;
+    margin: 3rem 0 0.6rem 0;
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 0.3rem;
+  }
+  h3 {
+    font-size: 1.12rem;
+    margin: 1.6rem 0 0.4rem 0;
+    color: var(--ink-soft);
+  }
+  p { margin: 0.8rem 0; }
+  /* Marginalia-style aside */
+  .lede {
+    font-size: 1.05rem;
+    color: var(--ink-soft);
+    font-style: italic;
+    border-left: 3px solid var(--accent);
+    padding-left: 0.9rem;
+    margin: 1rem 0 1.6rem 0;
+  }
+  .meta {
+    color: var(--ink-faint);
+    font-size: 0.85rem;
+    margin-bottom: 1.6rem;
+  }
+  .meta a { color: var(--ink-faint); }
+  code, pre, kbd {
+    font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    font-size: 0.92em;
+  }
+  /* Inline code */
+  p code, li code, td code {
+    background: var(--code-inline);
+    padding: 0.08em 0.36em;
+    border-radius: 3px;
+    color: var(--ink);
+  }
+  /* Code block */
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--rule);
+    padding: 0.9rem 1rem;
+    border-radius: 4px;
+    overflow-x: auto;
+    line-height: 1.5;
+    margin: 0.8rem 0;
+  }
+  pre code { background: transparent; padding: 0; }
+  /* Numbered list with tighter spacing */
+  ol.steps { padding-left: 1.4rem; }
+  ol.steps li { margin: 0.55rem 0; }
+  /* Task box */
+  .task {
+    background: #fff;
+    border: 1px solid var(--rule);
+    border-left: 4px solid var(--accent);
+    padding: 1rem 1.2rem;
+    margin: 1.4rem 0;
+    border-radius: 3px;
+  }
+  .task h3 {
+    margin-top: 0;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 0.85rem;
+    font-family: -apple-system, sans-serif;
+    font-weight: 700;
+  }
+  /* Quiz */
+  .quiz { margin: 1.6rem 0; }
+  .quiz-q {
+    background: #fff;
+    border: 1px solid var(--rule);
+    padding: 1rem 1.2rem;
+    border-radius: 3px;
+    margin: 0.8rem 0;
+  }
+  .quiz-q p:first-child { margin-top: 0; font-weight: 600; }
+  .quiz-opt {
+    display: block;
+    margin: 0.3rem 0;
+    cursor: pointer;
+  }
+  .quiz-opt input { margin-right: 0.5rem; }
+  .quiz-feedback {
+    display: none;
+    margin-top: 0.6rem;
+    padding: 0.5rem 0.8rem;
+    border-radius: 3px;
+    font-size: 0.95rem;
+  }
+  .quiz-feedback.show { display: block; }
+  .quiz-feedback.good { background: #e8f3ea; color: var(--good); border: 1px solid #b6d8be; }
+  .quiz-feedback.bad  { background: #fbeae5; color: var(--bad);  border: 1px solid #e8b9a8; }
+  /* Footer */
+  hr { border: none; border-top: 1px solid var(--rule); margin: 2.4rem 0 1.2rem 0; }
+  footer { color: var(--ink-faint); font-size: 0.85rem; }
+  footer a { color: var(--ink-soft); }
+  /* Print friendly */
+  @media print {
+    body { background: white; max-width: none; padding: 1.2rem; }
+    .task, .quiz-q { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Node.js 运行时:从浏览器到服务器</h1>
+  <p class="lede">给前端工程师的 Node 第一课 — 跑起来,讲清楚"为什么",为后面所有 NestJS 课打地基。</p>
+  <p class="meta">
+    课时 0001 · 预计 25 分钟 · 锚定项目 <code>nest-search</code>
+    · 上一节: 无 · 下一节: <a href="#what-next">Node 异步与错误处理</a>
+  </p>
+</header>
+
+<hr>
+
+<h2>你今天会拿到什么</h2>
+<ol class="steps">
+  <li>把 <code>nest-search</code> 跑起来,并 <code>curl</code> 通一次 gateway</li>
+  <li>能说清 Node 的事件循环和浏览器的差异</li>
+  <li>知道 <code>require</code> / <code>module.exports</code> / <code>__dirname</code> / <code>process.env</code> 各自在做什么</li>
+  <li>提交一行代码,作为后续日志系统的"探针"</li>
+</ol>
+
+<h2>0. Pre-flight:这是从哪开始的</h2>
+<p>你是一个 8 年的前端工程师。你熟悉 Chrome 的 V8、熟悉 <code>fetch</code>、熟悉 React 的渲染模型。下面这张表是 Node 和浏览器在底层能力上的几个关键差异 — 知道这些,你后面看到 NestJS 任意一段代码都不会慌。</p>
+
+<table style="width:100%; border-collapse: collapse; margin: 1rem 0;">
+  <thead>
+    <tr style="border-bottom: 1px solid var(--rule); text-align: left;">
+      <th style="padding: 0.4rem 0.6rem;">能力</th>
+      <th style="padding: 0.4rem 0.6rem;">浏览器</th>
+      <th style="padding: 0.4rem 0.6rem;">Node</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr style="border-bottom: 1px solid var(--rule);">
+      <td style="padding: 0.4rem 0.6rem;">文件系统 <code>fs</code></td>
+      <td style="padding: 0.4rem 0.6rem;">❌ 没有</td>
+      <td style="padding: 0.4rem 0.6rem;">✅ 同步/异步都支持</td>
+    </tr>
+    <tr style="border-bottom: 1px solid var(--rule);">
+      <td style="padding: 0.4rem 0.6rem;">网络 <code>net</code> / <code>http</code></td>
+      <td style="padding: 0.4rem 0.6rem;">只能发请求(<code>fetch</code>)</td>
+      <td style="padding: 0.4rem 0.6rem;">既能发,也能<strong>起服务</strong></td>
+    </tr>
+    <tr style="border-bottom: 1px solid var(--rule);">
+      <td style="padding: 0.4rem 0.6rem;">进程 / 信号</td>
+      <td style="padding: 0.4rem 0.6rem;">❌</td>
+      <td style="padding: 0.4rem 0.6rem;"><code>process</code> / <code>SIGTERM</code></td>
+    </tr>
+    <tr style="border-bottom: 1px solid var(--rule);">
+      <td style="padding: 0.4rem 0.6rem;">子进程 / 多线程</td>
+      <td style="padding: 0.4rem 0.6rem;">Web Workers</td>
+      <td style="padding: 0.4rem 0.6rem;"><code>child_process</code> / <code>worker_threads</code></td>
+    </tr>
+    <tr style="border-bottom: 1px solid var(--rule);">
+      <td style="padding: 0.4rem 0.6rem;">JS 引擎</td>
+      <td style="padding: 0.4rem 0.6rem;">V8</td>
+      <td style="padding: 0.4rem 0.6rem;">V8</td>
+    </tr>
+  </tbody>
+</table>
+<p>最下面一行是 <em>共性</em> — 这也是为什么前端转后端"语法上零成本",真正要学的是表里上面四行的差异。</p>
+
+<h2>1. 事件循环:30 秒版本</h2>
+<p>Node 是<strong>单线程</strong>(只有一个主线程执行 JS),但它是<strong>非阻塞</strong>的。这个"非阻塞"靠的是 libuv(底层 C 库)+ 一个循环,叫事件循环(event loop)。</p>
+
+<p>你跑 <code>node main.js</code> 时,NestJS 的 <code>bootstrap()</code> 会被调用一次,然后 Node 进入事件循环 — 等任务、取任务、执行任务、回到"等"。每次循环叫一个 <strong>tick</strong>。</p>
+
+<pre><code>   ┌───────────────────────────┐
+┌─▶│        timers             │ ← setTimeout / setInterval 回调
+│  └─────────────┬─────────────┘
+│  ┌─────────────▼─────────────┐
+│  │     pending callbacks     │ ← I/O 回调(上一轮延后的)
+│  └─────────────┬─────────────┘
+│  ┌─────────────▼─────────────┐
+│  │       idle, prepare       │ ← 内部用,通常忽略
+│  └─────────────┬─────────────┘
+│  ┌─────────────▼─────────────┐
+│  │          poll             │ ← 取出新 I/O 事件,执行回调
+│  └─────────────┬─────────────┘
+│  ┌─────────────▼─────────────┐
+│  │          check            │ ← setImmediate 回调
+│  └─────────────┬─────────────┘
+│  ┌─────────────▼─────────────┐
+│  │  close callbacks          │ ← socket.on('close')
+│  └─────────────┬─────────────┘
+└──┘                              一个 tick 完成,回到 timers
+</code></pre>
+
+<p>三条需要记住的铁律:</p>
+<ol>
+  <li>每个 phase 都有自己的 FIFO 队列,phase 跑完才进下一个 phase</li>
+  <li><code>process.nextTick</code> 和 <code>Promise.then</code> 是<strong>微任务</strong>,在<strong>每个 phase 切换之间</strong>清空 — 永远比 timers 跑得早</li>
+  <li>I/O 是异步的:你调用 <code>fs.readFile</code>,Node 不会卡住主线程;它把活交给 libuv 的线程池,完成后把回调塞进 pending callbacks</li>
+</ol>
+
+<p class="meta">权威来源:[Node.js Docs — The Node.js Event Loop](https://nodejs.org/en/docs/guides/event-loop-timers-and-nexttick)。第一次看可能糊,正常,后面每节课都会回来引用它。</p>
+
+<h2>2. 这个项目里的 <code>module</code> / <code>require</code> / <code>process</code></h2>
+
+<p>打开 <code>package.json</code> 找 <code>"type": "commonjs"</code> — 这意味着这个项目用的是 <strong>CommonJS</strong> 模块系统(不是 ESM)。所以:</p>
+
+<ul>
+  <li>你看到的 <code>require('express')</code> 不是 ES Module 的 <code>import</code>,是 CJS 的同步加载</li>
+  <li><code>module.exports = ...</code> 不是 <code>export default ...</code></li>
+  <li>每个 <code>.ts</code> 文件被 tsc 编译后,顶部会多出一段 <code>__decorate</code> / <code>__metadata</code> — 那是装饰器(后面课讲)</li>
+</ul>
+
+<p>现在看 <code>apps/gateway/src/main.ts</code> 这段:</p>
+<pre><code>const port = process.env.GATEWAY_PORT || 3000;
+await app.listen(port);
+console.log(`Gateway running on port ${port}`);
+</code></pre>
+
+<p>三个"在浏览器里没有"的东西出现了:</p>
+<ul>
+  <li><code>process.env.GATEWAY_PORT</code> — 从<strong>环境变量</strong>读配置,12-factor app 的核心约定。生产环境里这个值是 K8s/Docker 注入的,本地开发它就是 <code>undefined</code>,所以 <code>|| 3000</code> 兜底</li>
+  <li><code>__dirname</code>(没出现但马上会用)— 当前文件所在的<strong>绝对目录</strong>,常用于读同目录的配置文件</li>
+  <li><code>process.cwd()</code> — Node 进程<strong>启动时</strong>所在的工作目录,通常就是 <code>pnpm start:gateway</code> 执行的位置</li>
+</ul>
+
+<p class="meta">权威来源:[Node.js Docs — Process](https://nodejs.org/api/process.html) 和 [Node.js Docs — CommonJS modules](https://nodejs.org/api/modules.html)。</p>
+
+<h2>3. 跑通你的第一次 <code>pnpm start</code></h2>
+
+<p>这是你今天<strong>唯一</strong>要动手的环节。其它部分都可以读一遍就过。</p>
+
+<div class="task">
+  <h3>Hands-on · 25 分钟</h3>
+  <ol class="steps">
+    <li>开两个终端,都 <code>cd /Users/nmsn/Studio/nest-search</code></li>
+    <li>终端 A:<code>docker compose up -d</code> — 起 MySQL / Redis / RabbitMQ / Elasticsearch</li>
+    <li>终端 A:<code>docker compose ps</code> — 等所有服务状态变 <code>healthy</code>(约 30s-1min)</li>
+    <li>终端 B:<code>pnpm start:gateway</code> — 跑 gateway</li>
+    <li>看到 <code>Gateway running on port 3000</code> 后,终端 B 新开标签:<code>curl -i http://localhost:3000</code></li>
+    <li>观察:你看到的 HTTP 状态码是什么?响应头里有没有 <code>x-api-key</code> 相关的报错?控制台是不是打了 <code>console.log</code>?</li>
+  </ol>
+  <p><strong>预期现象</strong>: <code>401</code> 或 <code>403</code> 类(因为 ApiKeyGuard 会拦),控制台看到 <code>console.log</code>。如果 200,说明默认 API key 放行了,这其实是个<strong>小漏洞</strong>(LR-0002 里记着)。</p>
+</div>
+
+<h2>4. 你今天该交的一行代码</h2>
+
+<div class="task">
+  <h3>Commit · 5 分钟</h3>
+  <p>在 <code>apps/gateway/src/main.ts</code> 里,<strong>在 <code>await app.listen(port)</code> 之前</strong>加一行:</p>
+  <pre><code>console.log('cwd:', process.cwd(), 'env.PORT:', process.env.PORT);
+</code></pre>
+  <p>重启 <code>pnpm start:gateway</code>,观察控制台 — 你会看到 Node 进程的工作目录和当前环境里所有跟 PORT 相关的变量(包括 <code>PATH</code>、<code>SHELL</code> 这种无关的)。</p>
+  <p><strong>你在验证什么</strong>: <code>process.cwd()</code> 跟你 <code>pwd</code> 命令输出一致,说明 Node 不是"在 gateway 目录里"运行,而是"在 <code>pnpm start:gateway</code> 触发的 cwd 里"运行 — 这是后面所有"读配置 / 读证书 / 写日志"路径问题的根。</p>
+  <p style="color: var(--ink-soft); font-size: 0.92rem;">⚠️ 这行保留 commit,下一节课我们会把 <code>console.log</code> 替换成 Pino。</p>
+</div>
+
+<h2>5. 自我检测(3 道题)</h2>
+
+<div class="quiz">
+  <div class="quiz-q" data-correct="b">
+    <p>1. Node 进程里,主线程上一次"什么都不做"地去拿下一个事件,是在事件循环的哪个阶段?</p>
+    <label class="quiz-opt"><input type="radio" name="q1" value="a"> timers</label>
+    <label class="quiz-opt"><input type="radio" name="q1" value="b"> poll</label>
+    <label class="quiz-opt"><input type="radio" name="q1" value="c"> close callbacks</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz-q" data-correct="c">
+    <p>2. <code>process.env.API_KEY</code> 在生产环境里,通常是由谁注入的?</p>
+    <label class="quiz-opt"><input type="radio" name="q2" value="a"> 写死在 <code>.env</code> 文件里,然后 commit 到 git</label>
+    <label class="quiz-opt"><input type="radio" name="q2" value="b"> Node 自己从 npm registry 拉</label>
+    <label class="quiz-opt"><input type="radio" name="q2" value="c"> 部署平台(K8s / Docker / PM2)注入到进程环境</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz-q" data-correct="a">
+    <p>3. <code>__dirname</code> 和 <code>process.cwd()</code> 的根本区别是什么?</p>
+    <label class="quiz-opt"><input type="radio" name="q3" value="a"> <code>__dirname</code> 是当前源文件的绝对路径;<code>process.cwd()</code> 是进程启动时的工作目录</label>
+    <label class="quiz-opt"><input type="radio" name="q3" value="b"> 两者等价</label>
+    <label class="quiz-opt"><input type="radio" name="q3" value="c"> <code>__dirname</code> 是相对路径,<code>process.cwd()</code> 是绝对路径</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+</div>
+
+<h2 id="what-next">下一节预告</h2>
+<p>你刚刚把 Node 跑起来了,但还没碰<strong>异步错误</strong>。一个 Node 进程如果 throw 了一个 unhandled rejection,默认行为是<strong>让进程退出</strong> — 这就是为啥我们经常看到生产上 Node 服务"莫名其妙挂了"。<strong>Lesson 0002</strong> 我们会在 gateway 里<strong>故意 throw 一个 promise rejection</strong>,然后用 <code>unhandledRejection</code> 钩子接住它,顺便把"为什么 NestJS 要把 <code>enableShutdownHooks()</code> 打开"讲清楚。</p>
+
+<h2>延伸阅读</h2>
+<ul>
+  <li><a href="https://nodejs.org/en/docs/guides/event-loop-timers-and-nexttick">Node.js Docs — The Node.js Event Loop, Timers, and process.nextTick</a>(必读,但可以分三次读)</li>
+  <li><a href="https://github.com/goldbergyoni/nodebestpractices">Node.js Best Practices(Goldberg Yoni)</a> — 读 1.1 / 1.2 / 1.3 三节,看到很多"哦原来要这样"的小习惯</li>
+  <li><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Event_loop">MDN — Event loop</a> — 浏览器侧对照,看 V8 之上"事件循环"如何被宿主差异化</li>
+  <li><a href="../MISSION.md">MISSION.md</a> · <a href="../RESOURCES.md">RESOURCES.md</a> · <a href="../learning-records/0001-prior-knowledge-and-first-phase.md">LR-0001</a> · <a href="../learning-records/0002-nest-search-inventory.md">LR-0002</a></li>
+</ul>
+
+<p style="margin-top: 1.6rem; color: var(--accent); font-weight: 600;">📌 任何不清楚的地方直接问我 — 哪怕是"为什么 <code>__dirname</code> 不是下划线"这种问题。这一节是后面 5 节课的地基,地基打歪了后面都白搭。</p>
+
+<hr>
+<footer>
+  nest-search · teach workspace · 课时 0001<br>
+  <a href="mailto:无">有问题直接问 Claude</a> · 这是个持续教学会话,会一直记录你的进度
+</footer>
+
+<script>
+function check(btn) {
+  const q = btn.closest('.quiz-q');
+  const correct = q.dataset.correct;
+  const picked = q.querySelector('input[type=radio]:checked');
+  const fb = q.querySelector('.quiz-feedback');
+  if (!picked) {
+    fb.textContent = '⚠️ 选一个再提交。';
+    fb.className = 'quiz-feedback show bad';
+    return;
+  }
+  if (picked.value === correct) {
+    fb.textContent = '✅ 对了。';
+    fb.className = 'quiz-feedback show good';
+  } else {
+    fb.textContent = '❌ 不对,回到 §1 / §2 重读一遍,再试一次。';
+    fb.className = 'quiz-feedback show bad';
+  }
+}
+</script>
+
+</body>
+</html>
