@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>0002 · Node 异步与错误处理:三层防御</title>
+<style>
+  :root {
+    --bg: #fbfaf7;
+    --ink: #1d1d1d;
+    --ink-soft: #4a4a4a;
+    --ink-faint: #8a8a8a;
+    --rule: #d6d2c4;
+    --accent: #b04a2f;
+    --code-bg: #f1efe8;
+    --code-inline: #ece8db;
+    --good: #2c6e3e;
+    --bad: #b04a2f;
+    --pad: 2.4rem;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "SF Pro Text", "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  body { max-width: 760px; margin: 0 auto; padding: var(--pad); }
+  h1, h2, h3 { font-family: Georgia, "Source Han Serif SC", "Songti SC", serif; font-weight: 600; letter-spacing: -0.01em; }
+  h1 { font-size: 2.1rem; line-height: 1.15; margin: 0 0 0.4rem 0; }
+  h2 { font-size: 1.45rem; margin: 3rem 0 0.6rem 0; border-bottom: 1px solid var(--rule); padding-bottom: 0.3rem; }
+  h3 { font-size: 1.12rem; margin: 1.6rem 0 0.4rem 0; color: var(--ink-soft); }
+  p { margin: 0.8rem 0; }
+  .lede { font-size: 1.05rem; color: var(--ink-soft); font-style: italic; border-left: 3px solid var(--accent); padding-left: 0.9rem; margin: 1rem 0 1.6rem 0; }
+  .meta { color: var(--ink-faint); font-size: 0.85rem; margin-bottom: 1.6rem; }
+  .meta a { color: var(--ink-faint); }
+  code, pre, kbd { font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace; font-size: 0.92em; }
+  p code, li code, td code { background: var(--code-inline); padding: 0.08em 0.36em; border-radius: 3px; color: var(--ink); }
+  pre { background: var(--code-bg); border: 1px solid var(--rule); padding: 0.9rem 1rem; border-radius: 4px; overflow-x: auto; line-height: 1.5; margin: 0.8rem 0; }
+  pre code { background: transparent; padding: 0; }
+  ol.steps { padding-left: 1.4rem; }
+  ol.steps li { margin: 0.55rem 0; }
+  .task { background: #fff; border: 1px solid var(--rule); border-left: 4px solid var(--accent); padding: 1rem 1.2rem; margin: 1.4rem 0; border-radius: 3px; }
+  .task h3 { margin-top: 0; color: var(--accent); text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.85rem; font-family: -apple-system, sans-serif; font-weight: 700; }
+  .quiz { margin: 1.6rem 0; }
+  .quiz-q { background: #fff; border: 1px solid var(--rule); padding: 1rem 1.2rem; border-radius: 3px; margin: 0.8rem 0; }
+  .quiz-q p:first-child { margin-top: 0; font-weight: 600; }
+  .quiz-opt { display: block; margin: 0.3rem 0; cursor: pointer; }
+  .quiz-opt input { margin-right: 0.5rem; }
+  .quiz-feedback { display: none; margin-top: 0.6rem; padding: 0.5rem 0.8rem; border-radius: 3px; font-size: 0.95rem; }
+  .quiz-feedback.show { display: block; }
+  .quiz-feedback.good { background: #e8f3ea; color: var(--good); border: 1px solid #b6d8be; }
+  .quiz-feedback.bad { background: #fbeae5; color: var(--bad); border: 1px solid #e8b9a8; }
+  .layer-box { background: #fff; border: 1px solid var(--rule); border-radius: 3px; padding: 1rem 1.2rem; margin: 1rem 0; }
+  .layer-box .name { font-weight: 600; color: var(--accent); font-family: -apple-system, sans-serif; }
+  .layer-box .does { color: var(--ink-soft); font-size: 0.95rem; }
+  .layer-box .scope { color: var(--ink-faint); font-size: 0.85rem; font-style: italic; }
+  hr { border: none; border-top: 1px solid var(--rule); margin: 2.4rem 0 1.2rem 0; }
+  footer { color: var(--ink-faint); font-size: 0.85rem; }
+  footer a { color: var(--ink-soft); }
+  @media print {
+    body { background: white; max-width: none; padding: 1.2rem; }
+    .task, .quiz-q, .layer-box { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Node 异步与错误处理:三层防御</h1>
+  <p class="lede">把"throw 在 controller 里"和"Promise reject 没人接"区别开,看清 NestJS 的过滤器到底管不到哪里。</p>
+  <p class="meta">
+    课时 0002 · 预计 30 分钟 · 锚定项目 <code>nest-search</code>
+    · 上一节: <a href="0001-node-runtime-for-frontend-dev.html">Node 运行时</a>
+    · 下一节: <a href="#what-next">Node 进程生命周期</a>
+  </p>
+</header>
+
+<hr>
+
+<h2>你今天会拿到什么</h2>
+<ol class="steps">
+  <li>在脑子里画清楚"错误的三层防御":handler throw / NestJS Filter / process.on</li>
+  <li>知道为什么 NestJS 的 <code>AllExceptionsFilter</code> 抓不住所有错误</li>
+  <li>亲手在 <code>main.ts</code> 加 <code>process.on('unhandledRejection')</code> + <code>uncaughtException</code> 钩子</li>
+  <li>在 <code>AllExceptionsFilter</code> 加一行日志,把"被吞掉的异常"显形</li>
+  <li>一个可提交的 commit,完成第一阶段"可观测性三件套"的日志地基</li>
+</ol>
+
+<h2>1. 错误的三种"出口"</h2>
+<p>Node 把错误分成三个互不重叠的家族。混淆它们是 backend 新手最常见的"为什么我的错误没被处理"的根因。</p>
+
+<div class="layer-box">
+  <div class="name">家族 A:同步 throw</div>
+  <div class="does">在调用栈上被 <code>try/catch</code> 接住,或者冒泡到事件循环外变成 <code>uncaughtException</code>。</div>
+  <div class="scope">作用域: 当前调用栈。</div>
+</div>
+
+<div class="layer-box">
+  <div class="name">家族 B:错误优先回调(error-first callback)</div>
+  <div class="does">Node 老 API 风格 <code>fs.readFile(path, (err, data) =&gt; ...)</code>,错误是参数,不是 throw。</div>
+  <div class="scope">作用域: 调用者注册的回调。NestJS 几乎不直接用,但内部库会用(比如 ioredis 早期版本)。</div>
+</div>
+
+<div class="layer-box">
+  <div class="name">家族 C:Promise rejection</div>
+  <div class="does">Promise 被 reject 但没人在 <code>.then(onFulfilled, onRejected)</code> / <code>.catch()</code> / <code>await</code> 里接住时,会变成 <code>unhandledRejection</code>。</div>
+  <div class="scope">作用域: 进程级事件,<strong>不在任何请求的处理链上</strong>。</div>
+</div>
+
+<p>关键点: <strong>A 走调用栈,C 走事件队列</strong>。它们的"漏出去"的兜底机制完全不同 — 这就是为什么我们要把 <code>process.on('unhandledRejection')</code> 单独提出来讲。</p>
+
+<h2>2. NestJS 异常流的 5 层</h2>
+<p>当一个 HTTP 请求进入 NestJS,错误可能在这 5 层中的某一层被处理(也可能漏出去):</p>
+
+<pre><code>请求进 ─▶ Guard ─▶ Interceptor ─▶ Pipe ─▶ Controller.handler ─▶ Service
+                                          │
+                                          │ throw new HttpException(...)
+                                          ▼
+                                NestJS 内置 Catch ─▶ ExceptionFilter
+                                          │              ▲
+                                          │              │ 我们写的 AllExceptionsFilter
+                                          ▼              │
+                                      HTTP Response (JSON) ─▶ 客户端
+</code></pre>
+
+<p>只有当 throw 发生在<strong>请求上下文内</strong>(Guard / Pipe / Controller / Service 调用链),NestJS 才会把它路由到 <code>AllExceptionsFilter.catch()</code>。其它地方 — 比如 setTimeout 回调、EventEmitter 监听器、第三方库内部的 Promise — NestJS <strong>看不见</strong>。</p>
+
+<p>打开现在项目的 <code>apps/gateway/src/filters/all-exceptions.filter.ts</code>:</p>
+
+<pre><code>export class AllExceptionsFilter implements ExceptionFilter {
+  catch(exception: unknown, host: ArgumentsHost) {
+    // ... 把 exception 翻译成 HTTP 响应
+  }
+}
+</code></pre>
+
+<p>它确实写得不错 — 区分 <code>HttpException</code>(可控)和其他(不可控),返回统一格式。<strong>但它没打日志</strong>。意思是:每次出 500,你的控制台是干净的,你只能靠事后看 access log 反推,没有 stack、没有发生时间、没有上下文。</p>
+
+<h2>3. NestJS 看不到的世界</h2>
+<p>考虑下面这段伪代码(在 controller <strong>外面</strong>执行):</p>
+
+<pre><code>// 启动时排个延时任务
+setTimeout(() => {
+  fetch('http://downstream-service/some-api')   // 假设这是个会 reject 的 promise
+    .catch(err => logger.error(err));            // 我们写了 catch
+}, 5000);
+
+// 几个月后,有人重构时把 .catch 删了
+setTimeout(() => {
+  fetch('http://downstream-service/some-api')   // ← 没 catch
+}, 5000);
+</code></pre>
+
+<p>这个 fetch reject 时,Node 会发出 <code>'unhandledRejection'</code> 事件。<strong>NestJS 完全不知道这件事发生过</strong>。默认行为(在 Node 15+):打印到 stderr,下一次事件循环时<strong>让进程退出</strong>(退出码 1)。</p>
+
+<p class="meta">权威来源: [Node.js Docs — process: 'unhandledRejection' event](https://nodejs.org/api/process.html#warning-using-uncaughtexception-correctly)。Node 15+ 默认 <code>--unhandled-rejections=throw</code>。</p>
+
+<p>"让进程退出"听起来激进,但实际上**这是你想要的行为**。理由:你的服务已经进入了"不知道自己不知道"的状态 — 不知道哪个请求没被处理、不知道状态是否一致、不知道连接池是否泄漏。<strong>让进程死掉、让 K8s 重启、让健康检查拉黑、让告警响起</strong>,比"带着内存泄漏和连接泄漏继续服务下一个请求"安全得多。</p>
+
+<h2>4. 进程级钩子</h2>
+<p>Node 给你两个钩子去拦截这类灾难:</p>
+
+<pre><code>process.on('unhandledRejection', (reason, promise) =&gt; {
+  console.error('[unhandledRejection]', reason);
+  // 强烈建议:这里<strong>不要</strong>尝试恢复。记日志,然后让进程退出。
+  process.exit(1);
+});
+
+process.on('uncaughtException', (err) =&gt; {
+  console.error('[uncaughtException]', err);
+  process.exit(1);
+});
+</code></pre>
+
+<p>几个生产级约定:</p>
+<ol>
+  <li><strong>永远 log 完整 stack</strong>(上面的 <code>console.error(err)</code> 会自动展开 stack)</li>
+  <li><strong>永远</strong>在钩子里调 <code>process.exit</code>(默认行为虽然会退出,但显式退出可以让你控制退出码和清理顺序)</li>
+  <li><strong>不要在这里面 throw</strong> — 会触发另一个 uncaughtException,雪崩</li>
+  <li>NestJS 11 的 <code>app.enableShutdownHooks()</code> 会拦截 <code>SIGTERM</code> / <code>SIGINT</code>,这跟我们今天的钩子互补但不冲突(下节课讲)</li>
+</ol>
+
+<h2>5. 动手 · 30 分钟</h2>
+<p>这是本节课的实质部分 — 三个改动,每个都在 1-3 行内。完成后跑起来验证,然后我们 0002 末尾的 commit 命令一次性收口。</p>
+
+<div class="task">
+  <h3>5.1 · 在 main.ts 加进程级钩子</h3>
+  <p>打开 <code>apps/gateway/src/main.ts</code>,在 <code>bootstrap()</code> 之前(文件顶部,import 之后)加两段:</p>
+  <pre><code>process.on('unhandledRejection', (reason) =&gt; {
+  console.error('[unhandledRejection]', reason);
+});
+process.on('uncaughtException', (err) =&gt; {
+  console.error('[uncaughtException]', err);
+});
+</code></pre>
+  <p><strong>注意</strong>: 这里我们<strong>不</strong>调 <code>process.exit</code>。gateway 是生产服务的入口,本课目的是"让异常显形 + 不让进程爆炸" — 是否退出留给 NestJS 的 <code>enableShutdownHooks</code>(下节课)来管。</p>
+</div>
+
+<div class="task">
+  <h3>5.2 · 在 AllExceptionsFilter 加一行日志</h3>
+  <p>打开 <code>apps/gateway/src/filters/all-exceptions.filter.ts</code>,在 <code>catch()</code> 方法最前面加一行:</p>
+  <pre><code>catch(exception: unknown, host: ArgumentsHost) {
+  console.error('[AllExceptions]', exception);
+  // ... 原有逻辑
+}
+</code></pre>
+  <p>注意我们 log 的是 <code>exception</code> 对象,不是 <code>exception.message</code> — 因为 console.error 会展开 stack 和类型,后者只给字符串。</p>
+</div>
+
+<div class="task">
+  <h3>5.3 · 验证三个路径</h3>
+  <ol class="steps">
+    <li>重启 <code>pnpm start:gateway</code></li>
+    <li><strong>路径 1</strong>(同步 throw,应该被 filter 接住):<br>
+      临时改 <code>app.controller.ts</code> 的 <code>health()</code>:<br>
+      <pre><code>@Get('health')
+health() {
+  throw new Error('boom-sync');
+}</code></pre>
+      <code>curl -i http://localhost:3000/health</code> — 期望:500 + body 含 "boom-sync",控制台看到 <code>[AllExceptions]</code> 日志
+    </li>
+    <li><strong>路径 2</strong>(Promise reject,应该被 process.on 接住):<br>
+      还原 health(),改成:<br>
+      <pre><code>@Get('health')
+async health() {
+  Promise.reject(new Error('boom-async-no-catch'));
+  return { status: 'ok' };
+}</code></pre>
+      <code>curl -i http://localhost:3000/health</code> — 期望:200(因为 handler 本身没 throw),但<strong>控制台立刻</strong>看到 <code>[unhandledRejection] Error: boom-async-no-catch</code>
+    </li>
+    <li><strong>路径 3</strong>(完全对照):<br>
+      还原成原版 <code>return { status: 'ok', ... }</code>,再 curl 一次,确认控制台是干净的
+    </li>
+  </ol>
+</div>
+
+<p>三个路径都验证到了,你就有了一张完整的"错误家族"图:</p>
+
+<pre><code>  同步 throw ───────▶ [AllExceptions] 日志  ──▶ HTTP 500 响应
+                       ▲
+                       │ NestJS 异常管道
+                       │
+  Promise reject  ────▶ process.on('unhandledRejection')  ──▶ 仅日志
+  (无 catch)            ▲
+                       │ 进程级事件
+                       │
+  throw 在 setTimeout  ──▶ 同上
+</code></pre>
+
+<h2>6. 自我检测(3 道题)</h2>
+
+<div class="quiz">
+  <div class="quiz-q" data-correct="b">
+    <p>1. Node 默认(<code>--unhandled-rejections=throw</code>)对 unhandled promise rejection 的行为是?</p>
+    <label class="quiz-opt"><input type="radio" name="q1" value="a"> 静默,什么都不做</label>
+    <label class="quiz-opt"><input type="radio" name="q1" value="b"> 打印到 stderr,下一次事件循环时让进程退出(退出码 1)</label>
+    <label class="quiz-opt"><input type="radio" name="q1" value="c"> 自动 throw 一个 Error 到主线程</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz-q" data-correct="a">
+    <p>2. <code>AllExceptionsFilter</code> 能不能接住 <code>setTimeout(() =&gt; throw new Error(...), 1000)</code> 这种 throw?</p>
+    <label class="quiz-opt"><input type="radio" name="q2" value="a"> 不能,因为异常发生在请求上下文之外</label>
+    <label class="quiz-opt"><input type="radio" name="q2" value="b"> 能,所有 throw 都会被全局 filter 接住</label>
+    <label class="quiz-opt"><input type="radio" name="q2" value="c"> 能,但只在 Gateway 配置了 <code>useGlobalFilters</code> 时</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz-q" data-correct="c">
+    <p>3. 在 <code>process.on('unhandledRejection')</code> 钩子里,最佳实践是?</p>
+    <label class="quiz-opt"><input type="radio" name="q3" value="a"> 静默忽略,继续服务</label>
+    <label class="quiz-opt"><input type="radio" name="q3" value="b"> 重新 throw,让默认行为生效</label>
+    <label class="quiz-opt"><input type="radio" name="q3" value="c"> 记录日志(可选 process.exit(1)),<strong>不要</strong>尝试恢复状态</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+</div>
+
+<h2 id="what-next">下一节预告</h2>
+<p>你刚刚让"漏出去的异常"显形了,但还缺一块 — 进程在收到 <code>SIGTERM</code>(K8s 滚动升级)时,会怎么死?默认是"硬死":所有进行中的连接断掉,RabbitMQ consumer 不发 ack,Redis 连接不释放,新的请求进来发现 socket 没了。<strong>Lesson 0003 · Node 进程生命周期</strong>: 加 <code>app.enableShutdownHooks()</code>、看 NestJS 怎么协调 SIGTERM、对比"硬死 vs 软死"的时间线。</p>
+
+<h2>收口 · 这一节你 commit 什么</h2>
+<p>本节课的代码产物是 2 个文件:</p>
+<ul>
+  <li><code>apps/gateway/src/main.ts</code> — 加 2 个 <code>process.on</code> 钩子</li>
+  <li><code>apps/gateway/src/filters/all-exceptions.filter.ts</code> — 加 1 行 <code>console.error</code></li>
+</ul>
+
+<p>commit message(直接复制,改 author 留给 git 自己):</p>
+<pre><code>feat(gateway): log unhandled errors and process-level events
+
+- Add process.on('unhandledRejection') and process.on('uncaughtException')
+  hooks in gateway bootstrap so framework-invisible errors become visible
+- Add console.error logging in AllExceptionsFilter so every caught
+  error leaves a stack trace in the gateway logs
+
+Refs: docs/teaching/lessons/0002-async-and-errors.html
+</code></pre>
+
+<p>把答案告诉我(quiz 选了什么 / 5.3 三个路径控制台都看到什么),我就收口 0002 + 帮你执行上面的 commit 命令 + 写 LR-0005,然后建 0003。</p>
+
+<h2>延伸阅读</h2>
+<ul>
+  <li><a href="https://nodejs.org/api/process.html#event-unhandledrejection">Node.js Docs — 'unhandledRejection' event</a>(必读,讲清默认行为和退出码)</li>
+  <li><a href="https://docs.nestjs.com/exception-filters">NestJS Docs — Exception filters</a>(讲清 <code>@Catch()</code> 装饰器的工作原理)</li>
+  <li><a href="https://github.com/goldbergyoni/nodebestpractices/blob/master/sections/errorhandling.md">Node.js Best Practices — Error Handling</a>(章节 7,生产级错误处理清单)</li>
+  <li><a href="../MISSION.md">MISSION.md</a> · <a href="../RESOURCES.md">RESOURCES.md</a> · <a href="../learning-records/0003-typescript-types-vs-runtime.md">LR-0003</a> · <a href="../learning-records/0004-event-loop-poll-phase-misconception.md">LR-0004</a></li>
+</ul>
+
+<p style="margin-top: 1.6rem; color: var(--accent); font-weight: 600;">📌 任何不清楚的地方直接问我 — 特别是"为什么我故意写的 reject 反而不会让进程死掉"这种反直觉点。`process.exit` 不加是教学目的,但生产上你应该加。</p>
+
+<hr>
+<footer>
+  nest-search · teach workspace · 课时 0002<br>
+  有问题直接问 Claude
+</footer>
+
+<script>
+function check(btn) {
+  const q = btn.closest('.quiz-q');
+  const correct = q.dataset.correct;
+  const picked = q.querySelector('input[type=radio]:checked');
+  const fb = q.querySelector('.quiz-feedback');
+  if (!picked) {
+    fb.textContent = '⚠️ 选一个再提交。';
+    fb.className = 'quiz-feedback show bad';
+    return;
+  }
+  if (picked.value === correct) {
+    fb.textContent = '✅ 对了。';
+    fb.className = 'quiz-feedback show good';
+  } else {
+    fb.textContent = '❌ 不对,回到 §3 / §4 重读一遍,再试一次。';
+    fb.className = 'quiz-feedback show bad';
+  }
+}
+</script>
+
+</body>
+</html>
