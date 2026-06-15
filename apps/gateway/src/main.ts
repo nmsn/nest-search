@@ -20,6 +20,7 @@ async function bootstrap() {
     ],
     credentials: true,
   });
+  // app.enableShutdownHooks();
 
   const port = process.env.GATEWAY_PORT || 3000;
   console.log('cwd:', process.cwd(), 'env.PORT:', process.env.PORT);

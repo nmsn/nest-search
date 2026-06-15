@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>0003 · Node 进程生命周期:让服务有序地死</title>
+<style>
+  :root {
+    --bg: #fbfaf7;
+    --ink: #1d1d1d;
+    --ink-soft: #4a4a4a;
+    --ink-faint: #8a8a8a;
+    --rule: #d6d2c4;
+    --accent: #b04a2f;
+    --code-bg: #f1efe8;
+    --code-inline: #ece8db;
+    --good: #2c6e3e;
+    --bad: #b04a2f;
+    --pad: 2.4rem;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "SF Pro Text", "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  body { max-width: 760px; margin: 0 auto; padding: var(--pad); }
+  h1, h2, h3 { font-family: Georgia, "Source Han Serif SC", "Songti SC", serif; font-weight: 600; letter-spacing: -0.01em; }
+  h1 { font-size: 2.1rem; line-height: 1.15; margin: 0 0 0.4rem 0; }
+  h2 { font-size: 1.45rem; margin: 3rem 0 0.6rem 0; border-bottom: 1px solid var(--rule); padding-bottom: 0.3rem; }
+  h3 { font-size: 1.12rem; margin: 1.6rem 0 0.4rem 0; color: var(--ink-soft); }
+  p { margin: 0.8rem 0; }
+  .lede { font-size: 1.05rem; color: var(--ink-soft); font-style: italic; border-left: 3px solid var(--accent); padding-left: 0.9rem; margin: 1rem 0 1.6rem 0; }
+  .meta { color: var(--ink-faint); font-size: 0.85rem; margin-bottom: 1.6rem; }
+  .meta a { color: var(--ink-faint); }
+  code, pre, kbd { font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace; font-size: 0.92em; }
+  p code, li code, td code { background: var(--code-inline); padding: 0.08em 0.36em; border-radius: 3px; color: var(--ink); }
+  pre { background: var(--code-bg); border: 1px solid var(--rule); padding: 0.9rem 1rem; border-radius: 4px; overflow-x: auto; line-height: 1.5; margin: 0.8rem 0; }
+  pre code { background: transparent; padding: 0; }
+  ol.steps { padding-left: 1.4rem; }
+  ol.steps li { margin: 0.55rem 0; }
+  .task { background: #fff; border: 1px solid var(--rule); border-left: 4px solid var(--accent); padding: 1rem 1.2rem; margin: 1.4rem 0; border-radius: 3px; }
+  .task h3 { margin-top: 0; color: var(--accent); text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.85rem; font-family: -apple-system, sans-serif; font-weight: 700; }
+  .quiz { margin: 1.6rem 0; }
+  .quiz-q { background: #fff; border: 1px solid var(--rule); padding: 1rem 1.2rem; border-radius: 3px; margin: 0.8rem 0; }
+  .quiz-q p:first-child { margin-top: 0; font-weight: 600; }
+  .quiz-opt { display: block; margin: 0.3rem 0; cursor: pointer; }
+  .quiz-opt input { margin-right: 0.5rem; }
+  .quiz-feedback { display: none; margin-top: 0.6rem; padding: 0.5rem 0.8rem; border-radius: 3px; font-size: 0.95rem; }
+  .quiz-feedback.show { display: block; }
+  .quiz-feedback.good { background: #e8f3ea; color: var(--good); border: 1px solid #b6d8be; }
+  .quiz-feedback.bad { background: #fbeae5; color: var(--bad); border: 1px solid #e8b9a8; }
+  .timeline { background: #fff; border: 1px solid var(--rule); border-radius: 3px; padding: 1rem 1.2rem; margin: 1rem 0; }
+  .timeline h4 { margin: 0 0 0.5rem 0; font-size: 0.95rem; color: var(--accent); font-family: -apple-system, sans-serif; }
+  .timeline pre { margin: 0.4rem 0; }
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+  th, td { padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--rule); text-align: left; }
+  th { color: var(--ink-soft); font-weight: 600; }
+  hr { border: none; border-top: 1px solid var(--rule); margin: 2.4rem 0 1.2rem 0; }
+  footer { color: var(--ink-faint); font-size: 0.85rem; }
+  footer a { color: var(--ink-soft); }
+  @media print {
+    body { background: white; max-width: none; padding: 1.2rem; }
+    .task, .quiz-q, .timeline { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Node 进程生命周期:让服务有序地死</h1>
+  <p class="lede">K8s 让你死的时候,你有 30 秒。下节课的开场,要么优雅地交出请求,要么硬死被运维骂。</p>
+  <p class="meta">
+    课时 0003 · 预计 30 分钟 · 锚定项目 <code>nest-search</code>
+    · 上一节: <a href="0002-async-and-errors.html">Node 异步与错误处理</a>
+    · 下一节: <a href="#what-next">NestJS 请求生命周期</a>
+  </p>
+</header>
+
+<hr>
+
+<h2>你今天会拿到什么</h2>
+<ol class="steps">
+  <li>能说清 <code>process</code> 对象上最常用的 10 个属性/方法</li>
+  <li>背得下 5 个常用 Unix 信号的含义和"能不能拦"</li>
+  <li>在脑子里画出 K8s 滚动升级的 8 步时间线</li>
+  <li>把 <code>app.enableShutdownHooks()</code> 加到 <code>main.ts</code>,并写一个 LifecycleProbeService 验证 4 个阶段</li>
+  <li>亲手 <code>kill -SIGTERM &lt;pid&gt;</code> 一次,看 gateway 有序退出</li>
+  <li>一个可提交的 commit,把可观测性三件套的"基础生命周期"打地基</li>
+</ol>
+
+<h2>1. <code>process</code> 对象 — 你的进程自画像</h2>
+<p>Node 进程里的全局 <code>process</code> 对象是这个进程<strong>唯一</strong>的自我认知通道。0001 我们摸过 <code>process.cwd()</code> / <code>process.env</code>,这节课把其它常用的一并看:</p>
+
+<table>
+  <thead>
+    <tr><th>属性 / 方法</th><th>类型</th><th>含义</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>process.pid</code></td><td>number</td><td>当前进程 ID(给 <code>kill</code> 命令用)</td></tr>
+    <tr><td><code>process.ppid</code></td><td>number</td><td>父进程 ID(在 K8s 里通常是 container runtime)</td></tr>
+    <tr><td><code>process.uptime()</code></td><td>number</td><td>进程跑了多少秒</td></tr>
+    <tr><td><code>process.argv</code></td><td>string[]</td><td>命令行参数,<code>argv[0]</code> 是 node 二进制路径,<code>argv[1]</code> 是入口文件</td></tr>
+    <tr><td><code>process.env</code></td><td>object</td><td>环境变量(0001 讲过)</td></tr>
+    <tr><td><code>process.cwd()</code></td><td>() =&gt; string</td><td>当前工作目录(0001 讲过)</td></tr>
+    <tr><td><code>process.memoryUsage()</code></td><td>() =&gt; object</td><td>RSS / heapTotal / heapUsed / external 四个数值,看内存</td></tr>
+    <tr><td><code>process.exit(code)</code></td><td>(number) =&gt; never</td><td>立即退出,<code>code</code> 是退出码(0 = 正常,1+ = 异常)</td></tr>
+    <tr><td><code>process.on(signal, fn)</code></td><td>订阅信号</td><td>§2 讲</td></tr>
+  </tbody>
+</table>
+
+<p>记不住没关系 — 留个<strong>查表心锚</strong>: "我现在的进程怎么了" — 看 <code>uptime</code> / <code>memoryUsage</code>; "我要死了" — 看 §2-§4。</p>
+
+<h2>2. 信号家族 — 跟 OS 说话的 5 个词</h2>
+<p>Unix 信号是进程间最古老的"轻量通知": 内核给进程发一个整数,进程可以<strong>忽略</strong>、<strong>用默认动作处理</strong>(通常是退出),或者<strong>用代码拦截</strong>自己处理。Node 把这些信号映射成 <code>process.on('SIGXXX', handler)</code> 事件。</p>
+
+<table>
+  <thead>
+    <tr><th>信号</th><th>编号</th><th>触发场景</th><th>能拦?</th><th>默认行为</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>SIGTERM</code></td><td>15</td><td>K8s / systemd / <code>kill &lt;pid&gt;</code> 默认</td><td>✅</td><td>退出</td></tr>
+    <tr><td><code>SIGINT</code></td><td>2</td><td>Ctrl+C</td><td>✅</td><td>退出</td></tr>
+    <tr><td><code>SIGHUP</code></td><td>1</td><td>历史: 终端挂断;现代: 重载配置(nodemon 监听这个)</td><td>✅</td><td>退出</td></tr>
+    <tr><td><code>SIGKILL</code></td><td>9</td><td><code>kill -9</code> / K8s 超时兜底</td><td>❌</td><td>立即死,内核强制</td></tr>
+    <tr><td><code>SIGUSR2</code></td><td>12</td><td>用户自定义(NestJS <code>enableShutdownHooks</code> 也监听这个)</td><td>✅</td><td>退出</td></tr>
+  </tbody>
+</table>
+
+<p><strong>关键事实</strong>:<code>SIGKILL</code> 内核级强制,任何代码拦不住。这意味着"用 SIGKILL 关服务 = 没有任何 cleanup 的机会" — 所有 in-flight 请求会收到 502,所有未 ack 的消息会丢,所有未刷盘的日志会没。所以生产环境里"我先 SIGKILL 它"是最后手段,不是常规操作。</p>
+
+<p class="meta">权威来源: [Node.js Docs — Process signals](https://nodejs.org/api/process.html#signal-events) 和 [Linux man 7 signal(7)](https://man7.org/linux/man-pages/man7/signal.7.html)。</p>
+
+<h2>3. K8s 滚动升级的 8 步时间线</h2>
+<p>你写的这个 gateway 部署到 K8s 之后,运维做一次滚动升级,<strong>你这个进程在 8 步内会经历</strong>:</p>
+
+<div class="timeline">
+  <h4>第 1 步: kubectl apply / 镜像更新</h4>
+  <pre>Deployment spec 更新 ─▶ ReplicaSet 创建新 Pod</pre>
+</div>
+
+<div class="timeline">
+  <h4>第 2 步: 新 Pod readiness probe 通过</h4>
+  <pre>新 Pod 跑起来,K8s 发 GET /health (默认 10s 一次)
+期待: 200 OK ─▶ Pod 进入 Ready 状态</pre>
+  <p style="color: var(--ink-soft); font-size: 0.92rem;">⚠️ 这就是为什么 0001 我们说"必须修 /health 不能被 ApiKeyGuard 误伤"。</p>
+</div>
+
+<div class="timeline">
+  <h4>第 3 步: 旧 Pod readiness probe 失败 / 或 endpoint 摘除</h4>
+  <pre>Service Controller 收到 endpoint 更新 ─▶ Service 不再把流量打到旧 Pod
+(K8s 默认等 5-10s 让旧 Pod 上的"现存请求"自然结束)</pre>
+</div>
+
+<div class="timeline">
+  <h4>第 4 步: preStop hook (可选,Pod spec 配的)</h4>
+  <pre>比如 sleep 5 给 K8s 自己一点时间把 endpoint 摘掉,避免新请求涌入</pre>
+</div>
+
+<div class="timeline">
+  <h4>第 5 步: SIGTERM 发到旧 Pod 的 1 号进程</h4>
+  <pre>容器 runtime 拿到指令 ─▶ 给 PID 1 发 SIGTERM</pre>
+</div>
+
+<div class="timeline">
+  <h4>第 6 步: 等待 terminationGracePeriodSeconds(默认 30s)</h4>
+  <pre>你的进程可以在这 30 秒里:
+  ✓ 停止接受新 HTTP 请求
+  ✓ 等 in-flight 请求跑完
+  ✓ 关 RabbitMQ / Redis / MySQL 连接(发 ack, 不丢消息)
+  ✓ 刷日志 / 关闭文件句柄
+  ✓ process.exit(0)</pre>
+  <p style="color: var(--ink-soft); font-size: 0.92rem;">🟢 <strong>这就是"软死"</strong>。30 秒够大多数应用做完整 cleanup。</p>
+</div>
+
+<div class="timeline">
+  <h4>第 7 步: 30 秒到点,进程还没退</h4>
+  <pre>SIGKILL(9) ─▶ 内核强制,无 cleanup ─▶ 你的 in-flight 请求被打断,连接被切断</pre>
+  <p style="color: var(--bad); font-size: 0.92rem;">🔴 <strong>这就是"硬死"</strong>。每次发生都要查"为什么没在 30s 内退"。</p>
+</div>
+
+<div class="timeline">
+  <h4>第 8 步: 新 Pod 接管流量</h4>
+  <pre>Service endpoint 更新 ─▶ 流量打到新 Pod</pre>
+</div>
+
+<p>把这 8 步放心里 — backend 工程师做 oncall,被叫醒处理"Pod 启动慢"或者"Pod 关不掉",几乎都跟其中某一步有关。</p>
+
+<h2>4. <code>app.enableShutdownHooks()</code> 内部</h2>
+<p>NestJS 的 <code>enableShutdownHooks()</code> 是把 §3 第 6 步"程序化"的关键: 不开它,SIGTERM 默认直接走 Node 默认行为(立即退出);开了它,NestJS 监听 SIGTERM/SIGINT/SIGUSR2,触发一串有序的 lifecycle 钩子:</p>
+
+<pre><code>收到 SIGTERM
+    │
+    ▼
+OnModuleDestroy    (按依赖<strong>逆序</strong>调用每个 module 的实现)
+    │               ─ 关闭 RabbitMQ 连接,发 nack
+    │               ─ 关闭 Redis 客户端
+    │               ─ 等待 in-flight 业务操作完
+    ▼
+beforeApplicationShutdown  (应用级别,所有 module 都已 destroy 完)
+    │                       ─ 关掉外部定时任务调度
+    ▼
+HTTP server 停止接受新请求 (NestJS 内部)
+    │
+    ▼
+OnApplicationShutdown
+    │               ─ 刷日志到磁盘
+    │               ─ 关闭文件句柄
+    ▼
+process.exit(0)  (默认,如果 30s 内你退出了)</code></pre>
+
+<p>三件需要记住的:</p>
+<ol>
+  <li>这些钩子<strong>默认关闭</strong> — 因为监听信号有一点点性能成本,NestJS 让你显式开启</li>
+  <li>钩子触发顺序是<strong>依赖逆序</strong> — 子 module 先于父 module,跟 §3 第 6 步"先关内层再关外层"对应</li>
+  <li>钩子超时由 K8s 的 <code>terminationGracePeriodSeconds</code> 控制 — 你的代码里 30s 内跑不完,K8s 直接 SIGKILL,跟没写钩子一样</li>
+</ol>
+
+<h2>5. 动手 · 25 分钟</h2>
+<p>3 个文件改动,目的:看 <code>kill -SIGTERM</code> 触发 4 阶段有序退出。</p>
+
+<div class="task">
+  <h3>5.1 · 在 main.ts 加 <code>app.enableShutdownHooks()</code></h3>
+  <p>打开 <code>apps/gateway/src/main.ts</code>,在 <code>app.enableCors(...)</code> 后面加一行:</p>
+  <pre><code>app.enableCors({ ... });
+app.enableShutdownHooks();
+</code></pre>
+  <p>注意 0001 加的 <code>console.log</code> 探针和 0002 加的 <code>process.on</code> 钩子<strong>保留</strong>,我们会在收尾时一起删掉 console.log(因为它会在每次启动都打,生产里会刷屏)。</p>
+</div>
+
+<div class="task">
+  <h3>5.2 · 新建 LifecycleProbeService</h3>
+  <p>新建文件 <code>apps/gateway/src/lifecycle/lifecycle-probe.service.ts</code>:</p>
+  <pre><code>import { Injectable, OnModuleDestroy, OnApplicationShutdown } from '@nestjs/common';
+
+@Injectable()
+export class LifecycleProbeService implements OnModuleDestroy, OnApplicationShutdown {
+  onModuleDestroy() {
+    console.log('[Lifecycle] OnModuleDestroy: closing connections (simulated)');
+  }
+  onApplicationShutdown(signal?: string) {
+    console.log(`[Lifecycle] OnApplicationShutdown: signal=${signal}, flushing logs (simulated)`);
+  }
+}
+</code></pre>
+  <p>这个 service 是"教学用探针",它不做真实清理(没接 RabbitMQ/Redis,不能真关),只打日志,让你看到阶段顺序。生产里应该让它真的关掉对应的连接。</p>
+</div>
+
+<div class="task">
+  <h3>5.3 · 注册到 AppModule</h3>
+  <p>打开 <code>apps/gateway/src/app.module.ts</code>,把 <code>LifecycleProbeService</code> 加到 <code>providers</code> 数组里(跟在 <code>ProxyService</code> 后面):</p>
+  <pre><code>providers: [
+  ProxyService,
+  LifecycleProbeService,   // ← 新加
+  { provide: APP_GUARD, useClass: CasGuard },
+  ...
+],</code></pre>
+</div>
+
+<div class="task">
+  <h3>5.4 · 验证 SIGTERM 触发 4 阶段</h3>
+  <ol class="steps">
+    <li>重启 gateway:<code>pnpm start:gateway</code> — 留意启动日志第一行 PID,比如 <code>Nest] 14420</code> 就是 PID</li>
+    <li>新开一个终端:<code>kill -SIGTERM 14420</code>(用你看到的实际 PID 替换)</li>
+    <li>回到 gateway 终端,期望看到(按顺序):<br>
+      <pre>[Lifecycle] OnModuleDestroy: closing connections (simulated)
+[Lifecycle] OnApplicationShutdown: signal=SIGTERM, flushing logs (simulated)
+Gateway ... (无新日志)
+[进程退出码 0]</pre>
+    </li>
+    <li><strong>对比实验</strong>:把 5.1 那一行 <code>app.enableShutdownHooks()</code> 注释掉,重启,再 <code>kill -SIGTERM</code> — gateway 会<strong>立即</strong>死,没有 [Lifecycle] 日志。这证明钩子是被 enableShutdownHooks 激活的</li>
+  </ol>
+</div>
+
+<p>这个对比实验非常关键 — 它会让你直观看到"软死 vs 硬死"的差别。生产上"软死"就是靠这 30 秒的窗口期做清理。</p>
+
+<h2>6. 自我检测(3 道题)</h2>
+
+<div class="quiz">
+  <div class="quiz-q" data-correct="b">
+    <p>1. Node 进程收到 <code>SIGKILL</code> 时,会怎样?</p>
+    <label class="quiz-opt"><input type="radio" name="q1" value="a"> 跟 SIGTERM 一样,只是退出码不同</label>
+    <label class="quiz-opt"><input type="radio" name="q1" value="b"> 内核强制终止,任何代码都拦不住,没有 cleanup 机会</label>
+    <label class="quiz-opt"><input type="radio" name="q1" value="c"> Node 把信号翻译成 <code>unhandledRejection</code> 事件</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz-q" data-correct="c">
+    <p>2. K8s 给旧 Pod 发 SIGTERM 后,等多久没退出会发 SIGKILL?</p>
+    <label class="quiz-opt"><input type="radio" name="q2" value="a"> 5 秒</label>
+    <label class="quiz-opt"><input type="radio" name="q2" value="b"> 10 秒</label>
+    <label class="quiz-opt"><input type="radio" name="q2" value="c"> 取决于 <code>terminationGracePeriodSeconds</code>(默认 30 秒)</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz-q" data-correct="a">
+    <p>3. <code>enableShutdownHooks()</code> 触发 NestJS 生命周期钩子的顺序是?</p>
+    <label class="quiz-opt"><input type="radio" name="q3" value="a"> <code>OnModuleDestroy</code> → <code>beforeApplicationShutdown</code> → <code>OnApplicationShutdown</code></label>
+    <label class="quiz-opt"><input type="radio" name="q3" value="b"> <code>OnApplicationShutdown</code> → <code>OnModuleDestroy</code> → <code>beforeApplicationShutdown</code></label>
+    <label class="quiz-opt"><input type="radio" name="q3" value="c"> 随机顺序,看哪个 module 加载得快</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+</div>
+
+<h2 id="what-next">下一节预告</h2>
+<p>你现在能"有序地死"了,但还不知道一个 HTTP 请求<strong>在活着的进程里</strong>是怎么被 NestJS 一层一层处理的。0004 回到 §2 那些"Guard / Interceptor / Pipe / Filter" — 我们会逐个实现并加进 gateway:<br>
+&nbsp;&nbsp;• 用 <code>@UsePipes(ValidationPipe)</code> 校验 <code>POST /api/auth/register</code> 的 body<br>
+&nbsp;&nbsp;• 用 Interceptor 计时 + 记录响应大小<br>
+&nbsp;&nbsp;• 回头修 0001 的 /health 401 问题: <code>@Public()</code> 装饰器让健康检查跳过 ApiKeyGuard</p>
+
+<h2>收口 · 这一节你 commit 什么</h2>
+<p>3 个文件改动:</p>
+<ul>
+  <li><code>apps/gateway/src/main.ts</code> — 加 <code>app.enableShutdownHooks()</code></li>
+  <li><code>apps/gateway/src/app.module.ts</code> — 注册 <code>LifecycleProbeService</code></li>
+  <li><code>apps/gateway/src/lifecycle/lifecycle-probe.service.ts</code> — 新建,带 2 个 lifecycle 钩子</li>
+</ul>
+
+<p>commit message(直接复制):</p>
+<pre><code>feat(gateway): enable graceful shutdown via NestJS lifecycle hooks
+
+- Add app.enableShutdownHooks() so SIGTERM/SIGINT trigger
+  OnModuleDestroy, beforeApplicationShutdown, OnApplicationShutdown
+  in dependency-reverse order
+- Add LifecycleProbeService that logs at each phase, giving us a
+  visible hook for future real cleanup (RabbitMQ/Redis/MySQL close)
+- Without this, gateway hard-exits on SIGTERM, dropping in-flight
+  requests, unsent RabbitMQ acks, and leaked Redis connections
+- K8s default terminationGracePeriodSeconds (30s) is plenty for
+  our cleanup work
+
+Refs: docs/teaching/lessons/0003-process-lifecycle.html
+</code></pre>
+
+<p>5.4 三个验证跑完 + quiz 三道选完,告诉我结果,我跑上面的 commit + 写 LR-0006 + 开 0004。</p>
+
+<h2>延伸阅读</h2>
+<ul>
+  <li><a href="https://nodejs.org/api/process.html#signal-events">Node.js Docs — Signal events</a>(查表用)</li>
+  <li><a href="https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/">Kubernetes Docs — Pod Lifecycle</a>(§3 那张时间线的官方版本)</li>
+  <li><a href="https://docs.nestjs.com/fundamentals/lifecycle-events">NestJS Docs — Lifecycle events</a>(<code>enableShutdownHooks</code> 内部)</li>
+  <li><a href="https://12factor.net/processes">12-Factor App — Processes</a>("快速启动 + 优雅终止"的经典论述)</li>
+  <li><a href="../MISSION.md">MISSION.md</a> · <a href="../RESOURCES.md">RESOURCES.md</a> · <a href="../learning-records/0005-three-layer-error-defense.md">LR-0005</a></li>
+</ul>
+
+<p style="margin-top: 1.6rem; color: var(--accent); font-weight: 600;">📌 任何不清楚的地方直接问我 — 特别是"我 kill 了进程但看不到 [Lifecycle] 日志"的情况,99% 是 PID 错或者 5.1 那行没生效。</p>
+
+<hr>
+<footer>
+  nest-search · teach workspace · 课时 0003<br>
+  有问题直接问 Claude
+</footer>
+
+<script>
+function check(btn) {
+  const q = btn.closest('.quiz-q');
+  const correct = q.dataset.correct;
+  const picked = q.querySelector('input[type=radio]:checked');
+  const fb = q.querySelector('.quiz-feedback');
+  if (!picked) {
+    fb.textContent = '⚠️ 选一个再提交。';
+    fb.className = 'quiz-feedback show bad';
+    return;
+  }
+  if (picked.value === correct) {
+    fb.textContent = '✅ 对了。';
+    fb.className = 'quiz-feedback show good';
+  } else {
+    fb.textContent = '❌ 不对,回到 §1 / §2 / §4 重读一遍,再试一次。';
+    fb.className = 'quiz-feedback show bad';
+  }
+}
+</script>
+
+</body>
+</html>

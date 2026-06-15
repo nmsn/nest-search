@@ -6,12 +6,14 @@ import { ApiKeyGuard } from './guards/api-key.guard';
 import { CasGuard } from './guards/cas.guard';
 import { AllExceptionsFilter } from './filters/all-exceptions.filter';
 import { ProxyService } from './proxy/proxy.service';
+import { LifecycleProbeService } from './lifecycle/lifecycle-probe.service'
 
 @Module({
   imports: [ConfigModule.forRoot({ isGlobal: true })],
   controllers: [AppController],
   providers: [
     ProxyService,
+    LifecycleProbeService,   // ← 新加
     {
       provide: APP_GUARD,
       useClass: CasGuard,
