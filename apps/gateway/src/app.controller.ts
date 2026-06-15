@@ -2,11 +2,13 @@ import { Controller, Get, Post, Patch, Delete, Req, Res, Param, Body, Query, Use
 import { Request, Response } from 'express';
 import { ProxyService } from './proxy/proxy.service';
 import { AdminGuard } from './guards/cas.guard';
+import { Public } from './common/decorators';
 
 @Controller()
 export class AppController {
   constructor(private readonly proxyService: ProxyService) {}
 
+  @Public()
   @Get('health')
   health() {
     return { status: 'ok', service: 'gateway', timestamp: new Date().toISOString() };

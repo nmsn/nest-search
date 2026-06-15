@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>0004 · NestJS 请求生命周期:5 阶段 + 装饰器黑盒拆开</title>
+<style>
+  :root {
+    --bg: #fbfaf7;
+    --ink: #1d1d1d;
+    --ink-soft: #4a4a4a;
+    --ink-faint: #8a8a8a;
+    --rule: #d6d2c4;
+    --accent: #b04a2f;
+    --code-bg: #f1efe8;
+    --code-inline: #ece8db;
+    --good: #2c6e3e;
+    --bad: #b04a2f;
+    --pad: 2.4rem;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "SF Pro Text", "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  body { max-width: 760px; margin: 0 auto; padding: var(--pad); }
+  h1, h2, h3 { font-family: Georgia, "Source Han Serif SC", "Songti SC", serif; font-weight: 600; letter-spacing: -0.01em; }
+  h1 { font-size: 2.1rem; line-height: 1.15; margin: 0 0 0.4rem 0; }
+  h2 { font-size: 1.45rem; margin: 3rem 0 0.6rem 0; border-bottom: 1px solid var(--rule); padding-bottom: 0.3rem; }
+  h3 { font-size: 1.12rem; margin: 1.6rem 0 0.4rem 0; color: var(--ink-soft); }
+  p { margin: 0.8rem 0; }
+  .lede { font-size: 1.05rem; color: var(--ink-soft); font-style: italic; border-left: 3px solid var(--accent); padding-left: 0.9rem; margin: 1rem 0 1.6rem 0; }
+  .meta { color: var(--ink-faint); font-size: 0.85rem; margin-bottom: 1.6rem; }
+  .meta a { color: var(--ink-faint); }
+  code, pre, kbd { font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace; font-size: 0.92em; }
+  p code, li code, td code { background: var(--code-inline); padding: 0.08em 0.36em; border-radius: 3px; color: var(--ink); }
+  pre { background: var(--code-bg); border: 1px solid var(--rule); padding: 0.9rem 1rem; border-radius: 4px; overflow-x: auto; line-height: 1.5; margin: 0.8rem 0; }
+  pre code { background: transparent; padding: 0; }
+  ol.steps { padding-left: 1.4rem; }
+  ol.steps li { margin: 0.55rem 0; }
+  .task { background: #fff; border: 1px solid var(--rule); border-left: 4px solid var(--accent); padding: 1rem 1.2rem; margin: 1.4rem 0; border-radius: 3px; }
+  .task h3 { margin-top: 0; color: var(--accent); text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.85rem; font-family: -apple-system, sans-serif; font-weight: 700; }
+  .quiz { margin: 1.6rem 0; }
+  .quiz-q { background: #fff; border: 1px solid var(--rule); padding: 1rem 1.2rem; border-radius: 3px; margin: 0.8rem 0; }
+  .quiz-q p:first-child { margin-top: 0; font-weight: 600; }
+  .quiz-opt { display: block; margin: 0.3rem 0; cursor: pointer; }
+  .quiz-opt input { margin-right: 0.5rem; }
+  .quiz-feedback { display: none; margin-top: 0.6rem; padding: 0.5rem 0.8rem; border-radius: 3px; font-size: 0.95rem; }
+  .quiz-feedback.show { display: block; }
+  .quiz-feedback.good { background: #e8f3ea; color: var(--good); border: 1px solid #b6d8be; }
+  .quiz-feedback.bad { background: #fbeae5; color: var(--bad); border: 1px solid #e8b9a8; }
+  .diagram { background: var(--code-bg); border: 1px solid var(--rule); padding: 1rem 1.2rem; border-radius: 3px; margin: 1rem 0; font-family: "SF Mono", "JetBrains Mono", monospace; font-size: 0.88em; line-height: 1.5; overflow-x: auto; white-space: pre; }
+  hr { border: none; border-top: 1px solid var(--rule); margin: 2.4rem 0 1.2rem 0; }
+  footer { color: var(--ink-faint); font-size: 0.85rem; }
+  footer a { color: var(--ink-soft); }
+  @media print {
+    body { background: white; max-width: none; padding: 1.2rem; }
+    .task, .quiz-q { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>NestJS 请求生命周期:5 阶段 + 装饰器黑盒拆开</h1>
+  <p class="lede">从"装饰器是魔法"到"装饰器是给 class 写 metadata,然后 Reflector 读出来" — 这是 NestJS 唯一的"魔法"。</p>
+  <p class="meta">
+    课时 0004 · 预计 35 分钟 · 锚定项目 <code>nest-search</code>
+    · 上一节: <a href="0003-process-lifecycle.html">Node 进程生命周期</a>
+    · 下一节: <a href="#what-next">Pino 结构化日志</a>
+  </p>
+</header>
+
+<hr>
+
+<h2>你今天会拿到什么</h2>
+<ol class="steps">
+  <li>把 0002 §2 的 5 阶段图记成"长期记忆"(不是看一眼就忘)</li>
+  <li>拆开装饰器的黑盒:知道 <code>SetMetadata</code> 背后是 <code>Reflect.metadata</code> API,不是 TypeScript 魔法</li>
+  <li>亲手写一个 <code>@Public()</code> 装饰器,让 0001 留下的 <code>/health</code> 401 问题彻底消失</li>
+  <li>亲手写一个 <code>TimingInterceptor</code>,每个请求自动打响应时间 — 这是 0005 Pino 的 pre-work</li>
+  <li>给 <code>LifecycleProbeService</code> 加 <code>OnModuleInit</code> 做对称,验证完整的 init/destroy 配对</li>
+  <li>一个可提交的 commit,完成"可观测性三件套"的"hook 地基"</li>
+</ol>
+
+<h2>1. 5 阶段顺序图 — 长期记忆版</h2>
+<p>0002 §2 讲过 5 阶段,这节课给完整版,加上"谁先谁后"的精确顺序。</p>
+
+<div class="diagram">请求进入
+  │
+  ▼
+[1] Middleware        (Express 层级)
+  │
+  ▼
+[2] Guard(s)          (按声明顺序,先 APP_GUARD 后 @UseGuards)
+  │
+  ▼
+[3] Interceptor(s)    (pre-hook,按全局 → 路由)
+  │
+  ▼
+[4] Pipe(s)           (对 @Param / @Query / @Body 转换 + 校验)
+  │
+  ▼
+[5] Controller.handler
+  │
+  ▼
+[5] Service(s)        (handler 内部调用)
+  │
+  ▼
+[5] Interceptor(s)    (post-hook,按路由 → 全局 — 反序)
+  │
+  ▼
+[4] Filter(s)         (异常时接管,否则跳过)
+  │
+  ▼
+HTTP Response</div>
+
+<p>三条铁律:</p>
+<ol>
+  <li><strong>Guard 失败 = 立即拒绝</strong>,后面 4 阶段都不会跑</li>
+  <li><strong>Interceptor 包裹 handler</strong> — pre-hook 在 handler 前跑,post-hook 在 handler 后跑(反序)</li>
+  <li><strong>Filter 是"出错的兜底"</strong> — 没异常就不出现</li>
+</ol>
+
+<h2>2. 拆开装饰器的黑盒</h2>
+<p>你之前看到的 <code>@Controller()</code>、<code>@Injectable()</code>、<code>@Module()</code> 看着像 TypeScript 语法糖,**其实不是**。它们是依赖 <code>reflect-metadata</code> 这个 polyfill 的真实"挂载"操作。</p>
+
+<p>看一段真实代码:</p>
+
+<pre><code>import { SetMetadata } from '@nestjs/common';
+
+export const IS_PUBLIC_KEY = 'isPublic';
+export const Public = () =&gt; SetMetadata(IS_PUBLIC_KEY, true);
+</code></pre>
+
+<p><code>SetMetadata(key, value)</code> 的实现就一行:</p>
+
+<pre><code>// 来自 @nestjs/common
+export const SetMetadata = &lt;K = string, V = any&gt;(metadataKey: K, metadataValue: V) =&gt;
+  (target: object, key?: any, descriptor?: any) =&gt; {
+    Reflect.defineMetadata(metadataKey, metadataValue, descriptor.value);  // ← 真身
+  };
+</code></pre>
+
+<p>看到了吗?<code>@SetMetadata('isPublic', true)</code> 实际上调用的是 <code>Reflect.defineMetadata('isPublic', true, fn)</code> — **直接写到了这个 method 的元数据槽里**。`reflect-metadata` polyfill 把每个函数对象都扩展出一个隐藏的"metadata 槽",可以挂任意键值对。</p>
+
+<p>读的时候反过来:</p>
+
+<pre><code>import { Reflector } from '@nestjs/core';
+
+@Injectable()
+export class ApiKeyGuard implements CanActivate {
+  constructor(private reflector: Reflector) {}
+
+  canActivate(context: ExecutionContext): boolean {
+    const isPublic = this.reflector.getAllAndOverride&lt;boolean&gt;(IS_PUBLIC_KEY, [
+      context.getHandler(),   // 先看 method 上的 @Public
+      context.getClass(),     // 再看 class 上的 @Public
+    ]);
+    if (isPublic) return true;   // ← 关键:命中就放行
+    // ... 原有 API key 验证逻辑
+  }
+}
+</code></pre>
+
+<p>所以 NestJS "装饰器元数据"的本质就是:</p>
+
+<pre><code>   装饰器          运行时              Reflector
+   @Public()   ──▶  Reflect.define  ──▶  Reflect.get
+       │              ('isPublic', true)        │
+       │                  │                     │
+       ▼                  ▼                     ▼
+   写在 method       存到 method           在 Guard 里
+   上方              的隐藏 slot           读出来</code></pre>
+
+<p>三句话总结:</p>
+<ul>
+  <li><strong>不是魔法</strong> — 是标准 ES Reflect API,只是要在 <code>tsconfig.json</code> 开启 <code>"emitDecoratorMetadata": true</code></li>
+  <li><strong>全靠 polyfill</strong> — Node 原生 V8 <strong>不</strong>支持 metadata,必须 <code>import 'reflect-metadata'</code>(NestJS 在 <code>main.ts</code> 隐式加载了)</li>
+  <li><strong>Reflector 是 NestJS 的读取器</strong> — 你不用直接调 <code>Reflect.getMetadata</code>,用 <code>Reflector.get(handler, key)</code> 即可,API 更干净</li>
+</ul>
+
+<h2>3. 动手 · 35 分钟</h2>
+
+<div class="task">
+  <h3>3.1 · 新建 <code>@Public()</code> 装饰器</h3>
+  <p>新建 <code>apps/gateway/src/common/decorators/public.decorator.ts</code>:</p>
+  <pre><code>import { SetMetadata } from '@nestjs/common';
+
+export const IS_PUBLIC_KEY = 'isPublic';
+export const Public = () =&gt; SetMetadata(IS_PUBLIC_KEY, true);
+</code></pre>
+  <p>同时新建 <code>apps/gateway/src/common/decorators/index.ts</code> 统一导出(可选,但好习惯):</p>
+  <pre><code>export { Public, IS_PUBLIC_KEY } from './public.decorator';
+</code></pre>
+</div>
+
+<div class="task">
+  <h3>3.2 · 改 ApiKeyGuard:用 Reflector 读 @Public()</h3>
+  <p>打开 <code>apps/gateway/src/guards/api-key.guard.ts</code>,改 3 处:</p>
+  <ol>
+    <li>顶部 import 加 <code>Reflector</code> 和 <code>IS_PUBLIC_KEY</code></li>
+    <li>constructor 注入 <code>Reflector</code></li>
+    <li><code>canActivate</code> 开头加 4 行放行逻辑</li>
+  </ol>
+  <p>改完的核心片段:</p>
+  <pre><code>import { Reflector } from '@nestjs/core';
+import { IS_PUBLIC_KEY } from '../common/decorators';
+
+@Injectable()
+export class ApiKeyGuard implements CanActivate {
+  constructor(private reflector: Reflector) {}
+
+  canActivate(context: ExecutionContext): boolean {
+    const isPublic = this.reflector.getAllAndOverride&lt;boolean&gt;(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (isPublic) return true;
+
+    const request = context.switchToHttp().getRequest();
+    // ... 原有逻辑
+  }
+}</code></pre>
+</div>
+
+<div class="task">
+  <h3>3.3 · 把 <code>@Public()</code> 挂到 /health</h3>
+  <p>打开 <code>apps/gateway/src/app.controller.ts</code>,在 <code>health()</code> 上方加一行:</p>
+  <pre><code>import { Public } from './common/decorators';
+// ... 其它 import
+
+@Public()
+@Get('health')
+health() {
+  return { status: 'ok', service: 'gateway', timestamp: new Date().toISOString() };
+}</code></pre>
+</div>
+
+<div class="task">
+  <h3>3.4 · 新建 TimingInterceptor(全局)</h3>
+  <p>新建 <code>apps/gateway/src/interceptors/timing.interceptor.ts</code>:</p>
+  <pre><code>import { Injectable, NestInterceptor, ExecutionContext, CallHandler } from '@nestjs/common';
+import { Observable, tap } from 'rxjs';
+
+@Injectable()
+export class TimingInterceptor implements NestInterceptor {
+  intercept(context: ExecutionContext, next: CallHandler): Observable&lt;any&gt; {
+    const start = performance.now();
+    const req = context.switchToHttp().getRequest();
+    return next.handle().pipe(
+      tap(() =&gt; {
+        const ms = (performance.now() - start).toFixed(2);
+        console.log(`[Timing] ${req.method} ${req.url} ${ms}ms`);
+      }),
+    );
+  }
+}
+</code></pre>
+  <p>几个细节:</p>
+  <ul>
+    <li><code>performance.now()</code> 是 W3C High Resolution Time API,Node 原生支持,精度亚毫秒</li>
+    <li><code>RxJS tap()</code> 是"只观察,不修改"的 operator — handler 的返回值会原样传给 client,我们只是顺便记个时</li>
+    <li>这个 Interceptor <strong>不处理异常</strong> — handler 抛错时,tap 不跑(异常走 Filter)。所以 0002 的 [AllExceptions] 日志会跟 [Timing] 互不干扰</li>
+  </ul>
+</div>
+
+<div class="task">
+  <h3>3.5 · 在 AppModule 全局注册 TimingInterceptor</h3>
+  <p>打开 <code>apps/gateway/src/app.module.ts</code>,改 providers 数组加一项:</p>
+  <pre><code>import { APP_INTERCEPTOR } from '@nestjs/core';
+import { TimingInterceptor } from './interceptors/timing.interceptor';
+
+@Module({
+  ...
+  providers: [
+    ProxyService,
+    LifecycleProbeService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: TimingInterceptor,   // ← 全局注册
+    },
+    { provide: APP_GUARD, useClass: CasGuard },
+    { provide: APP_GUARD, useClass: ApiKeyGuard },
+    { provide: APP_FILTER, useClass: AllExceptionsFilter },
+  ],
+})</code></pre>
+</div>
+
+<div class="task">
+  <h3>3.6 · LifecycleProbeService 加 OnModuleInit</h3>
+  <p>打开 <code>apps/gateway/src/lifecycle/lifecycle-probe.service.ts</code>,加 import + 1 个方法:</p>
+  <pre><code>import { Injectable, OnModuleInit, OnModuleDestroy, OnApplicationShutdown } from '@nestjs/common';
+
+@Injectable()
+export class LifecycleProbeService implements OnModuleInit, OnModuleDestroy, OnApplicationShutdown {
+  onModuleInit() {
+    console.log('[Lifecycle] OnModuleInit: module dependencies resolved');
+  }
+
+  onModuleDestroy() {
+    console.log('[Lifecycle] OnModuleDestroy: closing connections (simulated)');
+  }
+
+  onApplicationShutdown(signal?: string) {
+    console.log(`[Lifecycle] OnApplicationShutdown: signal=${signal}, flushing logs (simulated)`);
+  }
+}</code></pre>
+  <p>现在 init/destroy 对称了 — 启动时一行 [Lifecycle] OnModuleInit,SIGTERM 时两行。</p>
+</div>
+
+<div class="task">
+  <h3>3.7 · 验证 4 件事</h3>
+  <ol class="steps">
+    <li>重启 <code>pnpm start:gateway</code> — 期望启动日志里看到 <code>[Lifecycle] OnModuleInit: module dependencies resolved</code></li>
+    <li>不带 X-API-Key curl:<code>curl -i http://localhost:3000/health</code> — 期望:<strong>200</strong>(不再是 401)+ body 含 service / timestamp + 控制台一行 <code>[Timing] GET /health 0.95ms</code></li>
+    <li>带任意 X-API-Key curl:<code>curl -i -H "X-API-Key: anything" http://localhost:3000/health</code> — 期望:200 + [Timing] 日志</li>
+    <li>走一次完整业务流(测试 Interceptor 跨 handler):<code>curl -i -X POST -H "X-API-Key: ds_key_123" -H "Content-Type: application/json" -d '{"email":"a@b.com","password":"x"}' http://localhost:3000/api/auth/login</code> — 期望:控制台 <code>[Timing] POST /api/auth/login XX.XXms</code>(具体数字看下游服务是否在线,可能 0.x ms 也可能超时)</li>
+    <li>SIGTERM 测完整 lifecycle:<code>kill -SIGTERM &lt;pid&gt;</code> — 期望:看到 <code>[Lifecycle] OnModuleDestroy</code> + <code>[Lifecycle] OnApplicationShutdown: signal=SIGTERM</code> + 进程退出码 0</li>
+  </ol>
+</div>
+
+<p>3.7 的第 2 步是这个 lesson 最关键的可视化现象 — <strong>0001 那个 /health 401 bug 终于修掉了</strong>。这标志着你从"理解 bug"走到了"用 NestJS 标准模式修 bug"。</p>
+
+<h2>4. 自我检测(3 道题)</h2>
+
+<div class="quiz">
+  <div class="quiz-q" data-correct="b">
+    <p>1. NestJS 装饰器元数据("给 method 挂一个 isPublic = true")最终存到哪里?</p>
+    <label class="quiz-opt"><input type="radio" name="q1" value="a"> class 的 static 属性</label>
+    <label class="quiz-opt"><input type="radio" name="q1" value="b"> function 对象的隐藏 metadata slot(<code>reflect-metadata</code> polyfill)</label>
+    <label class="quiz-opt"><input type="radio" name="q1" value="c"> <code>process.env</code> 里</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz-q" data-correct="a">
+    <p>2. 在 handler 上同时使用 <code>@UseGuards(X)</code> 和全局 <code>APP_GUARD</code>,执行顺序是?</p>
+    <label class="quiz-opt"><input type="radio" name="q2" value="a"> 全局 <code>APP_GUARD</code> 先,route <code>@UseGuards</code> 后</label>
+    <label class="quiz-opt"><input type="radio" name="q2" value="b"> route <code>@UseGuards</code> 先,全局 <code>APP_GUARD</code> 后</label>
+    <label class="quiz-opt"><input type="radio" name="q2" value="c"> 随机,跟注册顺序无关</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz-q" data-correct="b">
+    <p>3. TimingInterceptor 里用 <code>performance.now()</code> 而不是 <code>Date.now()</code> 的关键原因是?</p>
+    <label class="quiz-opt"><input type="radio" name="q3" value="a"> 性能更好(调用更快)</label>
+    <label class="quiz-opt"><input type="radio" name="q3" value="b"> 精度更高(亚毫秒),不依赖系统时钟</label>
+    <label class="quiz-opt"><input type="radio" name="q3" value="c"> 在 Node 里更老牌</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+</div>
+
+<h2 id="what-next">下一节预告</h2>
+<p>你现在能"看得见"每个请求的响应时间(通过 <code>console.log</code>),也能"看得见"业务异常(通过 0002 的 [AllExceptions]),但这些日志都是无结构的字符串 — 不能按字段查、不能聚合、不能告警。0005 把 <code>console.log</code> 升级成 <strong>Pino 结构化日志</strong>,并给每个请求注入 <code>requestId</code>,让所有日志能用 <code>requestId</code> 串起来。</p>
+
+<h2>收口 · 这一节你 commit 什么</h2>
+<p>5 个文件改动:</p>
+<ul>
+  <li><code>apps/gateway/src/common/decorators/public.decorator.ts</code> — 新建,<code>@Public()</code> 装饰器</li>
+  <li><code>apps/gateway/src/common/decorators/index.ts</code> — 新建,统一导出</li>
+  <li><code>apps/gateway/src/guards/api-key.guard.ts</code> — 加 <code>Reflector</code>,检查 <code>@Public()</code></li>
+  <li><code>apps/gateway/src/app.controller.ts</code> — <code>health()</code> 加 <code>@Public()</code></li>
+  <li><code>apps/gateway/src/interceptors/timing.interceptor.ts</code> — 新建,响应时间拦截器</li>
+  <li><code>apps/gateway/src/app.module.ts</code> — 注册 <code>APP_INTERCEPTOR</code></li>
+  <li><code>apps/gateway/src/lifecycle/lifecycle-probe.service.ts</code> — 加 <code>OnModuleInit</code></li>
+</ul>
+
+<p>commit message(直接复制):</p>
+<pre><code>feat(gateway): public routes, timing interceptor, lifecycle init symmetry
+
+- Add @Public() decorator + Reflector-aware ApiKeyGuard so routes
+  marked @Public() bypass the X-API-Key check (fixes /health 401
+  from LR-0003 so K8s readiness probe can hit it without a key)
+- Add global TimingInterceptor using performance.now() and RxJS tap()
+  to log every request's response time — pre-work for Pino in 0005
+- Add OnModuleInit to LifecycleProbeService for full init/destroy
+  symmetry
+- Demonstrates the SetMetadata + Reflector pattern that all NestJS
+  decorators use internally
+
+Refs: docs/teaching/lessons/0004-request-lifecycle.html
+</code></pre>
+
+<p>3.7 五个验证跑完 + quiz 三道选完,告诉我结果,我跑上面的 commit + 写 LR-0007 + 开 0005。</p>
+
+<h2>延伸阅读</h2>
+<ul>
+  <li><a href="https://docs.nestjs.com/fundamentals/lifecycle-events">NestJS Docs — Lifecycle events</a>(必读,跟 0003 互为补充)</li>
+  <li><a href="https://github.com/rbuckton/reflect-metadata">reflect-metadata polyfill</a>(所有"装饰器魔法"的源头)</li>
+  <li><a href="https://developer.mozilla.org/en-US/docs/Web/API/Performance_API">MDN — Performance API</a>(<code>performance.now()</code> 规范)</li>
+  <li><a href="https://rxjs.dev/api/operators/tap">RxJS — tap</a>(Interceptor 用的"不修改值,只观察"的操作符)</li>
+  <li><a href="../MISSION.md">MISSION.md</a> · <a href="../RESOURCES.md">RESOURCES.md</a> · <a href="../learning-records/0006-graceful-shutdown.md">LR-0006</a></li>
+</ul>
+
+<p style="margin-top: 1.6rem; color: var(--accent); font-weight: 600;">📌 卡点大概率会出在 §2"装饰器黑盒" — 如果看一遍没懂,直接在浏览器里打开 <code>node_modules/@nestjs/common/decorators/http/set-metadata.decorator.js</code> 看真实实现,比看文档快。也可以直接问我。</p>
+
+<hr>
+<footer>
+  nest-search · teach workspace · 课时 0004<br>
+  有问题直接问 Claude
+</footer>
+
+<script>
+function check(btn) {
+  const q = btn.closest('.quiz-q');
+  const correct = q.dataset.correct;
+  const picked = q.querySelector('input[type=radio]:checked');
+  const fb = q.querySelector('.quiz-feedback');
+  if (!picked) {
+    fb.textContent = '⚠️ 选一个再提交。';
+    fb.className = 'quiz-feedback show bad';
+    return;
+  }
+  if (picked.value === correct) {
+    fb.textContent = '✅ 对了。';
+    fb.className = 'quiz-feedback show good';
+  } else {
+    fb.textContent = '❌ 不对,回到 §1 / §2 重读一遍,再试一次。';
+    fb.className = 'quiz-feedback show bad';
+  }
+}
+</script>
+
+</body>
+</html>
