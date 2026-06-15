@@ -9,9 +9,21 @@ import { ProxyService } from "./proxy/proxy.service";
 import { LifecycleProbeService } from "./lifecycle/lifecycle-probe.service";
 import { TimingInterceptor } from "./interceptors/timing.interceptor";
 import { APP_INTERCEPTOR } from "@nestjs/core";
+import { LoggerModule } from "nestjs-pino";
+import { randomUUID } from "node:crypto";
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true })],
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    LoggerModule.forRoot({
+      pinoHttp: {
+        level: process.env.LOG_LEVEL || "info",
+        genReqId: (req) => req.headers["x-request-id"] || randomUUID(),
+        customProps: (req) => ({ requestId: req.id }),
+        autoLogging: false,
+      },
+    }),
+  ],
   controllers: [AppController],
   providers: [
     ProxyService,

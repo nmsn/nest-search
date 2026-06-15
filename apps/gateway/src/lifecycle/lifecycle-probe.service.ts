@@ -4,20 +4,24 @@ import {
   OnModuleDestroy,
   OnApplicationShutdown,
 } from "@nestjs/common";
+import { InjectPinoLogger, PinoLogger } from "nestjs-pino";
 
 @Injectable()
 export class LifecycleProbeService
   implements OnModuleDestroy, OnApplicationShutdown
 {
+  constructor(
+    @InjectPinoLogger(LifecycleProbeService.name)
+    private readonly logger: PinoLogger,
+  ) {}
+
   onModuleInit() {
-    console.log("[Lifecycle] OnModuleInit: module dependencies resolved");
+    this.logger.info("module dependencies resolved");
   }
   onModuleDestroy() {
-    console.log("[Lifecycle] OnModuleDestroy: closing connections (simulated)");
+    this.logger.info("closing connections (simulated)");
   }
   onApplicationShutdown(signal?: string) {
-    console.log(
-      `[Lifecycle] OnApplicationShutdown: signal=${signal}, flushing logs (simulated)`,
-    );
+    this.logger.info({ signal }, "flushing logs (simulated)");
   }
 }

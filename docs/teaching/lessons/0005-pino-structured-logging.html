@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>0005 · Pino 结构化日志:让 console.log 退休</title>
+<style>
+  :root {
+    --bg: #fbfaf7;
+    --ink: #1d1d1d;
+    --ink-soft: #4a4a4a;
+    --ink-faint: #8a8a8a;
+    --rule: #d6d2c4;
+    --accent: #b04a2f;
+    --code-bg: #f1efe8;
+    --code-inline: #ece8db;
+    --good: #2c6e3e;
+    --bad: #b04a2f;
+    --pad: 2.4rem;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "SF Pro Text", "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  body { max-width: 760px; margin: 0 auto; padding: var(--pad); }
+  h1, h2, h3 { font-family: Georgia, "Source Han Serif SC", "Songti SC", serif; font-weight: 600; letter-spacing: -0.01em; }
+  h1 { font-size: 2.1rem; line-height: 1.15; margin: 0 0 0.4rem 0; }
+  h2 { font-size: 1.45rem; margin: 3rem 0 0.6rem 0; border-bottom: 1px solid var(--rule); padding-bottom: 0.3rem; }
+  h3 { font-size: 1.12rem; margin: 1.6rem 0 0.4rem 0; color: var(--ink-soft); }
+  p { margin: 0.8rem 0; }
+  .lede { font-size: 1.05rem; color: var(--ink-soft); font-style: italic; border-left: 3px solid var(--accent); padding-left: 0.9rem; margin: 1rem 0 1.6rem 0; }
+  .meta { color: var(--ink-faint); font-size: 0.85rem; margin-bottom: 1.6rem; }
+  .meta a { color: var(--ink-faint); }
+  code, pre, kbd { font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace; font-size: 0.92em; }
+  p code, li code, td code { background: var(--code-inline); padding: 0.08em 0.36em; border-radius: 3px; color: var(--ink); }
+  pre { background: var(--code-bg); border: 1px solid var(--rule); padding: 0.9rem 1rem; border-radius: 4px; overflow-x: auto; line-height: 1.5; margin: 0.8rem 0; }
+  pre code { background: transparent; padding: 0; }
+  .json-block { background: #2a2a2a; color: #e8e8e8; border: 1px solid #1a1a1a; padding: 0.9rem 1rem; border-radius: 4px; overflow-x: auto; line-height: 1.5; margin: 0.8rem 0; font-family: "SF Mono", "JetBrains Mono", monospace; font-size: 0.88em; }
+  .json-block .key { color: #f0a868; }
+  .json-block .str { color: #b8d68c; }
+  .json-block .num { color: #88c4f0; }
+  ol.steps { padding-left: 1.4rem; }
+  ol.steps li { margin: 0.55rem 0; }
+  .task { background: #fff; border: 1px solid var(--rule); border-left: 4px solid var(--accent); padding: 1rem 1.2rem; margin: 1.4rem 0; border-radius: 3px; }
+  .task h3 { margin-top: 0; color: var(--accent); text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.85rem; font-family: -apple-system, sans-serif; font-weight: 700; }
+  .quiz { margin: 1.6rem 0; }
+  .quiz-q { background: #fff; border: 1px solid var(--rule); padding: 1rem 1.2rem; border-radius: 3px; margin: 0.8rem 0; }
+  .quiz-q p:first-child { margin-top: 0; font-weight: 600; }
+  .quiz-opt { display: block; margin: 0.3rem 0; cursor: pointer; }
+  .quiz-opt input { margin-right: 0.5rem; }
+  .quiz-feedback { display: none; margin-top: 0.6rem; padding: 0.5rem 0.8rem; border-radius: 3px; font-size: 0.95rem; }
+  .quiz-feedback.show { display: block; }
+  .quiz-feedback.good { background: #e8f3ea; color: var(--good); border: 1px solid #b6d8be; }
+  .quiz-feedback.bad { background: #fbeae5; color: var(--bad); border: 1px solid #e8b9a8; }
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0; }
+  .compare > div { background: #fff; border: 1px solid var(--rule); border-radius: 3px; padding: 0.8rem 1rem; }
+  .compare h4 { margin: 0 0 0.4rem 0; font-size: 0.9rem; color: var(--ink-soft); }
+  hr { border: none; border-top: 1px solid var(--rule); margin: 2.4rem 0 1.2rem 0; }
+  footer { color: var(--ink-faint); font-size: 0.85rem; }
+  footer a { color: var(--ink-soft); }
+  @media (max-width: 600px) { .compare { grid-template-columns: 1fr; } }
+  @media print {
+    body { background: white; max-width: none; padding: 1.2rem; }
+    .task, .quiz-q { break-inside: avoid; }
+    .json-block { background: white; color: var(--ink); border-color: var(--rule); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Pino 结构化日志:让 <code>console.log</code> 退休</h1>
+  <p class="lede">从"console 一坨字符串"到"JSON 字段可被 grep/jq/splunk 查询" — 这是可观测性三件套的"主菜"。</p>
+  <p class="meta">
+    课时 0005 · 预计 35 分钟 · 锚定项目 <code>nest-search</code>
+    · 上一节: <a href="0004-request-lifecycle.html">NestJS 请求生命周期</a>
+    · 下一节: <a href="#what-next">可观测性收官</a>
+  </p>
+</header>
+
+<hr>
+
+<h2>你今天会拿到什么</h2>
+<ol class="steps">
+  <li>把项目里所有 <code>console.log/error</code> 升级成 <code>PinoLogger</code>,输出统一 JSON 格式</li>
+  <li>让每个请求自动带 <code>reqId</code>(W3C tracecontext),所有日志能用它 grep</li>
+  <li>修 0004 留下的 3 个真工程坑: TimingInterceptor tap 漏、AllExceptionsFilter 4xx 刷屏、跨进程无法串日志</li>
+  <li>理解 <code>AsyncLocalStorage</code> — 为什么 <code>reqId</code> 能跨 await / setTimeout 跟住</li>
+  <li>一个可提交的 commit,完成"可观测性三件套"的"日志地基"</li>
+</ol>
+
+<h2>1. 为什么是 Pino,不是 console.log</h2>
+<p>先看一个对比。同一个"请求出错了"事件,两种写法:</p>
+
+<div class="compare">
+  <div>
+    <h4>console.log(字符串)</h4>
+<pre><code>console.error('[AllExceptions]', exception);
+// 输出:
+// [AllExceptions] Error: Invalid credentials
+//     at AppController.login (...)
+//     ...</code></pre>
+  </div>
+  <div>
+    <h4>Pino(结构化 JSON)</h4>
+<pre><code>logger.error({ err: exception, requestId: 'abc-123' }, 'login failed');
+// 输出:
+// {"level":50,"time":...,"requestId":"abc-123",
+//  "err":{"message":"Invalid credentials",...}}</code></pre>
+  </div>
+</div>
+
+<p>字符串日志 vs JSON 日志,生产价值天差地别:</p>
+<table style="width:100%; border-collapse: collapse; margin: 1rem 0;">
+  <thead>
+    <tr style="border-bottom: 1px solid var(--rule); text-align: left;">
+      <th style="padding: 0.4rem 0.6rem;">场景</th>
+      <th style="padding: 0.4rem 0.6rem;">console.log</th>
+      <th style="padding: 0.4rem 0.6rem;">Pino JSON</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr style="border-bottom: 1px solid var(--rule);">
+      <td style="padding: 0.4rem 0.6rem;">查"requestId=abc-123 这个请求的所有日志"</td>
+      <td style="padding: 0.4rem 0.6rem;">❌ 没法 grep 字段,只能凭时间戳猜</td>
+      <td style="padding: 0.4rem 0.6rem;">✅ <code>jq 'select(.requestId=="abc-123")'</code></td>
+    </tr>
+    <tr style="border-bottom: 1px solid var(--rule);">
+      <td style="padding: 0.4rem 0.6rem;">"5 分钟内有多少 500 错误?"</td>
+      <td style="padding: 0.4rem 0.6rem;">❌ 需要写正则,脆弱</td>
+      <td style="padding: 0.4rem 0.6rem;">✅ <code>jq 'select(.statusCode&gt;=500)' | wc -l</code></td>
+    </tr>
+    <tr style="border-bottom: 1px solid var(--rule);">
+      <td style="padding: 0.4rem 0.6rem;">接 ELK / Loki / Splunk</td>
+      <td style="padding: 0.4rem 0.6rem;">⚠️ 需要 grok 解析</td>
+      <td style="padding: 0.4rem 0.6rem;">✅ 直接 ingest</td>
+    </tr>
+    <tr style="border-bottom: 1px solid var(--rule);">
+      <td style="padding: 0.4rem 0.6rem;">按业务字段聚合(用户数 / 错误码)</td>
+      <td style="padding: 0.4rem 0.6rem;">❌ 几乎不可能</td>
+      <td style="padding: 0.4rem 0.6rem;">✅ <code>jq 'group_by(.userId) | length'</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<p><strong>Pino 是 Node 生态里最快的 JSON logger</strong>([benchmarks](https://github.com/pinojs/pino/blob/master/docs/benchmarks.md)): 比 console.log 在高频日志场景下还快(因为它默认不格式化,直接 JSON.stringify 写流)。`nestjs-pino` 是 Pino 的 NestJS 官方风格集成包。</p>
+
+<h2>2. AsyncLocalStorage — requestId 怎么"跟住"你</h2>
+<p>先讲原理,这样你用 nestjs-pino 时不会觉得是魔法。</p>
+<p>问题: 一个 HTTP 请求进入 NestJS,经过 Guard / Interceptor / Pipe / Controller / Service 一路调用,中间有 5+ 个 <code>await</code>、3 个 <code>setTimeout</code>、2 个 Promise 链。如果每个函数都要 log,你需要在每条 log 调用里手动传 <code>requestId</code> — 这会污染所有签名。</p>
+
+<p>解法: <strong>Node 的 AsyncLocalStorage</strong>([MDN](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/AsyncLocalStorage))。它是 V8 的"线程局部存储"等价物:</p>
+
+<pre><code>import { AsyncLocalStorage } from 'node:async_hooks';
+
+const als = new AsyncLocalStorage&lt;Map&lt;string, string&gt;&gt;();
+
+// 入口处"进入"上下文
+als.run(new Map([['requestId', 'abc-123']]), () =&gt; {
+  // 这里任何函数(同步/异步/await/setTimeout 都可以)
+  // 都能拿到这个 requestId,不需要传参
+  setTimeout(() =&gt; {
+    const store = als.getStore();
+    console.log(store?.get('requestId'));   // 'abc-123'
+  }, 1000);
+});</code></pre>
+
+<p>原理: V8 的 async_hooks 会在每次 microtask / Promise / setTimeout 创建时打"上下文快照",Node 把这个快照跟 Promise 绑定。同一 Promise 链上的所有函数都看到同一份 store — <strong>不需要手动传参</strong>。</p>
+
+<p>React 类比: 跟 `useContext` 是一回事 — Provider 在外层塞值,任何内层组件不用 prop drilling 就能拿到。Node 的"Provider" = `als.run()`,Node 的"useContext" = `als.getStore()`。</p>
+
+<h2>3. nestjs-pino 集成 — 一行配置搞定大半</h2>
+<p>`nestjs-pino` 已经替我们做完最难的"自动注入 requestId + AsyncLocalStorage"。你只需要在 <code>AppModule</code> 注册 <code>LoggerModule</code>:</p>
+
+<pre><code>import { LoggerModule } from 'nestjs-pino';
+import { randomUUID } from 'node:crypto';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    LoggerModule.forRoot({
+      pinoHttp: {
+        level: process.env.LOG_LEVEL || 'info',
+        genReqId: (req) =&gt; req.headers['x-request-id'] || randomUUID(),
+        customProps: (req) =&gt; ({ requestId: req.id }),
+        transport: process.env.NODE_ENV === 'production'
+          ? undefined
+          : { target: 'pino-pretty', options: { singleLine: true } },
+      },
+    }),
+    ...
+  ],
+})</code></pre>
+
+<p>关键点:</p>
+<ul>
+  <li><code>genReqId</code>: 优先用客户端传的 <code>x-request-id</code> 头,没有就生成 UUID。这样 <strong>跨服务转发时 requestId 会保留</strong>(proxy 加个头就行,留作 0006 扩展)</li>
+  <li><code>customProps</code>: 把 <code>reqId</code> 暴露成 <code>requestId</code> 字段,所有日志都能拿到</li>
+  <li><code>transport</code>: dev 环境用 <code>pino-pretty</code> 美化(单行,可读),prod 直接 JSON(机器可读)</li>
+</ul>
+
+<p>默认行为: <strong>每个 HTTP 请求进来,自动 log 一条 "request completed"</strong>(method / url / statusCode / durationMs)。你不用写一行 Interceptor 就有了访问日志。</p>
+
+<h2>4. 动手 · 6 个文件改动</h2>
+<p>这一节比 0004 改动多但每个更小,做完后**整个 gateway 的日志**都会变成 JSON 格式。</p>
+
+<div class="task">
+  <h3>4.1 · 装 nestjs-pino</h3>
+  <pre><code>pnpm add -w nestjs-pino pino
+pnpm add -wD pino-pretty @types/pino</code></pre>
+  <p>注意 <code>pino-pretty</code> 是 dev-only 依赖 — 生产不会带它。</p>
+</div>
+
+<div class="task">
+  <h3>4.2 · AppModule 注册 LoggerModule</h3>
+  <p>打开 <code>apps/gateway/src/app.module.ts</code>,在 <code>imports</code> 数组最前面加 <code>LoggerModule</code>(必须在 <code>ConfigModule</code> 之后,因为配置里读 <code>LOG_LEVEL</code>):</p>
+  <pre><code>import { LoggerModule } from 'nestjs-pino';
+import { randomUUID } from 'node:crypto';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    LoggerModule.forRoot({
+      pinoHttp: {
+        level: process.env.LOG_LEVEL || 'info',
+        genReqId: (req) =&gt; req.headers['x-request-id'] || randomUUID(),
+        customProps: (req) =&gt; ({ requestId: req.id }),
+        transport: process.env.NODE_ENV === 'production'
+          ? undefined
+          : { target: 'pino-pretty', options: { singleLine: true } },
+      },
+    }),
+    ...
+  ],
+})</code></pre>
+</div>
+
+<div class="task">
+  <h3>4.3 · 替换 main.ts 里的 console.log</h3>
+  <p>打开 <code>apps/gateway/src/main.ts</code>,把 0001 留的 <code>console.log('cwd:', ...)</code> 删掉(探针任务完成了),保留其它代码不动。NestJS 启动日志会自动被 nestjs-pino 接管,不需要手动 log。</p>
+</div>
+
+<div class="task">
+  <h3>4.4 · 替换 LifecycleProbeService 的 console.log</h3>
+  <p>打开 <code>apps/gateway/src/lifecycle/lifecycle-probe.service.ts</code>,用 <code>PinoLogger</code> 替代 <code>console.log</code>:</p>
+  <pre><code>import { Injectable, OnModuleInit, OnModuleDestroy, OnApplicationShutdown } from '@nestjs/common';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+
+@Injectable()
+export class LifecycleProbeService implements OnModuleInit, OnModuleDestroy, OnApplicationShutdown {
+  constructor(@InjectPinoLogger(LifecycleProbeService.name) private readonly logger: PinoLogger) {}
+
+  onModuleInit() {
+    this.logger.info('module dependencies resolved');
+  }
+  onModuleDestroy() {
+    this.logger.info('closing connections (simulated)');
+  }
+  onApplicationShutdown(signal?: string) {
+    this.logger.info({ signal }, 'flushing logs (simulated)');
+  }
+}</code></pre>
+  <p>现在 log 输出是 JSON,带 <code>context: "LifecycleProbeService"</code> 字段,可以 grep。</p>
+</div>
+
+<div class="task">
+  <h3>4.5 · 升级 TimingInterceptor: tap → finalize + statusCode + Pino</h3>
+  <p>打开 <code>apps/gateway/src/interceptors/timing.interceptor.ts</code>,完整重写:</p>
+  <pre><code>import { Injectable, NestInterceptor, ExecutionContext, CallHandler } from '@nestjs/common';
+import { Observable, finalize } from 'rxjs';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+
+@Injectable()
+export class TimingInterceptor implements NestInterceptor {
+  constructor(@InjectPinoLogger(TimingInterceptor.name) private readonly logger: PinoLogger) {}
+
+  intercept(context: ExecutionContext, next: CallHandler): Observable&lt;any&gt; {
+    const start = performance.now();
+    const req = context.switchToHttp().getRequest();
+    return next.handle().pipe(
+      finalize(() =&gt; {
+        const durationMs = Number((performance.now() - start).toFixed(2));
+        const statusCode = context.switchToHttp().getResponse().statusCode;
+        this.logger.info({ method: req.method, url: req.url, statusCode, durationMs }, 'request completed');
+      }),
+    );
+  }
+}</code></pre>
+  <p><strong>两个关键修复</strong>:</p>
+  <ol>
+    <li><code>tap</code> → <code>finalize</code>: 现在 4xx / 5xx 也能打 timing 日志(0004 漏的那个)</li>
+    <li>加 <code>statusCode</code> 字段: 你可以 <code>jq 'select(.statusCode &gt;= 500)'</code> 找慢且失败的请求</li>
+  </ol>
+</div>
+
+<div class="task">
+  <h3>4.6 · 升级 AllExceptionsFilter: 只 log 5xx + Pino</h3>
+  <p>打开 <code>apps/gateway/src/filters/all-exceptions.filter.ts</code>,把 <code>console.error</code> 换成 PinoLogger,并加 statusCode 判断:</p>
+  <pre><code>import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus } from '@nestjs/common';
+import { Request, Response } from 'express';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+
+@Catch()
+export class AllExceptionsFilter implements ExceptionFilter {
+  constructor(@InjectPinoLogger(AllExceptionsFilter.name) private readonly logger: PinoLogger) {}
+
+  catch(exception: unknown, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse&lt;Response&gt;();
+    const request = ctx.getRequest&lt;Request&gt;();
+
+    const status = exception instanceof HttpException
+      ? exception.getStatus()
+      : HttpStatus.INTERNAL_SERVER_ERROR;
+
+    // ✅ 关键: 只 log 5xx,4xx 静默
+    if (status &gt;= 500) {
+      this.logger.error({ err: exception, path: request.url, method: request.method }, 'unhandled exception');
+    } else {
+      this.logger.debug({ status, path: request.url }, 'client error (expected)');
+    }
+
+    const message = exception instanceof HttpException
+      ? exception.getResponse()
+      : 'Internal server error';
+
+    response.status(status).json({
+      statusCode: status,
+      message: typeof message === 'string' ? message : (message as any).message || message,
+      error: typeof message === 'string' ? message : (message as any).error || 'Error',
+      timestamp: new Date().toISOString(),
+      path: request.url,
+    });
+  }
+}</code></pre>
+  <p>4xx(401 / 400 等预期错误)走 <code>debug</code> 级,默认不显示;5xx(真崩了)走 <code>error</code> 级,带完整 stack。这是行业标准做法。</p>
+</div>
+
+<div class="task">
+  <h3>4.7 · 验证 JSON 日志</h3>
+  <ol class="steps">
+    <li>重启 <code>pnpm start:gateway</code> — 启动日志应变成单行 JSON(因为 dev 用了 <code>pino-pretty</code> 美化)</li>
+    <li><code>curl -i http://localhost:3000/health</code>(不带 API key) — 期望:200 + body,日志里看到带 <code>requestId</code> 的"request completed"行</li>
+    <li><code>curl -i -X POST -H "X-API-Key: ds_key_123" -H "Content-Type: application/json" -d '{"username":"a@b.com","password":"xxxxxx"}' http://localhost:3000/api/auth/login</code> — 期望:看到 <code>statusCode: 401</code> 的 timing 日志(0004 漏的那个现在能打了)+ AllExceptions 的 debug 级日志("client error (expected)")</li>
+    <li>用同一个 requestId 做 grep 测试:<code>grep "&lt;reqId&gt;" /tmp/gateway.log</code>(如果你有重定向到文件) — 期望能拉出这个请求的所有日志</li>
+    <li><code>kill -SIGTERM &lt;pid&gt;</code> — 期望看到 [Lifecycle] 两条 JSON 日志 + 进程退出</li>
+  </ol>
+</div>
+
+<h2>5. 你应该看到什么 — 一个真实请求的完整日志</h2>
+<p>用 <code>curl -i -X POST -H "X-API-Key: ds_key_123" ...</code> 之后,dev 环境(<code>pino-pretty</code> 美化后)类似这样的输出:</p>
+
+<div class="json-block"><span class="key">"level"</span>:<span class="num">30</span> <span class="key">"time"</span>:<span class="str">"2026-06-15T20:30:00.123Z"</span> <span class="key">"pid"</span>:<span class="num">21107</span> <span class="key">"context"</span>:<span class="str">"TimingInterceptor"</span> <span class="key">"requestId"</span>:<span class="str">"abc-123-def"</span> <span class="key">"method"</span>:<span class="str">"POST"</span> <span class="key">"url"</span>:<span class="str">"/api/auth/login"</span> <span class="key">"statusCode"</span>:<span class="num">401</span> <span class="key">"durationMs"</span>:<span class="num">23.4</span> <span class="key">"msg"</span>:<span class="str">"request completed"</span></div>
+
+<p>而如果你把 <code>NODE_ENV=production</code> 启动,同一行就是纯 JSON(没颜色、没单行),可以直接灌进 ELK / Loki / Splunk。</p>
+
+<h2>6. 自我检测(3 道题)</h2>
+
+<div class="quiz">
+  <div class="quiz-q" data-correct="b">
+    <p>1. nestjs-pino 在每个 HTTP 请求自动注入的字段是?</p>
+    <label class="quiz-opt"><input type="radio" name="q1" value="a"> <code>traceId</code></label>
+    <label class="quiz-opt"><input type="radio" name="q1" value="b"> <code>reqId</code>(W3C tracecontext 风格的请求 ID)</label>
+    <label class="quiz-opt"><input type="radio" name="q1" value="c"> <code>correlationId</code></label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz-q" data-correct="b">
+    <p>2. AsyncLocalStorage 是什么?</p>
+    <label class="quiz-opt"><input type="radio" name="q2" value="a"> Node 的文件系统抽象</label>
+    <label class="quiz-opt"><input type="radio" name="q2" value="b"> Node 的"线程局部存储"等价物,值在 <code>await</code> / <code>setTimeout</code> / Promise 链上自动传播</label>
+    <label class="quiz-opt"><input type="radio" name="q2" value="c"> Redis 缓存的 Node 包装</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz-q" data-correct="a">
+    <p>3. AllExceptionsFilter 只 log 5xx 不 log 4xx 的核心原因是?</p>
+    <label class="quiz-opt"><input type="radio" name="q3" value="a"> 4xx 是"客户端正常错误路径"(密码错 / 权限不足),属于预期;5xx 是"服务器真崩了",需要排查</label>
+    <label class="quiz-opt"><input type="radio" name="q3" value="b"> 5xx 颜色比较显眼</label>
+    <label class="quiz-opt"><input type="radio" name="q3" value="c"> 4xx 永远不该发生,被屏蔽是因为它们一定不是 bug</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+</div>
+
+<h2 id="what-next">下一节预告</h2>
+<p>你现在有了: 结构化日志 + requestId 自动注入 + 4xx/5xx 区分。**还差两块拼图**完成"可观测性三件套":<br>
+&nbsp;&nbsp;• 真正的健康检查(用 <code>@nestjs/terminus</code>,而不是 <code>return { status: 'ok' }`)<br>
+&nbsp;&nbsp;• API 文档(用 <code>@nestjs/swagger</code>,前端同事不再"对着 controller 猜字段")<br>
+&nbsp;&nbsp;• 跨进程 requestId 转发(让 gateway 的 reqId 跟着 HTTP 头传到 auth-service / search-service)<br>
+0006 是"可观测性收官" + "API 文档" 一节,把这几块一次性补齐。</p>
+
+<h2>收口 · 这一节你 commit 什么</h2>
+<p>6 个文件改动:</p>
+<ul>
+  <li><code>package.json</code> + <code>pnpm-lock.yaml</code> — 装 nestjs-pino / pino / pino-pretty / @types/pino</li>
+  <li><code>apps/gateway/src/app.module.ts</code> — 注册 LoggerModule</li>
+  <li><code>apps/gateway/src/main.ts</code> — 删 0001 的 console.log 探针</li>
+  <li><code>apps/gateway/src/lifecycle/lifecycle-probe.service.ts</code> — 改用 PinoLogger</li>
+  <li><code>apps/gateway/src/interceptors/timing.interceptor.ts</code> — tap→finalize + statusCode + PinoLogger</li>
+  <li><code>apps/gateway/src/filters/all-exceptions.filter.ts</code> — 5xx only + PinoLogger</li>
+</ul>
+
+<p>commit message(直接复制):</p>
+<pre><code>feat(gateway): pino structured logging with request correlation
+
+- Install nestjs-pino and configure globally with custom reqId
+  (W3C tracecontext style, falls back to randomUUID)
+- Replace all console.log/error in gateway with injected PinoLogger,
+  output unified JSON via AsyncLocalStorage
+- Upgrade TimingInterceptor from tap() to finalize() so 4xx/5xx
+  responses also get logged, with statusCode field (fixes 0004
+  timing gap on error path)
+- Upgrade AllExceptionsFilter to only log at error level when
+  statusCode >= 500; 4xx passes through at debug level (industry
+  standard — 4xx is expected client path)
+- AsyncLocalStorage propagates reqId through await chains and
+  setTimeout without manual threading
+
+Refs: docs/teaching/lessons/0005-pino-structured-logging.html
+</code></pre>
+
+<p>4.7 五个验证跑完 + quiz 三道选完,告诉我结果,我跑上面的 commit + 写 LR-0008 + 开 0006(可观测性收官 + Swagger)。</p>
+
+<h2>延伸阅读</h2>
+<ul>
+  <li><a href="https://getpino.io/">Pino 官方文档</a>(快,只看 "Getting Started" 和 "Log Child Loggers" 即可)</li>
+  <li><a href="https://github.com/iamolegga/nestjs-pino">nestjs-pino</a>(NestJS 集成的标准包)</li>
+  <li><a href="https://nodejs.org/api/async_context.html#class-asynclocalstorage">Node.js Docs — AsyncLocalStorage</a>(§2 那段讲的就是这个 API)</li>
+  <li><a href="https://www.w3.org/TR/trace-context/">W3C Trace Context</a>(reqId 的标准化来源,微服务跟踪的事实标准)</li>
+  <li><a href="../MISSION.md">MISSION.md</a> · <a href="../RESOURCES.md">RESOURCES.md</a> · <a href="../learning-records/0007-request-lifecycle-and-observability-hooks.md">LR-0007</a></li>
+</ul>
+
+<p style="margin-top: 1.6rem; color: var(--accent); font-weight: 600;">📌 装包出错(版本冲突 / peer dep)直接问我。装完后第一次跑,日志格式看着"怪"是正常的 — dev 用 <code>pino-pretty</code> 美化过,prod 才是真 JSON。</p>
+
+<hr>
+<footer>
+  nest-search · teach workspace · 课时 0005<br>
+  有问题直接问 Claude
+</footer>
+
+<script>
+function check(btn) {
+  const q = btn.closest('.quiz-q');
+  const correct = q.dataset.correct;
+  const picked = q.querySelector('input[type=radio]:checked');
+  const fb = q.querySelector('.quiz-feedback');
+  if (!picked) {
+    fb.textContent = '⚠️ 选一个再提交。';
+    fb.className = 'quiz-feedback show bad';
+    return;
+  }
+  if (picked.value === correct) {
+    fb.textContent = '✅ 对了。';
+    fb.className = 'quiz-feedback show good';
+  } else {
+    fb.textContent = '❌ 不对,回到 §1 / §2 / §4.6 重读一遍,再试一次。';
+    fb.className = 'quiz-feedback show bad';
+  }
+}
+</script>
+
+</body>
+</html>
