@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>0007 · 限流与安全:让 gateway 学会说"不"</title>
+<style>
+  :root {
+    --bg: #fbfaf7;
+    --ink: #1d1d1d;
+    --ink-soft: #4a4a4a;
+    --ink-faint: #8a8a8a;
+    --rule: #d6d2c4;
+    --accent: #b04a2f;
+    --code-bg: #f1efe8;
+    --code-inline: #ece8db;
+    --good: #2c6e3e;
+    --bad: #b04a2f;
+    --pad: 2.4rem;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "SF Pro Text", "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  body { max-width: 760px; margin: 0 auto; padding: var(--pad); }
+  h1, h2, h3 { font-family: Georgia, "Source Han Serif SC", "Songti SC", serif; font-weight: 600; letter-spacing: -0.01em; }
+  h1 { font-size: 2.1rem; line-height: 1.15; margin: 0 0 0.4rem 0; }
+  h2 { font-size: 1.45rem; margin: 3rem 0 0.6rem 0; border-bottom: 1px solid var(--rule); padding-bottom: 0.3rem; }
+  h3 { font-size: 1.12rem; margin: 1.6rem 0 0.4rem 0; color: var(--ink-soft); }
+  p { margin: 0.8rem 0; }
+  .lede { font-size: 1.05rem; color: var(--ink-soft); font-style: italic; border-left: 3px solid var(--accent); padding-left: 0.9rem; margin: 1rem 0 1.6rem 0; }
+  .meta { color: var(--ink-faint); font-size: 0.85rem; margin-bottom: 1.6rem; }
+  .meta a { color: var(--ink-faint); }
+  code, pre, kbd { font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace; font-size: 0.92em; }
+  p code, li code, td code { background: var(--code-inline); padding: 0.08em 0.36em; border-radius: 3px; color: var(--ink); }
+  pre { background: var(--code-bg); border: 1px solid var(--rule); padding: 0.9rem 1rem; border-radius: 4px; overflow-x: auto; line-height: 1.5; margin: 0.8rem 0; }
+  pre code { background: transparent; padding: 0; }
+  .task { background: #fff; border: 1px solid var(--rule); border-left: 4px solid var(--accent); padding: 1rem 1.2rem; margin: 1.4rem 0; border-radius: 3px; }
+  .task h3 { margin-top: 0; color: var(--accent); text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.85rem; font-family: -apple-system, sans-serif; font-weight: 700; }
+  .quiz { margin: 1.6rem 0; }
+  .quiz-q { background: #fff; border: 1px solid var(--rule); padding: 1rem 1.2rem; border-radius: 3px; margin: 0.8rem 0; }
+  .quiz-q p:first-child { margin-top: 0; font-weight: 600; }
+  .quiz-opt { display: block; margin: 0.3rem 0; cursor: pointer; }
+  .quiz-opt input { margin-right: 0.5rem; }
+  .quiz-feedback { display: none; margin-top: 0.6rem; padding: 0.5rem 0.8rem; border-radius: 3px; font-size: 0.95rem; }
+  .quiz-feedback.show { display: block; }
+  .quiz-feedback.good { background: #e8f3ea; color: var(--good); border: 1px solid #b6d8be; }
+  .quiz-feedback.bad { background: #fbeae5; color: var(--bad); border: 1px solid #e8b9a8; }
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+  th, td { padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--rule); text-align: left; }
+  th { color: var(--ink-soft); font-weight: 600; }
+  hr { border: none; border-top: 1px solid var(--rule); margin: 2.4rem 0 1.2rem 0; }
+  footer { color: var(--ink-faint); font-size: 0.85rem; }
+  footer a { color: var(--ink-soft); }
+  @media print {
+    body { background: white; max-width: none; padding: 1.2rem; }
+    .task, .quiz-q { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>限流与安全:让 gateway 学会说"不"</h1>
+  <p class="lede">没限流的 gateway = 任意客户端可以在 1 秒内发 10000 个请求把你的进程 / 下游服务打爆。</p>
+  <p class="meta">
+    课时 0007 · 预计 25 分钟 · 锚定项目 <code>nest-search</code>
+    · 上一节: <a href="0006-observability-closure.html">可观测性收官 + Swagger</a>
+    · 下一节: <a href="#what-next">跨服务追踪 + DTO 严格化</a>
+  </p>
+</header>
+
+<hr>
+
+<h2>你今天会拿到什么</h2>
+<ol class="steps">
+  <li>理解限流的两大参数: <strong>TTL(时间窗)</strong> + <strong>Limit(限额)</strong></li>
+  <li>用 <code>@nestjs/throttler</code> 装上全局限流,默认 100 req/min</li>
+  <li>对敏感端点(如 <code>/api/auth/login</code>)单独配更严格的限额 — 防爆破</li>
+  <li>在 <code>/health</code> 上加 <code>@SkipThrottle()</code>,让 K8s probe 不被限流</li>
+  <li>用一行 shell 验证限流真的工作(快速 100 个请求,看到 429)</li>
+  <li>一个可提交的 commit,把"企业级"最后一道门关上</li>
+</ol>
+
+<h2>1. 为什么需要限流</h2>
+<p>考虑这三种"事故",每一种都真实发生过:</p>
+<table>
+  <thead>
+    <tr><th>场景</th><th>后果</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>前端 bug 写错死循环,每 10ms 调一次登录</td><td>auth-service CPU 100%,所有用户登不上</td></tr>
+    <tr><td>恶意用户拿脚本刷 <code>/api/auth/login</code> 猜密码</td><td>数据库被慢查询塞满,所有业务慢</td></tr>
+    <tr><td>DDOS 攻击</td><td>gateway 进程被请求淹没,正常用户全 502</td></tr>
+  </tbody>
+</table>
+
+<p>限流是"主动拒绝"机制 — 在请求被处理之前,根据<strong>调用方身份</strong>或<strong>IP</strong>判断"你已经在窗口里用了多少次了,超了就不让进"。</p>
+
+<h2>2. Throttler 心智模型:3 个关键概念</h2>
+
+<pre><code>ThrottlerModule.forRoot([{
+  ttl: 60_000,   // 1 分钟时间窗(毫秒)
+  limit: 100,    // 这个窗口里最多 100 次
+}])
+</code></pre>
+
+<p>三个核心元素:</p>
+<table>
+  <thead>
+    <tr><th>概念</th><th>含义</th><th>类比</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>ttl</code></td><td>时间窗大小(毫秒)<code>60_000</code> = 1 分钟</td><td>"过去 1 分钟内"</td></tr>
+    <tr><td><code>limit</code></td><td>窗口内允许的最大请求数</td><td>"不能超过 100 次"</td></tr>
+    <tr><td><code>ThrottlerGuard</code></td><td>实际的"看门人",每次请求判断"超没超"</td><td>"保安"</td></tr>
+  </tbody>
+</table>
+
+<p>超出 → 自动 429 Too Many Requests 响应(<strong>无</strong>业务代码介入,Guard 直接拒)。</p>
+
+<p>还可以定义<strong>多窗口</strong>叠加(每个都通过才算"未超"):</p>
+
+<pre><code>ThrottlerModule.forRoot([
+  { name: 'short', ttl: 1_000,   limit: 5 },     // 1 秒内最多 5 次
+  { name: 'long',  ttl: 60_000,  limit: 100 },   // 1 分钟内最多 100 次
+])</code></pre>
+
+<p>攻击者 1 秒发 1000 个请求 → short 窗口 5 个就拒了,根本到不了业务代码。</p>
+
+<h2>3. Counter 存在哪?</h2>
+<p>默认存<strong>当前进程的内存 Map</strong>(<code>ThrottlerStorageService</code>)。这意味着:</p>
+<ul>
+  <li>多实例部署时,每个实例独立计数 — 实际限额 = 配置值 × 实例数</li>
+  <li>实例重启,counter 归零</li>
+</ul>
+
+<p>多实例 production 通常用 Redis 存 counter(下节课 0008 讲)。本节课用默认 in-memory,够 demo。</p>
+
+<h2>4. 动手 · 5 个文件改动</h2>
+
+<div class="task">
+  <h3>4.1 · 装 @nestjs/throttler</h3>
+  <pre><code>pnpm add -w @nestjs/throttler</code></pre>
+</div>
+
+<div class="task">
+  <h3>4.2 · AppModule 注册 ThrottlerModule + ThrottlerGuard</h3>
+  <p>打开 <code>apps/gateway/src/app.module.ts</code>,加 import + 在 <code>providers</code> 数组加 ThrottlerGuard:</p>
+  <pre><code>import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    LoggerModule.forRoot({ ... }),
+    HealthModule,
+    ThrottlerModule.forRoot([     // ← 新加
+      { name: 'short', ttl: 1_000, limit: 5 },
+      { name: 'long', ttl: 60_000, limit: 100 },
+    ]),
+  ],
+  providers: [
+    ...
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,   // ← 新加,全局生效
+    },
+  ],
+})</code></pre>
+  <p>现在每个请求都被计数。两次窗口任一超限 → 429。</p>
+</div>
+
+<div class="task">
+  <h3>4.3 · /health 加 @SkipThrottle()</h3>
+  <p>打开 <code>apps/gateway/src/health/health.controller.ts</code>,每个 handler 加 <code>@SkipThrottle()</code>:</p>
+  <pre><code>import { SkipThrottle } from '@nestjs/throttler';
+
+@Public()
+@SkipThrottle()         // ← 新加
+@Get('live')
+@HealthCheck()
+liveness() { ... }
+
+@Public()
+@SkipThrottle()         // ← 新加
+@Get()
+@HealthCheck()
+readiness() { ... }</code></pre>
+  <p>原因: K8s probe 每 5-10 秒就 ping 一次 /health,如果不 skip 会被限流,然后 K8s 觉得"服务挂了"重启 pod,陷入循环。</p>
+</div>
+
+<div class="task">
+  <h3>4.4 · 给敏感端点加更严的 @Throttle</h3>
+  <p>打开 <code>apps/gateway/src/app.controller.ts</code>,给 <code>/api/auth/login</code> 加 <code>@Throttle</code> 覆盖默认:</p>
+  <pre><code>import { Throttle } from '@nestjs/throttler';
+
+@ApiOperation({ summary: "用户登录(代理到 auth-service)" })
+@ApiResponse({ status: 200, description: "登录成功" })
+@ApiResponse({ status: 401, description: "凭证错" })
+@ApiResponse({ status: 429, description: "请求过于频繁" })
+@Throttle({ default: { limit: 5, ttl: 60_000 } })   // ← 新加:1 分钟最多 5 次
+@Post("api/auth/login")
+async login(@Body() body: any) { ... }</code></pre>
+  <p>防爆破: 1 分钟最多 5 次,密码错误次数再多也进不了 — 同时慢下来阻止暴力枚举。</p>
+</div>
+
+<div class="task">
+  <h3>4.5 · 验证 4 件事</h3>
+  <ol class="steps">
+    <li>重启 <code>pnpm start:gateway</code></li>
+    <li>验证 <code>/health</code> 不被限流(连发 20 次应该都 200):
+      <pre><code>for i in {1..20}; do curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3000/health; done | sort | uniq -c</code></pre>
+      期望: <code>20 200</code>(没 429,说明 @SkipThrottle 生效)
+    </li>
+    <li>验证 <code>/api/auth/me</code>(普通端点)按 long 窗口限流(快速 110 次):
+      <pre><code>for i in {1..110}; do curl -s -o /dev/null -w "%{http_code}\n" -H "X-API-Key: ds_key_123" http://localhost:3000/api/auth/me; done | sort | uniq -c</code></pre>
+      期望: 大约 <code>100 401</code> + <code>10 429</code>(前 100 个穿透,后 10 个被限)
+    </li>
+    <li>验证 <code>/api/auth/login</code> 按更严的 5/min 限流(快速 10 次):
+      <pre><code>for i in {1..10}; do curl -s -o /dev/null -w "%{http_code}\n" -X POST -H "Content-Type: application/json" -d '{"username":"a","password":"b"}' http://localhost:3000/api/auth/login; done | sort | uniq -c</code></pre>
+      期望: <code>5 401</code> + <code>5 429</code>(5 次过后被更严的限流拒)
+    </li>
+    <li>看控制台 — 应该有 0005 装的 Pino 格式 <code>429</code> 日志</li>
+  </ol>
+</div>
+
+<p>4.5 步骤 3 是这一节"金样本" — 看到第 6 次登录就 429,你会突然理解"为什么 app 总在'我密码对了为啥不让登'"。</p>
+
+<h2>5. 自我检测(3 道题)</h2>
+
+<div class="quiz">
+  <div class="quiz-q" data-correct="b">
+    <p>1. <code>ttl: 60_000</code> 在 Throttler 里表示什么?</p>
+    <label class="quiz-opt"><input type="radio" name="q1" value="a"> Token Total Limit(token 总量)</label>
+    <label class="quiz-opt"><input type="radio" name="q1" value="b"> 1 分钟时间窗(60_000 毫秒)</label>
+    <label class="quiz-opt"><input type="radio" name="q1" value="c"> Try To Login(尝试登录)</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz-q" data-correct="c">
+    <p>2. 默认 Throttler 的 counter 存在哪?</p>
+    <label class="quiz-opt"><input type="radio" name="q2" value="a"> Redis</label>
+    <label class="quiz-opt"><input type="radio" name="q2" value="b"> MySQL</label>
+    <label class="quiz-opt"><input type="radio" name="q2" value="c"> 当前 Node 进程的内存 Map(<code>ThrottlerStorageService</code>)</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz-q" data-correct="b">
+    <p>3. 装上全局 ThrottlerGuard 后,怎么让 <code>/health</code> 不被 K8s probe 触发限流?</p>
+    <label class="quiz-opt"><input type="radio" name="q3" value="a"> 不处理,Throttler 自动跳过 <code>/health</code></label>
+    <label class="quiz-opt"><input type="radio" name="q3" value="b"> 在 health controller 上加 <code>@SkipThrottle()</code> 装饰器</label>
+    <label class="quiz-opt"><input type="radio" name="q3" value="c"> 改 K8s probe 配置加白名单</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+</div>
+
+<h2 id="what-next">下一节预告</h2>
+<p>你现在有了: 限流防爆 + Swagger 给前端 + 真健康检查 + 结构化日志 + 优雅退出。gateway 这边"对外"的层级全部到位。<br>
+&nbsp;&nbsp;• 0008 我们做"对内"的剩余两块: <strong>跨服务 requestId 转发</strong>(让 gateway 的 reqId 跟着 HTTP 头传到 auth-service)+ <strong>DTO 严格化</strong>(把 <code>body: any</code> 替换成有 class-validator 装饰器的 DTO 类,Swagger 也能正确显示字段)<br>
+&nbsp;&nbsp;• 这两块做完,8 节课的 NestJS 企业级主线就完整了</p>
+
+<h2>收口 · 这一节你 commit 什么</h2>
+<p>4 个文件改动:</p>
+<ul>
+  <li><code>package.json</code> / <code>pnpm-lock.yaml</code> — 装 @nestjs/throttler</li>
+  <li><code>apps/gateway/src/app.module.ts</code> — 注册 ThrottlerModule + APP_GUARD:ThrottlerGuard</li>
+  <li><code>apps/gateway/src/health/health.controller.ts</code> — 加 @SkipThrottle()</li>
+  <li><code>apps/gateway/src/app.controller.ts</code> — 给 /api/auth/login 加 @Throttle 覆盖</li>
+</ul>
+
+<p>commit message(直接复制):</p>
+<pre><code>feat(gateway): rate limiting with @nestjs/throttler
+
+- Register ThrottlerModule globally with two stacked windows:
+  5 req/sec + 100 req/min. ThrottlerGuard registered as APP_GUARD
+  applies to all routes by default
+- Skip throttling on /health/live and /health/readiness so K8s
+  probes aren't rate-limited (would cause restart loops)
+- Override /api/auth/login to stricter 5 req/min limit to
+  prevent credential brute force
+- Multi-window design: attack spike gets caught by short window
+  before reaching downstream services
+
+Refs: docs/teaching/lessons/0007-rate-limiting.html
+</code></pre>
+
+<p>4.5 三个验证跑完 + quiz 三道选完,告诉我结果,我跑上面的 commit + 写 LR-0010 + 开 0008(跨服务追踪 + DTO 严格化)。</p>
+
+<h2>延伸阅读</h2>
+<ul>
+  <li><a href="https://docs.nestjs.com/security/rate-limiting">NestJS Docs — Rate limiting</a>(必读,装饰器列表)</li>
+  <li><a href="https://github.com/nestjs/throttler">@nestjs/throttler GitHub</a>(看 <code>src/throttler-storage.interface.ts</code> 了解 storage 抽象)</li>
+  <li><a href="https://tools.ietf.org/html/rfc6585">RFC 6585 — Additional HTTP Status Codes (429 规范)</a></li>
+  <li><a href="../MISSION.md">MISSION.md</a> · <a href="../RESOURCES.md">RESOURCES.md</a> · <a href="../learning-records/0009-observability-closure.md">LR-0009</a></li>
+</ul>
+
+<p style="margin-top: 1.6rem; color: var(--accent); font-weight: 600;">📌 4.5 步骤 3 那条"前 5 次过,后 5 次 429"是这一节的金样本。如果你没试这一步,你只验证了"装上了",没验证"装对了"。</p>
+
+<hr>
+<footer>
+  nest-search · teach workspace · 课时 0007<br>
+  有问题直接问 Claude
+</footer>
+
+<script>
+function check(btn) {
+  const q = btn.closest('.quiz-q');
+  const correct = q.dataset.correct;
+  const picked = q.querySelector('input[type=radio]:checked');
+  const fb = q.querySelector('.quiz-feedback');
+  if (!picked) {
+    fb.textContent = '⚠️ 选一个再提交。';
+    fb.className = 'quiz-feedback show bad';
+    return;
+  }
+  if (picked.value === correct) {
+    fb.textContent = '✅ 对了。';
+    fb.className = 'quiz-feedback show good';
+  } else {
+    fb.textContent = '❌ 不对,回到 §2 / §4.3 重读一遍,再试一次。';
+    fb.className = 'quiz-feedback show bad';
+  }
+}
+</script>
+
+</body>
+</html>
