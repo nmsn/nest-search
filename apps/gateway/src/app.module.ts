@@ -11,6 +11,7 @@ import { TimingInterceptor } from "./interceptors/timing.interceptor";
 import { APP_INTERCEPTOR } from "@nestjs/core";
 import { LoggerModule } from "nestjs-pino";
 import { randomUUID } from "node:crypto";
+import { HealthModule } from "./health/health.module";
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { randomUUID } from "node:crypto";
         autoLogging: false,
       },
     }),
+    HealthModule, // ← 新加
   ],
   controllers: [AppController],
   providers: [

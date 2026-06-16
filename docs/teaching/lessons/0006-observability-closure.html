@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>0006 · 可观测性收官 + Swagger:让运维和前端都能"看见"你的服务</title>
+<style>
+  :root {
+    --bg: #fbfaf7;
+    --ink: #1d1d1d;
+    --ink-soft: #4a4a4a;
+    --ink-faint: #8a8a8a;
+    --rule: #d6d2c4;
+    --accent: #b04a2f;
+    --code-bg: #f1efe8;
+    --code-inline: #ece8db;
+    --good: #2c6e3e;
+    --bad: #b04a2f;
+    --pad: 2.4rem;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "SF Pro Text", "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  body { max-width: 760px; margin: 0 auto; padding: var(--pad); }
+  h1, h2, h3 { font-family: Georgia, "Source Han Serif SC", "Songti SC", serif; font-weight: 600; letter-spacing: -0.01em; }
+  h1 { font-size: 2.1rem; line-height: 1.15; margin: 0 0 0.4rem 0; }
+  h2 { font-size: 1.45rem; margin: 3rem 0 0.6rem 0; border-bottom: 1px solid var(--rule); padding-bottom: 0.3rem; }
+  h3 { font-size: 1.12rem; margin: 1.6rem 0 0.4rem 0; color: var(--ink-soft); }
+  p { margin: 0.8rem 0; }
+  .lede { font-size: 1.05rem; color: var(--ink-soft); font-style: italic; border-left: 3px solid var(--accent); padding-left: 0.9rem; margin: 1rem 0 1.6rem 0; }
+  .meta { color: var(--ink-faint); font-size: 0.85rem; margin-bottom: 1.6rem; }
+  .meta a { color: var(--ink-faint); }
+  code, pre, kbd { font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace; font-size: 0.92em; }
+  p code, li code, td code { background: var(--code-inline); padding: 0.08em 0.36em; border-radius: 3px; color: var(--ink); }
+  pre { background: var(--code-bg); border: 1px solid var(--rule); padding: 0.9rem 1rem; border-radius: 4px; overflow-x: auto; line-height: 1.5; margin: 0.8rem 0; }
+  pre code { background: transparent; padding: 0; }
+  .task { background: #fff; border: 1px solid var(--rule); border-left: 4px solid var(--accent); padding: 1rem 1.2rem; margin: 1.4rem 0; border-radius: 3px; }
+  .task h3 { margin-top: 0; color: var(--accent); text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.85rem; font-family: -apple-system, sans-serif; font-weight: 700; }
+  .quiz { margin: 1.6rem 0; }
+  .quiz-q { background: #fff; border: 1px solid var(--rule); padding: 1rem 1.2rem; border-radius: 3px; margin: 0.8rem 0; }
+  .quiz-q p:first-child { margin-top: 0; font-weight: 600; }
+  .quiz-opt { display: block; margin: 0.3rem 0; cursor: pointer; }
+  .quiz-opt input { margin-right: 0.5rem; }
+  .quiz-feedback { display: none; margin-top: 0.6rem; padding: 0.5rem 0.8rem; border-radius: 3px; font-size: 0.95rem; }
+  .quiz-feedback.show { display: block; }
+  .quiz-feedback.good { background: #e8f3ea; color: var(--good); border: 1px solid #b6d8be; }
+  .quiz-feedback.bad { background: #fbeae5; color: var(--bad); border: 1px solid #e8b9a8; }
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0; }
+  .compare > div { background: #fff; border: 1px solid var(--rule); border-radius: 3px; padding: 0.8rem 1rem; }
+  .compare h4 { margin: 0 0 0.4rem 0; font-size: 0.9rem; color: var(--ink-soft); }
+  hr { border: none; border-top: 1px solid var(--rule); margin: 2.4rem 0 1.2rem 0; }
+  footer { color: var(--ink-faint); font-size: 0.85rem; }
+  footer a { color: var(--ink-soft); }
+  @media (max-width: 600px) { .compare { grid-template-columns: 1fr; } }
+  @media print {
+    body { background: white; max-width: none; padding: 1.2rem; }
+    .task, .quiz-q { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>可观测性收官 + Swagger:让运维和前端都能"看见"你的服务</h1>
+  <p class="lede">前 5 节课把"日志 / 进程 / 异常"全部接通了。这一节把"运维能监控" + "前端能调你"两件事一起关掉。</p>
+  <p class="meta">
+    课时 0006 · 预计 35 分钟 · 锚定项目 <code>nest-search</code>
+    · 上一节: <a href="0005-pino-structured-logging.html">Pino 结构化日志</a>
+    · 下一节: <a href="#what-next">限流与安全</a>
+  </p>
+</header>
+
+<hr>
+
+<h2>你今天会拿到什么</h2>
+<ol class="steps">
+  <li>把项目里那个"谎报"的 <code>/health</code> 升级成真检测 — 它会真去 ping auth-service,真去看 memory heap</li>
+  <li>区分 K8s 的 liveness probe 和 readiness probe,知道 K8s 怎么用</li>
+  <li>装 Swagger,让 <code>http://localhost:3000/api</code> 出现完整 OpenAPI 文档 — 前端不再"对着 controller 猜字段"</li>
+  <li>一个可提交的 commit,完成"可观测性三件套" + "API 文档"的最终形态</li>
+</ol>
+
+<h2>1. 为什么现在的 <code>/health</code> 是 bug</h2>
+<p>看 <code>apps/gateway/src/app.controller.ts</code> 里的 <code>health()</code>:</p>
+<pre><code>@Get('health')
+health() {
+  return { status: 'ok', service: 'gateway', timestamp: new Date().toISOString() };
+}</code></pre>
+
+<p>这个 endpoint **永远返回 200**,无论下面这些情况:</p>
+<ul>
+  <li>MySQL 挂了,gateway 没法 proxy 任何业务</li>
+  <li>auth-service 进程死了,gateway 的 /api/auth/* 全部 502</li>
+  <li>RabbitMQ 连接断了,所有事件流停了</li>
+  <li>内存泄漏到 90% heap 占用</li>
+</ul>
+
+<p>你的 gateway 在 K8s 里的状态会一直显示 "Ready" — 流量照打,然后客户端全 502。**这是 silent failure 的典型形态**。</p>
+
+<div class="compare">
+  <div>
+    <h4>现在的 /health</h4>
+    <pre><code>GET /health
+→ 200 {"status":"ok"}
+(无任何检查,谎报健康)</code></pre>
+  </div>
+  <div>
+    <h4>0006 之后</h4>
+    <pre><code>GET /health
+→ 200 {
+  "status": "ok",
+  "info": {
+    "auth_service": {"status": "up"},
+    "memory_heap": {"status": "up"}
+  }
+}
+
+GET /health
+→ 503 (auth-service 挂了)
+{"status": "error", ...}</code></pre>
+  </div>
+</div>
+
+<h2>2. K8s liveness vs readiness — 必须分清</h2>
+<p>两个 probe 用途完全不同,搞混了 service 会"卡死"或"被无限重启":</p>
+
+<table>
+  <thead>
+    <tr style="border-bottom: 1px solid var(--rule); text-align: left;">
+      <th style="padding: 0.4rem 0.6rem;">probe</th>
+      <th style="padding: 0.4rem 0.6rem;">问的问题</th>
+      <th style="padding: 0.4rem 0.6rem;">失败后果</th>
+      <th style="padding: 0.4rem 0.6rem;">用哪个 endpoint</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr style="border-bottom: 1px solid var(--rule);">
+      <td style="padding: 0.4rem 0.6rem;">liveness</td>
+      <td style="padding: 0.4rem 0.6rem;">"我是不是死了 / 卡死了?"</td>
+      <td style="padding: 0.4rem 0.6rem;"><strong>重启 pod</strong>(K8s 觉得它不行了)</td>
+      <td style="padding: 0.4rem 0.6rem;"><code>/health/live</code> — 只检查"进程在"</td>
+    </tr>
+    <tr style="border-bottom: 1px solid var(--rule);">
+      <td style="padding: 0.4rem 0.6rem;">readiness</td>
+      <td style="padding: 0.4rem 0.6rem;">"我能不能接新流量?"</td>
+      <td style="padding: 0.4rem 0.6rem;"><strong>摘出 Service endpoint</strong>(不重启,只是不接流量)</td>
+      <td style="padding: 0.4rem 0.6rem;"><code>/health</code> 或 <code>/health/ready</code> — 检查下游依赖</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>经典坑: 把 liveness 接到了依赖检查的 endpoint 上,MySQL 抖一下,K8s 觉得 pod 死了,**直接重启** — 但重启 MySQL 也连不上,陷入"无限重启循环"。</p>
+
+<h2>3. <code>@nestjs/terminus</code> — HealthIndicator 模式</h2>
+<p>Terminus 给你一个 <code>HealthCheckService</code>,你传一个 indicator 数组,它跑每个 indicator,聚合成一个 JSON 响应:</p>
+
+<pre><code>@Get()
+@HealthCheck()
+check() {
+  return this.health.check([
+    (http)  =&gt; http.pingCheck('auth-service', 'http://localhost:3004'),
+    (mem)   =&gt; mem.checkHeap('memory_heap', 200 * 1024 * 1024),
+    (disk)  =&gt; disk.checkStorage('disk', { thresholdPercent: 0.9 }),
+  ]);
+}</code></pre>
+
+<p>每个 indicator 是一个函数,接受一个或多个 <code>HealthIndicator</code> 服务(<code>http</code> / <code>mem</code> / <code>disk</code>),返回一个 <code>HealthIndicatorResult</code>(成功或失败)。<strong>任意一个失败 → 整体 503</strong>。</p>
+
+<p>Terminus 内置 indicator:</p>
+<ul>
+  <li><code>HttpHealthIndicator</code> — pingCheck HTTP 端点</li>
+  <li>TypeORM / Mongoose / MikroOrm / Prisma — 数据库连接</li>
+  <li><code>MemoryHealthIndicator</code> — checkHeap / checkRSS</li>
+  <li><code>DiskHealthIndicator</code> — 磁盘空间</li>
+</ul>
+
+<p>没有 Drizzle 内置 indicator(因为 Drizzle 不是"全功能 ORM"框架) — 但写一个自定义 indicator 也就 10 行(下面 §5.2 会做)。</p>
+
+<h2>4. Swagger 是什么、为什么必要</h2>
+<p>OpenAPI 是个"接口契约规范",Swagger 是它的可视化工具。装上之后:</p>
+<ul>
+  <li>浏览器开 <code>http://localhost:3000/api</code> 看到所有 endpoint 的列表 + 字段</li>
+  <li>每个 endpoint 标了"作用 / 参数 / 返回结构 / 错误码"</li>
+  <li>前端可以在 Swagger UI 里"直接试"(点 Try it out)</li>
+  <li>可以下载 <code>openapi.json</code> 给前端自动生成 client SDK(用 <code>openapi-generator</code> / <code>orval</code> 等)</li>
+</ul>
+
+<p>没 Swagger 的世界: 前端同事看着你 controller 的源码"猜"字段名,经常猜错(尤其 <code>email</code> vs <code>username</code> 这种)。有了 Swagger,所有字段名都自动列出来。</p>
+
+<h2>5. 动手 · 6 个文件改动</h2>
+<p>这一节比 0005 简单: 大部分时间在写注解,核心代码就一个 HealthController。</p>
+
+<div class="task">
+  <h3>5.1 · 装两个包</h3>
+  <pre><code>pnpm add -w @nestjs/terminus @nestjs/swagger</code></pre>
+</div>
+
+<div class="task">
+  <h3>5.2 · 新建 HealthController</h3>
+  <p>新建 <code>apps/gateway/src/health/health.controller.ts</code>:</p>
+  <pre><code>import { Controller, Get } from '@nestjs/common';
+import { HealthCheck, HealthCheckService, HttpHealthIndicator, MemoryHealthIndicator } from '@nestjs/terminus';
+import { Public } from '../common/decorators';
+
+@Controller('health')
+export class HealthController {
+  constructor(
+    private readonly health: HealthCheckService,
+    private readonly http: HttpHealthIndicator,
+    private readonly memory: MemoryHealthIndicator,
+  ) {}
+
+  // liveness: 进程在就行
+  @Public()
+  @Get('live')
+  @HealthCheck()
+  liveness() {
+    return this.health.check([(mem) =&gt; mem.checkHeap('memory_heap', 300 * 1024 * 1024)]);
+  }
+
+  // readiness: 进程在 + 下游能调到
+  @Public()
+  @Get()
+  @HealthCheck()
+  readiness() {
+    return this.health.check([
+      (http) =&gt; http.pingCheck('auth-service', 'http://localhost:3004', {
+        // 接受 2xx / 3xx / 4xx 都算"活着",只有 5xx 才算挂了
+        validateStatus: (status) =&gt; status &gt;= 200 &amp;&amp; status &lt; 500,
+      }),
+      (mem) =&gt; mem.checkHeap('memory_heap', 200 * 1024 * 1024),
+    ]);
+  }
+}</code></pre>
+  <p>注意: <code>@Public()</code> 来自 0004 装的装饰器。K8s probe 不可能带 API key,必须跳过 Guard。</p>
+</div>
+
+<div class="task">
+  <h3>5.3 · 新建 HealthModule</h3>
+  <p>新建 <code>apps/gateway/src/health/health.module.ts</code>:</p>
+  <pre><code>import { Module } from '@nestjs/common';
+import { TerminusModule } from '@nestjs/terminus';
+import { HealthController } from './health.controller';
+
+@Module({
+  imports: [TerminusModule],
+  controllers: [HealthController],
+})
+export class HealthModule {}</code></pre>
+</div>
+
+<div class="task">
+  <h3>5.4 · 在 AppModule 注册 + 删旧 health()</h3>
+  <p>打开 <code>apps/gateway/src/app.module.ts</code>,加 <code>HealthModule</code> 到 <code>imports</code>:</p>
+  <pre><code>import { HealthModule } from './health/health.module';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    LoggerModule.forRoot({ ... }),
+    HealthModule,   // ← 新加
+  ],
+  controllers: [AppController],
+  ...
+})</code></pre>
+  <p>然后打开 <code>apps/gateway/src/app.controller.ts</code>,<strong>删掉旧 health() handler</strong>(被 HealthController 接管了):</p>
+  <pre><code>// 删这些:
+@Public()
+@Get('health')
+health() {
+  return { status: 'ok', service: 'gateway', timestamp: new Date().toISOString() };
+}</code></pre>
+</div>
+
+<div class="task">
+  <h3>5.5 · main.ts 装 SwaggerModule</h3>
+  <p>打开 <code>apps/gateway/src/main.ts</code>,在 <code>app.listen(port)</code> 之前加:</p>
+  <pre><code>import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+
+// ... 在 bootstrap() 里
+const swaggerConfig = new DocumentBuilder()
+  .setTitle('Nest-Search Gateway')
+  .setDescription('API 网关 — 代理 auth / sync / search / form 4 个服务')
+  .setVersion('1.0')
+  .addApiKey({ type: 'apiKey', name: 'X-API-Key', in: 'header' }, 'X-API-Key')
+  .build();
+const document = SwaggerModule.createDocument(app, swaggerConfig);
+SwaggerModule.setup('api', app, document);
+
+await app.listen(port);</code></pre>
+</div>
+
+<div class="task">
+  <h3>5.6 · 给 AppController 加 Swagger 注解</h3>
+  <p>打开 <code>apps/gateway/src/app.controller.ts</code>,文件顶部加 <code>@ApiTags</code>,每个 handler 加 <code>@ApiOperation</code> + <code>@ApiResponse</code>。改完大概长这样:</p>
+  <pre><code>import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
+import { Public } from './common/decorators';
+
+@ApiTags('Gateway · Auth 代理')
+@Controller()
+export class AppController {
+  constructor(private readonly proxyService: ProxyService) {}
+
+  @ApiOperation({ summary: '用户注册(代理到 auth-service)' })
+  @ApiResponse({ status: 201, description: '注册成功' })
+  @ApiResponse({ status: 400, description: '参数校验失败' })
+  @Post('api/auth/register')
+  async register(@Body() body: any) { ... }
+
+  @ApiOperation({ summary: '用户登录(代理到 auth-service)' })
+  @ApiResponse({ status: 200, description: '登录成功,返回 token' })
+  @ApiResponse({ status: 401, description: '凭证错' })
+  @Post('api/auth/login')
+  async login(@Body() body: any) { ... }
+
+  // ... 给所有 handler 类似加
+}</code></pre>
+  <p>注意: 我们不替换 <code>@Body() body: any</code> 为 DTO — 那是更大的重构(留 0007 / 0008 follow-up)。Swagger 能识别 any 类型,只是 docs 里看不到字段细节。</p>
+</div>
+
+<div class="task">
+  <h3>5.7 · 验证 3 件事</h3>
+  <ol class="steps">
+    <li>重启 <code>pnpm start:gateway</code></li>
+    <li><code>curl -i http://localhost:3000/health</code> — 期望:200 + JSON body 含 <code>info.auth_service</code> 字段(如果 auth-service 跑着)。停掉 auth-service 再 curl,期望:503 + body 含 <code>error.auth_service</code></li>
+    <li>浏览器开 <code>http://localhost:3000/api</code> — 期望:Swagger UI 列出所有 handler,带 summary / 响应码,点 "Try it out" 能直接 curl</li>
+    <li><code>curl http://localhost:3000/api-json</code> — 期望:下载 OpenAPI JSON spec</li>
+  </ol>
+</div>
+
+<p>5.7 步骤 2 是这一节"金样本" — 看到 health check 真在检查下游,而不是 `return ok`,你会觉得"哦原来这才叫监控"。</p>
+
+<h2>6. 自我检测(3 道题)</h2>
+
+<div class="quiz">
+  <div class="quiz-q" data-correct="a">
+    <p>1. K8s readiness probe 失败 vs liveness probe 失败,后果分别是?</p>
+    <label class="quiz-opt"><input type="radio" name="q1" value="a"> readiness 失败 = 摘出 endpoint 不接流量;liveness 失败 = 重启 pod</label>
+    <label class="quiz-opt"><input type="radio" name="q1" value="b"> 它们完全一样</label>
+    <label class="quiz-opt"><input type="radio" name="q1" value="c"> liveness 是 HTTP,readiness 是 TCP</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz-q" data-correct="b">
+    <p>2. <code>HttpHealthIndicator.pingCheck</code> 的 <code>validateStatus</code> 选项作用是?</p>
+    <label class="quiz-opt"><input type="radio" name="q2" value="a"> 决定 health 响应是 JSON 还是 text</label>
+    <label class="quiz-opt"><input type="radio" name="q2" value="b"> 决定哪些 HTTP 状态码算"健康"(默认只 2xx,需要放宽到 2xx-4xx 时用)</label>
+    <label class="quiz-opt"><input type="radio" name="q2" value="c"> 决定走 HTTP/1.1 还是 HTTP/2</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz-q" data-correct="b">
+    <p>3. OpenAPI/Swagger 在生产环境的实际价值是?</p>
+    <label class="quiz-opt"><input type="radio" name="q3" value="a"> 主要是 UI 好看,给老板演示用</label>
+    <label class="quiz-opt"><input type="radio" name="q3" value="b"> 让前后端契约明确,前端可基于 OpenAPI spec 自动生成 client SDK(用 openapi-generator / orval)</label>
+    <label class="quiz-opt"><input type="radio" name="q3" value="c"> 纯文档作用,没人真用</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+</div>
+
+<h2 id="what-next">下一节预告</h2>
+<p>你现在的 gateway 既有"对运维"的可观测(/health + 日志 + lifecycle),又有"对前端"的契约(/api Swagger)。但还差一层 — <strong>"对自己"</strong> — 怎么防止 gateway 被刷爆、怎么防止被恶意请求?0007 装 <code>@nestjs/throttler</code> 做限流,这是企业级 service 的最后一道门。</p>
+
+<h2>收口 · 这一节你 commit 什么</h2>
+<p>6 个文件改动:</p>
+<ul>
+  <li><code>apps/gateway/src/health/health.controller.ts</code> — 新建,真 health check</li>
+  <li><code>apps/gateway/src/health/health.module.ts</code> — 新建</li>
+  <li><code>apps/gateway/src/main.ts</code> — 加 SwaggerModule setup</li>
+  <li><code>apps/gateway/src/app.module.ts</code> — 注册 HealthModule</li>
+  <li><code>apps/gateway/src/app.controller.ts</code> — 删旧 health() + 加 @ApiTags / @ApiOperation / @ApiResponse</li>
+  <li><code>package.json</code> / <code>pnpm-lock.yaml</code> — 装 @nestjs/terminus + @nestjs/swagger</li>
+</ul>
+
+<p>commit message(直接复制):</p>
+<pre><code>feat(gateway): real health checks + OpenAPI docs
+
+- Add @nestjs/terminus HealthModule with HttpHealthIndicator
+  (pings auth-service) and MemoryHealthIndicator. Replaces the
+  lying return-ok /health with real downstream + heap checks.
+  K8s liveness (/health/live) and readiness (/health) now have
+  separate semantics so probe failures don't trigger pod restarts
+  on transient dependency issues
+- Add @nestjs/swagger with @ApiTags/@ApiOperation/@ApiResponse
+  on all gateway handlers. OpenAPI spec auto-generated at /api
+  (UI) and /api-json (spec download). Frontend can now generate
+  client SDK from the spec instead of guessing field names
+
+Refs: docs/teaching/lessons/0006-observability-closure.html
+</code></pre>
+
+<p>5.7 三个验证跑完 + quiz 三道选完,告诉我结果,我跑上面的 commit + 写 LR-0009 + 开 0007(限流与安全)。</p>
+
+<h2>延伸阅读</h2>
+<ul>
+  <li><a href="https://docs.nestjs.com/recipes/terminus">NestJS Docs — Health checks (Terminus)</a>(必读,内置 indicator 全表)</li>
+  <li><a href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/">Kubernetes Docs — Configure probes</a>(liveness / readiness / startup 区别)</li>
+  <li><a href="https://docs.nestjs.com/openapi/introduction">NestJS Docs — OpenAPI / Swagger</a>(注解列表)</li>
+  <li><a href="https://swagger.io/specification/v3/">OpenAPI 3.0 规范</a>(spec 本身)</li>
+  <li><a href="../MISSION.md">MISSION.md</a> · <a href="../RESOURCES.md">RESOURCES.md</a> · <a href="../learning-records/0008-pino-migration-and-3-blindspots.md">LR-0008</a></li>
+</ul>
+
+<p style="margin-top: 1.6rem; color: var(--accent); font-weight: 600;">📌 5.7 步骤 2 那条"停掉 auth-service 看 health 返 503"是关键验证。如果没试这一步,你只验证了"happy path" — backend oncall 知道 happy path 没意义,出问题路径才是真测试。</p>
+
+<hr>
+<footer>
+  nest-search · teach workspace · 课时 0006<br>
+  有问题直接问 Claude
+</footer>
+
+<script>
+function check(btn) {
+  const q = btn.closest('.quiz-q');
+  const correct = q.dataset.correct;
+  const picked = q.querySelector('input[type=radio]:checked');
+  const fb = q.querySelector('.quiz-feedback');
+  if (!picked) {
+    fb.textContent = '⚠️ 选一个再提交。';
+    fb.className = 'quiz-feedback show bad';
+    return;
+  }
+  if (picked.value === correct) {
+    fb.textContent = '✅ 对了。';
+    fb.className = 'quiz-feedback show good';
+  } else {
+    fb.textContent = '❌ 不对,回到 §1 / §2 / §4 重读一遍,再试一次。';
+    fb.className = 'quiz-feedback show bad';
+  }
+}
+</script>
+
+</body>
+</html>
