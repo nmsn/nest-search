@@ -21,7 +21,7 @@ export class HealthController {
   @HealthCheck()
   liveness() {
     return this.health.check([
-      (mem) => mem.checkHeap("memory_heap", 300 * 1024 * 1024),
+      () => this.memory.checkHeap("memory_heap", 300 * 1024 * 1024),
     ]);
   }
 
@@ -31,12 +31,12 @@ export class HealthController {
   @HealthCheck()
   readiness() {
     return this.health.check([
-      (http) =>
-        http.pingCheck("auth-service", "http://localhost:3004", {
+      () =>
+        this.http.pingCheck("auth-service", "http://localhost:3004", {
           // 接受 2xx / 3xx / 4xx 都算"活着",只有 5xx 才算挂了
           validateStatus: (status) => status >= 200 && status < 500,
         }),
-      (mem) => mem.checkHeap("memory_heap", 200 * 1024 * 1024),
+      () => this.memory.checkHeap("memory_heap", 200 * 1024 * 1024),
     ]);
   }
 }
