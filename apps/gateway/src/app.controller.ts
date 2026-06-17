@@ -15,12 +15,8 @@ import { Request, Response } from "express";
 import { ProxyService } from "./proxy/proxy.service";
 import { AdminGuard } from "./guards/cas.guard";
 import { Public } from "./common/decorators";
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiParam,
-} from "@nestjs/swagger";
+import { ApiTags, ApiOperation, ApiResponse, ApiParam } from "@nestjs/swagger";
+import { Throttle } from "@nestjs/throttler";
 
 @ApiTags("Gateway · 代理")
 @Controller()
@@ -45,6 +41,7 @@ export class AppController {
   @ApiOperation({ summary: "用户登录(代理到 auth-service)" })
   @ApiResponse({ status: 200, description: "登录成功,返回 token" })
   @ApiResponse({ status: 401, description: "凭证错" })
+  @Throttle({ default: { limit: 5, ttl: 60_000 } }) // ← 新加:1 分钟最多 5 次
   @Post("api/auth/login")
   async login(@Body() body: any) {
     return this.proxyService.forward("auth", "POST", "/api/auth/login", body);

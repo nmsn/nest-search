@@ -12,6 +12,7 @@ import { APP_INTERCEPTOR } from "@nestjs/core";
 import { LoggerModule } from "nestjs-pino";
 import { randomUUID } from "node:crypto";
 import { HealthModule } from "./health/health.module";
+import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
 
 @Module({
   imports: [
@@ -25,6 +26,11 @@ import { HealthModule } from "./health/health.module";
       },
     }),
     HealthModule, // ← 新加
+    ThrottlerModule.forRoot([
+      // ← 新加
+      { name: "short", ttl: 1_000, limit: 5 },
+      { name: "long", ttl: 60_000, limit: 100 },
+    ]),
   ],
   controllers: [AppController],
   providers: [
@@ -45,6 +51,10 @@ import { HealthModule } from "./health/health.module";
     {
       provide: APP_FILTER,
       useClass: AllExceptionsFilter,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard, // ← 新加,全局生效
     },
   ],
 })

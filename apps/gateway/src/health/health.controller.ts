@@ -6,6 +6,7 @@ import {
   MemoryHealthIndicator,
 } from "@nestjs/terminus";
 import { Public } from "../common/decorators";
+import { SkipThrottle } from '@nestjs/throttler';
 
 @Controller("health")
 export class HealthController {
@@ -19,6 +20,7 @@ export class HealthController {
   @Public()
   @Get("live")
   @HealthCheck()
+  @SkipThrottle()         // ← 新加
   liveness() {
     return this.health.check([
       () => this.memory.checkHeap("memory_heap", 300 * 1024 * 1024),
@@ -29,6 +31,7 @@ export class HealthController {
   @Public()
   @Get()
   @HealthCheck()
+  @SkipThrottle()         // ← 新加
   readiness() {
     return this.health.check([
       () =>
