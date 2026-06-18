@@ -17,6 +17,8 @@ import { AdminGuard } from "./guards/cas.guard";
 import { Public } from "./common/decorators";
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
+import { LoginDto } from './common/dto/login.dto';
+import { RegisterDto } from './common/dto/register.dto';
 
 @ApiTags("Gateway · 代理")
 @Controller()
@@ -29,7 +31,7 @@ export class AppController {
   @ApiResponse({ status: 201, description: "注册成功" })
   @ApiResponse({ status: 400, description: "参数校验失败" })
   @Post("api/auth/register")
-  async register(@Body() body: any) {
+  async register(@Body() body: RegisterDto) {
     return this.proxyService.forward(
       "auth",
       "POST",
@@ -43,7 +45,7 @@ export class AppController {
   @ApiResponse({ status: 401, description: "凭证错" })
   @Throttle({ default: { limit: 5, ttl: 60_000 } }) // ← 新加:1 分钟最多 5 次
   @Post("api/auth/login")
-  async login(@Body() body: any) {
+  async login(@Body() body: LoginDto) {
     return this.proxyService.forward("auth", "POST", "/api/auth/login", body);
   }
 

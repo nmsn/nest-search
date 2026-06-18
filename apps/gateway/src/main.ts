@@ -1,6 +1,7 @@
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+import { ValidationPipe } from "@nestjs/common";
 
 process.on("unhandledRejection", (reason) => {
   console.error("[unhandledRejection]", reason);
@@ -29,9 +30,15 @@ async function bootstrap() {
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup("api", app, document);
-  
-  
+
   app.enableShutdownHooks();
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true, // 自动剔除没在 DTO 里声明的字段
+      transform: true, // 自动把 plain object 转成 DTO class instance
+    }),
+  );
 
   const port = process.env.GATEWAY_PORT || 3000;
   await app.listen(port);

@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>0008 · 主线收官:跨服务追踪 + DTO 严格化</title>
+<style>
+  :root {
+    --bg: #fbfaf7;
+    --ink: #1d1d1d;
+    --ink-soft: #4a4a4a;
+    --ink-faint: #8a8a8a;
+    --rule: #d6d2c4;
+    --accent: #b04a2f;
+    --code-bg: #f1efe8;
+    --code-inline: #ece8db;
+    --good: #2c6e3e;
+    --bad: #b04a2f;
+    --pad: 2.4rem;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "SF Pro Text", "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  body { max-width: 760px; margin: 0 auto; padding: var(--pad); }
+  h1, h2, h3 { font-family: Georgia, "Source Han Serif SC", "Songti SC", serif; font-weight: 600; letter-spacing: -0.01em; }
+  h1 { font-size: 2.1rem; line-height: 1.15; margin: 0 0 0.4rem 0; }
+  h2 { font-size: 1.45rem; margin: 3rem 0 0.6rem 0; border-bottom: 1px solid var(--rule); padding-bottom: 0.3rem; }
+  h3 { font-size: 1.12rem; margin: 1.6rem 0 0.4rem 0; color: var(--ink-soft); }
+  p { margin: 0.8rem 0; }
+  .lede { font-size: 1.05rem; color: var(--ink-soft); font-style: italic; border-left: 3px solid var(--accent); padding-left: 0.9rem; margin: 1rem 0 1.6rem 0; }
+  .meta { color: var(--ink-faint); font-size: 0.85rem; margin-bottom: 1.6rem; }
+  .meta a { color: var(--ink-faint); }
+  code, pre, kbd { font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace; font-size: 0.92em; }
+  p code, li code, td code { background: var(--code-inline); padding: 0.08em 0.36em; border-radius: 3px; color: var(--ink); }
+  pre { background: var(--code-bg); border: 1px solid var(--rule); padding: 0.9rem 1rem; border-radius: 4px; overflow-x: auto; line-height: 1.5; margin: 0.8rem 0; position: relative; }
+  pre code { background: transparent; padding: 0; }
+  pre .copy-btn {
+    position: absolute;
+    top: 0.4rem;
+    right: 0.4rem;
+    padding: 0.25rem 0.55rem;
+    background: rgba(255,255,255,0.85);
+    color: var(--ink-soft);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    font-family: -apple-system, "SF Pro Text", sans-serif;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    opacity: 0.65;
+    transition: opacity 0.15s, background 0.15s, color 0.15s;
+  }
+  pre .copy-btn:hover { opacity: 1; }
+  pre .copy-btn.copied {
+    background: var(--good);
+    color: white;
+    border-color: var(--good);
+    opacity: 1;
+  }
+  pre .copy-btn.failed {
+    background: var(--bad);
+    color: white;
+    border-color: var(--bad);
+    opacity: 1;
+  }
+  .task { background: #fff; border: 1px solid var(--rule); border-left: 4px solid var(--accent); padding: 1rem 1.2rem; margin: 1.4rem 0; border-radius: 3px; }
+  .task h3 { margin-top: 0; color: var(--accent); text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.85rem; font-family: -apple-system, sans-serif; font-weight: 700; }
+  .quiz { margin: 1.6rem 0; }
+  .quiz-q { background: #fff; border: 1px solid var(--rule); padding: 1rem 1.2rem; border-radius: 3px; margin: 0.8rem 0; }
+  .quiz-q p:first-child { margin-top: 0; font-weight: 600; }
+  .quiz-opt { display: block; margin: 0.3rem 0; cursor: pointer; }
+  .quiz-opt input { margin-right: 0.5rem; }
+  .quiz-feedback { display: none; margin-top: 0.6rem; padding: 0.5rem 0.8rem; border-radius: 3px; font-size: 0.95rem; }
+  .quiz-feedback.show { display: block; }
+  .quiz-feedback.good { background: #e8f3ea; color: var(--good); border: 1px solid #b6d8be; }
+  .quiz-feedback.bad { background: #fbeae5; color: var(--bad); border: 1px solid #e8b9a8; }
+  hr { border: none; border-top: 1px solid var(--rule); margin: 2.4rem 0 1.2rem 0; }
+  footer { color: var(--ink-faint); font-size: 0.85rem; }
+  footer a { color: var(--ink-soft); }
+  @media print {
+    body { background: white; max-width: none; padding: 1.2rem; }
+    .task, .quiz-q { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>主线收官:跨服务追踪 + DTO 严格化</h1>
+  <p class="lede">NestJS 企业级主线最后两块拼图 — 让"一条请求的完整轨迹"在多服务间串得起来,让"接口的字段契约"对前端真实可见。</p>
+  <p class="meta">
+    课时 0008 · 预计 30 分钟 · 锚定项目 <code>nest-search</code>
+    · 上一节: <a href="0007-rate-limiting.html">限流与安全</a>
+    · 下一节: <a href="#what-next">主线完成 · 副线开启</a>
+  </p>
+</header>
+
+<hr>
+
+<h2>你今天会拿到什么</h2>
+<ol class="steps">
+  <li>在 gateway 装上 <code>ValidationPipe</code>,让 NestJS 自动校验请求体</li>
+  <li>写两个 DTO 类(<code>LoginDto</code> / <code>RegisterDto</code>),用 class-validator 装饰器描述字段约束</li>
+  <li>把 <code>@Body() body: any</code> 替换成 <code>@Body() body: LoginDto</code>(2-3 个 handler)</li>
+  <li>让 <code>ProxyService</code> 自动把 <code>x-request-id</code> 头加到转发请求里</li>
+  <li>一个可提交的 commit — 8 节课主线的最后一关</li>
+</ol>
+
+<h2>1. 主线回顾 + 这节补的两块</h2>
+<p>8 节课把 gateway 从"一个能跑的 NestJS app"打磨成"企业级服务"。回顾一下:</p>
+
+<table>
+  <thead>
+    <tr><th>课时</th><th>主题</th><th>能力</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>0001</td><td>Node 运行时</td><td>知道 Node 怎么动</td></tr>
+    <tr><td>0002</td><td>错误处理</td><td>错误怎么"显"</td></tr>
+    <tr><td>0003</td><td>进程生命周期</td><td>进程怎么"死"</td></tr>
+    <tr><td>0004</td><td>NestJS 请求生命周期</td><td>请求怎么"流"</td></tr>
+    <tr><td>0005</td><td>Pino 结构化日志</td><td>日志怎么"查"</td></tr>
+    <tr><td>0006</td><td>健康检查 + Swagger</td><td>运维 / 前端能"看见"</td></tr>
+    <tr><td>0007</td><td>限流</td><td>服务不被刷爆</td></tr>
+    <tr><td><strong>0008</strong></td><td><strong>跨服务追踪 + DTO 严格化</strong></td><td><strong>多服务能"串" + 接口字段真实</strong></td></tr>
+  </tbody>
+</table>
+
+<h2>2. 跨服务追踪 — 当前痛点</h2>
+<p>考虑一个真实的排查场景:用户报"我登录失败",你要查"这条请求经过了哪些服务、每步做了什么"。</p>
+
+<p>现在你的 gateway 日志里有 <code>requestId=abc-123</code>。但当你 <code>grep "abc-123" auth-service.log</code> 时 — **啥都没有**。因为 auth-service 自己生成了一个新的 reqId(<code>requestId=def-456</code>),两个日志无法关联。</p>
+
+<p>修法:gateway 在转发请求给 auth-service 时,加一个 <code>x-request-id: abc-123</code> HTTP 头。auth-service 的 nestjs-pino(0005 装的那个)会检测这个头,如果存在就用它,否则才生成新的。</p>
+
+<p>之后两边日志用同一个 ID,你就能在两个进程里 grep 同一个 ID 看完整轨迹了。</p>
+
+<p>这跟 OpenTelemetry 的 traceparent 头思路一致 — 业界标准,我们这里手动实现最简版。</p>
+
+<h2>3. DTO 严格化 — 当前的 gateway 是个"骗子"</h2>
+<p>看现在的 <code>app.controller.ts</code>:</p>
+
+<pre><code>@Post('api/auth/login')
+async login(@Body() body: any) {
+  return this.proxyService.forward('auth', 'POST', '/api/auth/login', body);
+}</code></pre>
+
+<p><code>@Body() body: any</code> 意味着:<strong>任何 JSON 都能进来,不做任何校验</strong>。所以:</p>
+<ul>
+  <li>前端发 <code>{"email": "a@b.com", "password": "x"}</code> → 字段名错的,网关不拦,转发给 auth-service,auth-service 返 400</li>
+  <li>前端发 <code>{"username": "a", "password": ""}</code> → password 是空字符串,网关不拦,转发给 auth-service</li>
+  <li>前端发 <code>{"foo": "bar"}</code> → 完全没字段,网关不拦,转发给 auth-service</li>
+</ul>
+
+<p>每个错误请求都要走完整个调用链才被发现 — **在网关层就能拦的事,白白浪费了下游服务的处理时间**。</p>
+
+<p>DTO 严格化 = 在网关层用 <code>class-validator</code> 装饰器描述字段约束,NestJS 的 <code>ValidationPipe</code> 自动校验,失败直接 400,根本不转发到下游。</p>
+
+<p>前端同事:Swagger UI 现在能显示真实字段(`username: string, password: string, minLength 6`),不再是 `body: any`。</p>
+
+<h2>4. 动手 · 6 步</h2>
+
+<div class="task">
+  <h3>4.1 · main.ts 装 ValidationPipe</h3>
+  <p>打开 <code>apps/gateway/src/main.ts</code>,在 <code>app.enableCors(...)</code> 之后加:</p>
+  <pre><code>import { ValidationPipe } from '@nestjs/common';
+
+// ... 现有代码
+app.enableCors({ ... });
+app.enableShutdownHooks();
+app.useGlobalPipes(new ValidationPipe({
+  whitelist: true,    // 自动剔除没在 DTO 里声明的字段
+  transform: true,    // 自动把 plain object 转成 DTO class instance
+}));</code></pre>
+  <p>装上之后,所有带 DTO 的 handler 都会自动校验。</p>
+</div>
+
+<div class="task">
+  <h3>4.2 · 新建 LoginDto</h3>
+  <p>新建 <code>apps/gateway/src/common/dto/login.dto.ts</code>:</p>
+  <pre><code>import { IsString, MinLength } from 'class-validator';
+
+export class LoginDto {
+  @IsString()
+  @MinLength(1, { message: 'username 不能为空' })
+  username: string;
+
+  @IsString()
+  @MinLength(6, { message: 'password 至少 6 位' })
+  password: string;
+}</code></pre>
+</div>
+
+<div class="task">
+  <h3>4.3 · 新建 RegisterDto</h3>
+  <p>新建 <code>apps/gateway/src/common/dto/register.dto.ts</code>:</p>
+  <pre><code>import { IsEmail, IsString, MinLength, IsOptional } from 'class-validator';
+
+export class RegisterDto {
+  @IsString()
+  @MinLength(1, { message: 'username 不能为空' })
+  username: string;
+
+  @IsString()
+  @MinLength(6, { message: 'password 至少 6 位' })
+  password: string;
+
+  @IsOptional()
+  @IsEmail({}, { message: 'email 格式不对' })
+  email?: string;
+}</code></pre>
+</div>
+
+<div class="task">
+  <h3>4.4 · AppController 替换 @Body() body: any</h3>
+  <p>打开 <code>apps/gateway/src/app.controller.ts</code>,加 import + 改两个 handler:</p>
+  <pre><code>import { LoginDto } from './common/dto/login.dto';
+import { RegisterDto } from './common/dto/register.dto';
+
+@ApiOperation({ summary: "用户登录(代理到 auth-service)" })
+@ApiResponse({ status: 200, description: "登录成功" })
+@ApiResponse({ status: 400, description: "请求体参数校验失败" })
+@ApiResponse({ status: 401, description: "凭证错" })
+@ApiResponse({ status: 429, description: "请求过于频繁" })
+@Throttle({ default: { limit: 5, ttl: 60_000 } })
+@Post("api/auth/login")
+async login(@Body() body: LoginDto) {   // ← 改: any → LoginDto
+  return this.proxyService.forward("auth", "POST", "/api/auth/login", body);
+}
+
+@ApiOperation({ summary: "用户注册(代理到 auth-service)" })
+@ApiResponse({ status: 201, description: "注册成功" })
+@ApiResponse({ status: 400, description: "参数校验失败" })
+@Post("api/auth/register")
+async register(@Body() body: RegisterDto) {   // ← 改: any → RegisterDto
+  return this.proxyService.forward("auth", "POST", "/api/auth/register", body);
+}</code></pre>
+  <p>其他 5 个 handler (validate / logout / me / 各种 sync / search / form) **不动** — 它们要么没 body,要么 body 是路径参数(不是 DTO 场景)。**只改 2 个最常用的 POST**。</p>
+</div>
+
+<div class="task">
+  <h3>4.5 · ProxyService 自动转发 x-request-id</h3>
+  <p>打开 <code>apps/gateway/src/proxy/proxy.service.ts</code>,改 constructor + forward():</p>
+  <pre><code>import { Inject, Injectable, HttpException } from '@nestjs/common';
+import { REQUEST } from '@nestjs/core';
+import { Request } from 'express';
+import axios, { Method } from 'axios';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+
+const SERVICE_MAP: Record&lt;string, string&gt; = {
+  sync: process.env.SYNC_SERVICE_URL || 'http://localhost:3001',
+  search: process.env.SEARCH_SERVICE_URL || 'http://localhost:3002',
+  form: process.env.FORM_SERVICE_URL || 'http://localhost:3003',
+  auth: process.env.AUTH_SERVICE_URL || 'http://localhost:3004',
+};
+
+@Injectable()
+export class ProxyService {
+  constructor(
+    @InjectPinoLogger(ProxyService.name) private readonly logger: PinoLogger,   // ← 保留(0005 装的)
+    @Inject(REQUEST) private readonly request: Request,                            // ← 新增
+  ) {}
+
+  async forward(
+    service: string,
+    method: Method,
+    path: string,
+    body?: any,
+    headers?: Record&lt;string, string&gt;,
+  ) {
+    const baseUrl = SERVICE_MAP[service];
+    if (!baseUrl) {
+      throw new Error(`Unknown service: ${service}`);
+    }
+
+    const url = `${baseUrl}${path}`;
+    this.logger.info(`Proxying ${method} ${path} → ${service}-service`);
+
+    // ✅ 自动把当前请求的 reqId 加到转发头里
+    const requestId = (this.request as any).id;   // nestjs-pino 注入的
+    const forwardedHeaders = {
+      'Content-Type': 'application/json',
+      ...(requestId ? { 'x-request-id': requestId } : {}),
+      ...headers,
+    };
+
+    try {
+      const response = await axios({
+        method,
+        url,
+        data: body,
+        headers: forwardedHeaders,
+        timeout: 30000,
+      });
+
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        this.logger.error(`Downstream error: ${error.response.status} ${error.response.data?.message}`);
+        throw new HttpException(error.response.data, error.response.status);
+      }
+      this.logger.error(`Proxy error: ${error.message}`);
+      throw error;
+    }
+  }
+}</code></pre>
+  <p>关键点: <code>@Inject(REQUEST)</code> 拿到当前请求对象,nestjs-pino 之前已经给 <code>req.id</code> 赋值。我们把它加到 headers,下游服务就能用同一个 ID。</p>
+</div>
+
+<div class="task">
+  <h3>4.6 · 验证 3 件事</h3>
+  <ol class="steps">
+    <li>重启 <code>pnpm start:gateway</code> + <code>pnpm start:auth</code>(如果没跑)</li>
+    <li>验证 DTO 校验(传错字段看 400):<br>
+      <pre><code>curl -i -X POST -H "X-API-Key: ds_key_123" -H "Content-Type: application/json" -d '{"username":"a","password":"x"}' http://localhost:3000/api/auth/login</code></pre>
+      期望:400 + body 含 <code>"password 至少 6 位"</code>(ValidationPipe 直接拦,根本没转发到 auth-service)
+    </li>
+    <li>验证正确请求能通(字段对、长度够):<br>
+      <pre><code>curl -i -X POST -H "X-API-Key: ds_key_123" -H "Content-Type: application/json" -d '{"username":"a","password":"xxxxxx"}' http://localhost:3000/api/auth/login</code></pre>
+      期望:401(账号不存在,但 DTO 校验通过,转发到 auth-service)
+    </li>
+    <li>验证 x-request-id 转发(用同一个 curl,在 gateway 和 auth-service 日志里 grep):<br>
+      <pre><code># 1. 找到刚才 curl 在 gateway 日志里的 requestId
+grep "POST /api/auth/login" /path/to/gateway.log | tail -1
+# 2. 用这个 requestId 在 auth-service 日志里 grep
+grep "&lt;那个 id&gt;" /path/to/auth-service.log
+# 3. 应该能看到 auth-service 也用同一个 ID</code></pre>
+      期望:两边都看到同一个 requestId,**跨进程关联成功**</li>
+  </ol>
+</div>
+
+<h2>5. 自我检测(3 道题)</h2>
+
+<div class="quiz">
+  <div class="quiz-q" data-correct="b">
+    <p>1. gateway 转发请求给 auth-service 时,加 <code>x-request-id</code> 头的核心目的是?</p>
+    <label class="quiz-opt"><input type="radio" name="q1" value="a"> 让 auth-service 拒绝未认证请求</label>
+    <label class="quiz-opt"><input type="radio" name="q1" value="b"> 跨服务日志关联(同一个请求在多个服务的日志能被串起来)</label>
+    <label class="quiz-opt"><input type="radio" name="q1" value="c"> 跳过 auth-service 的鉴权</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz-q" data-correct="b">
+    <p>2. <code>@IsString()</code> 在 class-validator 里做什么?</p>
+    <label class="quiz-opt"><input type="radio" name="q2" value="a"> 把输入转成字符串</label>
+    <label class="quiz-opt"><input type="radio" name="q2" value="b"> 校验输入是字符串,失败抛 400</label>
+    <label class="quiz-opt"><input type="radio" name="q2" value="c"> 加密字符串内容</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz-q" data-correct="b">
+    <p>3. 装了全局 <code>ValidationPipe</code> 后,请求体不符合 DTO 时会发生什么?</p>
+    <label class="quiz-opt"><input type="radio" name="q3" value="a"> 请求继续,body 是 null</label>
+    <label class="quiz-opt"><input type="radio" name="q3" value="b"> NestJS 自动返 400 + 错误详情,handler 不被调用</label>
+    <label class="quiz-opt"><input type="radio" name="q3" value="c"> NestJS 抛 unhandledRejection 事件</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+</div>
+
+<h2 id="what-next">下一节预告 — 主线完成 ✅</h2>
+<p><strong>8 节课打完,企业级 NestJS 服务的主线完整</strong>。后面可以走:</p>
+<ul>
+  <li><strong>副线 1</strong>:把同样的可观测性 + 限流 + DTO 模式<strong>迁移到其它 3 个后端服务</strong>(auth / search / form),把"知识"扩展到"项目级"</li>
+  <li><strong>副线 2</strong>:补单元测试 + 集成测试(Jest 已装但 0 行测试)</li>
+  <li><strong>副线 3</strong>:CI/CD 流水线(GitHub Actions 跑 build + test)</li>
+  <li><strong>副线 4</strong>:部署(把 gateway + 4 个服务 + 4 个前端都打包,跑真 K8s / Docker Compose)</li>
+</ul>
+<p>具体走哪条,你说。</p>
+
+<h2>收口 · 这一节你 commit 什么</h2>
+<p>5-6 个文件改动:</p>
+<ul>
+  <li><code>apps/gateway/src/main.ts</code> — 加 ValidationPipe</li>
+  <li><code>apps/gateway/src/common/dto/login.dto.ts</code> — 新建</li>
+  <li><code>apps/gateway/src/common/dto/register.dto.ts</code> — 新建</li>
+  <li><code>apps/gateway/src/proxy/proxy.service.ts</code> — 注入 REQUEST + 转发 x-request-id</li>
+  <li><code>apps/gateway/src/app.controller.ts</code> — login / register 用 DTO</li>
+</ul>
+
+<p>commit message(直接复制):</p>
+<pre><code>feat(gateway): DTO validation + cross-service requestId forwarding
+
+- Add global ValidationPipe so NestJS auto-validates request bodies
+  against DTO classes. Replaces @Body() body: any lie with strict
+  typed contracts. Invalid payloads return 400 at gateway, never
+  reach downstream services
+- Add LoginDto (username + minLength 6 password) and RegisterDto
+  (+ optional email). AppController login/register handlers now
+  use the DTOs and Swagger UI displays real field constraints
+- Inject REQUEST into ProxyService to auto-forward x-request-id
+  header to downstream services. Combined with auth-service's
+  nestjs-pino config (genReqId prefers x-request-id), the same
+  request ID now correlates across all services' logs
+
+Refs: docs/teaching/lessons/0008-main-arc-finale.html
+</code></pre>
+
+<p>4.6 三个验证跑完 + quiz 三道选完,告诉我结果,我跑上面的 commit + 写 LR-0011(主线收官反思)+ 跟你一起决定下一步走哪条副线。</p>
+
+<h2>延伸阅读</h2>
+<ul>
+  <li><a href="https://docs.nestjs.com/techniques/validation">NestJS Docs — Validation</a>(必读,class-validator 全装饰器)</li>
+  <li><a href="https://github.com/typestack/class-validator">class-validator GitHub</a>(装饰器大全)</li>
+  <li><a href="https://www.w3.org/TR/trace-context/">W3C Trace Context</a>(x-request-id 的标准化版叫 traceparent,我们用简版)</li>
+  <li><a href="https://opentelemetry.io/docs/concepts/context-propagation/">OpenTelemetry Context Propagation</a>(业界标准方案,等真要上 K8s 可以升级到这个)</li>
+  <li><a href="../MISSION.md">MISSION.md</a> · <a href="../RESOURCES.md">RESOURCES.md</a> · <a href="../learning-records/0010-rate-limiting-and-shell-debugging.md">LR-0010</a></li>
+</ul>
+
+<p style="margin-top: 1.6rem; color: var(--accent); font-weight: 600;">📌 4.6 步骤 2 是"网关现在是诚实的人"的金样本 — 看到 <code>password 至少 6 位</code> 的 400 响应,你会理解"为什么之前 auth-service 总是 400 但 gateway 啥都没说"。</p>
+
+<hr>
+<footer>
+  nest-search · teach workspace · 课时 0008 · 主线收官<br>
+  有问题直接问 Claude
+</footer>
+
+<script>
+function check(btn) {
+  const q = btn.closest('.quiz-q');
+  const correct = q.dataset.correct;
+  const picked = q.querySelector('input[type=radio]:checked');
+  const fb = q.querySelector('.quiz-feedback');
+  if (!picked) {
+    fb.textContent = '⚠️ 选一个再提交。';
+    fb.className = 'quiz-feedback show bad';
+    return;
+  }
+  if (picked.value === correct) {
+    fb.textContent = '✅ 对了。';
+    fb.className = 'quiz-feedback show good';
+  } else {
+    fb.textContent = '❌ 不对,回到 §2 / §3 重读一遍,再试一次。';
+    fb.className = 'quiz-feedback show bad';
+  }
+}
+
+// 一键复制:给每个 <pre> 块右上角加按钮
+document.querySelectorAll('pre').forEach(function(pre) {
+  // 跳过 JSON 高亮块(只对普通代码块加按钮)
+  if (pre.classList.contains('json-block')) return;
+  if (pre.querySelector('.copy-btn')) return;  // 幂等
+
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.textContent = 'Copy';
+  btn.setAttribute('aria-label', '复制代码');
+  pre.appendChild(btn);
+
+  btn.addEventListener('click', async function() {
+    var codeEl = pre.querySelector('code');
+    if (!codeEl) return;
+    var text = codeEl.textContent;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        // 降级:execCommand (老浏览器)
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+    } catch (err) {
+      btn.textContent = 'Failed';
+      btn.classList.add('failed');
+      console.error('Copy failed:', err);
+    }
+    setTimeout(function() {
+      btn.textContent = 'Copy';
+      btn.classList.remove('copied', 'failed');
+    }, 1500);
+  });
+});
+</script>
+
+</body>
+</html>
