@@ -17,8 +17,9 @@ import { AdminGuard } from "./guards/cas.guard";
 import { Public } from "./common/decorators";
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
-import { LoginDto } from './common/dto/login.dto';
-import { RegisterDto } from './common/dto/register.dto';
+import { LoginDto } from "./common/dto/login.dto";
+import { RegisterDto } from "./common/dto/register.dto";
+import { Roles } from "./common/decorators/roles.decorator";
 
 @ApiTags("Gateway · 代理")
 @Controller()
@@ -88,6 +89,7 @@ export class AppController {
   @ApiParam({ name: "businessLine", example: "ds" })
   @ApiResponse({ status: 200, description: "同步任务已启动" })
   @ApiResponse({ status: 403, description: "非管理员" })
+  @Roles("admin", "editor")
   @UseGuards(AdminGuard)
   @Post("api/sync/full/:businessLine")
   async syncFull(@Param("businessLine") bl: string) {

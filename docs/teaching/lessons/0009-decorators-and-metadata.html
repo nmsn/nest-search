@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>0009 · 装饰器与元数据原理:把 NestJS 的"魔法"拆开</title>
+<style>
+  :root {
+    --bg: #fbfaf7;
+    --ink: #1d1d1d;
+    --ink-soft: #4a4a4a;
+    --ink-faint: #8a8a8a;
+    --rule: #d6d2c4;
+    --accent: #b04a2f;
+    --code-bg: #f1efe8;
+    --code-inline: #ece8db;
+    --good: #2c6e3e;
+    --bad: #b04a2f;
+    --pad: 2.4rem;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "SF Pro Text", "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  body { max-width: 760px; margin: 0 auto; padding: var(--pad); }
+  h1, h2, h3 { font-family: Georgia, "Source Han Serif SC", "Songti SC", serif; font-weight: 600; letter-spacing: -0.01em; }
+  h1 { font-size: 2.1rem; line-height: 1.15; margin: 0 0 0.4rem 0; }
+  h2 { font-size: 1.45rem; margin: 3rem 0 0.6rem 0; border-bottom: 1px solid var(--rule); padding-bottom: 0.3rem; }
+  h3 { font-size: 1.12rem; margin: 1.6rem 0 0.4rem 0; color: var(--ink-soft); }
+  p { margin: 0.8rem 0; }
+  .lede { font-size: 1.05rem; color: var(--ink-soft); font-style: italic; border-left: 3px solid var(--accent); padding-left: 0.9rem; margin: 1rem 0 1.6rem 0; }
+  .meta { color: var(--ink-faint); font-size: 0.85rem; margin-bottom: 1.6rem; }
+  .meta a { color: var(--ink-faint); }
+  code, pre, kbd { font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace; font-size: 0.92em; }
+  p code, li code, td code { background: var(--code-inline); padding: 0.08em 0.36em; border-radius: 3px; color: var(--ink); }
+  pre { background: var(--code-bg); border: 1px solid var(--rule); padding: 0.9rem 1rem; border-radius: 4px; overflow-x: auto; line-height: 1.5; margin: 0.8rem 0; position: relative; }
+  pre code { background: transparent; padding: 0; }
+  pre .copy-btn {
+    position: absolute;
+    top: 0.4rem;
+    right: 0.4rem;
+    padding: 0.25rem 0.55rem;
+    background: rgba(255,255,255,0.85);
+    color: var(--ink-soft);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    font-family: -apple-system, "SF Pro Text", sans-serif;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    opacity: 0.65;
+    transition: opacity 0.15s, background 0.15s, color 0.15s;
+  }
+  pre .copy-btn:hover { opacity: 1; }
+  pre .copy-btn.copied { background: var(--good); color: white; border-color: var(--good); opacity: 1; }
+  pre .copy-btn.failed { background: var(--bad); color: white; border-color: var(--bad); opacity: 1; }
+  .task { background: #fff; border: 1px solid var(--rule); border-left: 4px solid var(--accent); padding: 1rem 1.2rem; margin: 1.4rem 0; border-radius: 3px; }
+  .task h3 { margin-top: 0; color: var(--accent); text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.85rem; font-family: -apple-system, sans-serif; font-weight: 700; }
+  .quiz { margin: 1.6rem 0; }
+  .quiz-q { background: #fff; border: 1px solid var(--rule); padding: 1rem 1.2rem; border-radius: 3px; margin: 0.8rem 0; }
+  .quiz-q p:first-child { margin-top: 0; font-weight: 600; }
+  .quiz-opt { display: block; margin: 0.3rem 0; cursor: pointer; }
+  .quiz-opt input { margin-right: 0.5rem; }
+  .quiz-feedback { display: none; margin-top: 0.6rem; padding: 0.5rem 0.8rem; border-radius: 3px; font-size: 0.95rem; }
+  .quiz-feedback.show { display: block; }
+  .quiz-feedback.good { background: #e8f3ea; color: var(--good); border: 1px solid #b6d8be; }
+  .quiz-feedback.bad { background: #fbeae5; color: var(--bad); border: 1px solid #e8b9a8; }
+  .diagram { background: var(--code-bg); border: 1px solid var(--rule); padding: 1rem 1.2rem; border-radius: 3px; margin: 1rem 0; font-family: "SF Mono", "JetBrains Mono", monospace; font-size: 0.88em; line-height: 1.5; overflow-x: auto; white-space: pre; }
+  hr { border: none; border-top: 1px solid var(--rule); margin: 2.4rem 0 1.2rem 0; }
+  footer { color: var(--ink-faint); font-size: 0.85rem; }
+  footer a { color: var(--ink-soft); }
+  @media print {
+    body { background: white; max-width: none; padding: 1.2rem; }
+    .task, .quiz-q { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>装饰器与元数据原理:把 NestJS 的"魔法"拆开</h1>
+  <p class="lede">前 8 节课一直在用 <code>@Get</code>、<code>@Injectable</code>、<code>@Module</code>,但没人说清"装饰器到底做了什么"。这一节拆开它。</p>
+  <p class="meta">
+    课时 0009 · 预计 60 分钟 · 锚定项目 <code>nest-search</code>
+    · 上一节: <a href="0008-main-arc-finale.html">主线收官</a>
+    · 下一节: <a href="#what-next">0010 IoC 容器</a>
+  </p>
+</header>
+
+<hr>
+
+<h2>你今天会拿到什么</h2>
+<ol class="steps">
+  <li>理解 TypeScript 装饰器就是<strong>函数</strong>(不是关键字,不是注解,不是 AOP 黑魔法)</li>
+  <li>理解 4 种装饰器签名(Class / Method / Property / Parameter),每种拿到的参数不同</li>
+  <li>理解 <code>reflect-metadata</code> 协议 — NestJS 怎么在运行时读出"构造函数需要哪些依赖"</li>
+  <li>亲手写 4 个自定义装饰器 + 一个迷你 IoC 容器,**30 行代码还原 NestJS 的路由 + DI 机制**</li>
+  <li>一个可提交的 commit,以及打开后续 0010(IoC)+ 0011(AOP)的认知基础</li>
+</ol>
+
+<h2>1. 装饰器是什么(把"魔法"先拆掉)</h2>
+<p>TypeScript 装饰器,<strong>就是函数</strong>。没有别的。</p>
+
+<p>看 <code>@Get('/api/users')</code> 这个看起来神秘的写法,展开后是:</p>
+
+<pre><code>// 你写的:
+class UserController {
+  @Get('/api/users')
+  list() { ... }
+}
+
+// 编译后实际执行的:
+class UserController {
+  list() { ... }
+}
+__decorate([
+  Get('/api/users'),  // ← 装饰器工厂返回的函数被调用
+  __metadata("design:type", Function),
+  __metadata("design:paramtypes", []),
+  __metadata("design:returntype", undefined)
+], UserController.prototype, 'list', undefined);
+</code></pre>
+
+<p>看清楚了吗?<strong>装饰器就是一个函数</strong>,在类定义时被调用,接收被装饰的东西(target / key / descriptor),可以读 / 写 metadata,可以替换函数实现。</p>
+
+<h3>4 种装饰器签名(必须背下来)</h3>
+
+<pre><code>// 1. Class 装饰器 — 装饰整个类
+function MyDecorator(constructor: Function) {
+  // 可以修改类、追加属性、注册到全局表
+}
+
+// 2. Method 装饰器 — 装饰方法
+function MyDecorator(
+  target: any,           // 类原型
+  propertyKey: string,   // 方法名
+  descriptor: PropertyDescriptor,  // 方法的描述符
+) {}
+
+// 3. Property 装饰器 — 装饰属性
+function MyDecorator(
+  target: any,
+  propertyKey: string,
+) {}
+
+// 4. Parameter 装饰器 — 装饰方法参数(很少单独用,NestJS 用它)
+function MyDecorator(
+  target: any,           // 类原型
+  propertyKey: string,   // 方法名
+  parameterIndex: number,// 第几个参数
+) {}</code></pre>
+
+<p>四种装饰器<strong>参数不一样</strong>,这是后面写自定义装饰器时要背的"契约"。</p>
+
+<h2>2. reflect-metadata 协议 — 装饰器怎么"互相通信"</h2>
+<p>现在有个问题:NestJS 怎么知道 <code>@Injectable()</code> 修饰的类构造函数需要哪些参数?</p>
+
+<p>逻辑上,<strong>装饰器之间不通信</strong>:<code>@Injectable()</code> 不知道类构造函数签名,<code>@Inject('SOME_TOKEN')</code> 不知道类在哪里。NestJS 是在<strong>运行时</strong>用 <code>reflect-metadata</code> API 读取的。</p>
+
+<h3>基本 API</h3>
+
+<pre><code>import 'reflect-metadata';
+
+// 写
+Reflect.defineMetadata('key', 'value', target);
+
+// 读
+const v = Reflect.getMetadata('key', target);
+
+// 类型化(看 key 上的 generic 知道是什么类型)
+Reflect.defineMetadata&lt;string&gt;('path', '/api/users', UserController.prototype.list);</code></pre>
+
+<h3>NestJS 用了哪些"标准 key"</h3>
+
+<p>你不需要记,但要<strong>知道存在</strong>:</p>
+<ul>
+  <li><code>design:paramtypes</code> — 构造函数参数类型列表(NestJS 拿这个做自动 DI)</li>
+  <li><code>design:type</code> — 属性 / 方法的类型</li>
+  <li><code>design:returntype</code> — 方法返回类型</li>
+  <li><code>path</code> — 路由路径(<code>@Get('/api/users')</code> 写的)</li>
+  <li><code>method</code> — HTTP 方法</li>
+</ul>
+
+<p>这些都是 <strong>NestJS 自定义的 metadata key</strong>,不是标准 — 是社区/框架约定的。</p>
+
+<h3>为什么需要 <code>"emitDecoratorMetadata": true</code></h3>
+
+<p>这是 <code>tsconfig.json</code> 里的开关。它让 TypeScript 编译器在编译期<strong>自动 emit</strong> <code>Reflect.defineMetadata('design:paramtypes', [...], class)</code> 这种调用,把构造函数签名"写进"编译产物。否则运行时读不到类型,自动 DI 失效。</p>
+
+<p>这是 NestJS 项目的<strong>必备</strong>开关(项目已经开了)。</p>
+
+<h2>3. NestJS 装饰器内幕 — 看 5 行源码</h2>
+<p>装饰器<strong>不魔法</strong>,魔法在"运行时 + reflect-metadata + 工厂函数"。看 NestJS 几个核心装饰器的简化实现:</p>
+
+<h3>@Get(路由路径)</h3>
+
+<pre><code>// 简化版(从 @nestjs/common 抽出来的本质)
+export function Get(path: string = ''): MethodDecorator {
+  return (target, key, descriptor) =&gt; {
+    Reflect.defineMetadata('path', path, descriptor.value);   // 存 path
+    Reflect.defineMetadata('method', 'GET', descriptor.value); // 存 method
+  };
+}</code></pre>
+
+<p>就这两步 — "贴 metadata"。NestJS 启动时扫所有 method,根据 path + method 挂到 Express 上。</p>
+
+<h3>@Injectable()(自动 DI 的核心)</h3>
+
+<pre><code>export function Injectable(): ClassDecorator {
+  return (target) =&gt; {
+    // 不需要存任何东西!关键在 tsconfig 开了 emitDecoratorMetadata
+    // 编译时自动加:
+    //   Reflect.defineMetadata('design:paramtypes', [LoggerService, ConfigService], target);
+    // 所以 NestJS 运行时能读到"这个类构造函数需要 LoggerService 和 ConfigService"
+  };
+}</code></pre>
+
+<p>这是 NestJS 自动 DI 的核心 — <strong>装饰器本身不做任何事,关键是 tsc 自动 emit 的元数据</strong>。</p>
+
+<h3>@Inject(TOKEN)</h3>
+
+<pre><code>export function Inject(token: string): ParameterDecorator {
+  return (target, key, parameterIndex) =&gt; {
+    Reflect.defineMetadata('self:paramtypes', ..., ...);  // 标记"这个参数用 token 取"
+    // NestJS 看到这个 metadata 就去容器里找 token 对应的 instance
+  };
+}</code></pre>
+
+<h2>4. 动手 · 30 行代码还原 NestJS</h2>
+<p>新建 <code>apps/gateway/src/decorators-demo/index.ts</code>,一个文件做完 4 个装饰器 + 迷你 IoC 容器 + 一个 demo:</p>
+
+<div class="task">
+  <h3>4.1 · 单文件 demo:30 行还原 NestJS 路由 + DI</h3>
+  <p>新建文件 <code>apps/gateway/src/decorators-demo/index.ts</code>:</p>
+  <pre><code>import 'reflect-metadata';
+
+// ========== 1. 4 个装饰器(简化版 NestJS 实现) ==========
+
+function Controller(prefix: string = ''): ClassDecorator {
+  return (target) =&gt; {
+    Reflect.defineMetadata('prefix', prefix, target);
+  };
+}
+
+function Get(path: string = ''): MethodDecorator {
+  return (target, key, descriptor) =&gt; {
+    Reflect.defineMetadata('path', path, descriptor.value);
+    Reflect.defineMetadata('method', 'GET', descriptor.value);
+  };
+}
+
+function Injectable(): ClassDecorator {
+  return (target) =&gt; {
+    // 关键:不做事。依赖 tsc 的 emitDecoratorMetadata 自动写 design:paramtypes
+  };
+}
+
+function Inject(token: string): ParameterDecorator {
+  return (target, key, parameterIndex) =&gt; {
+    const existing = Reflect.getMetadata('custom:paramtypes', target, key) || [];
+    existing[parameterIndex] = token;
+    Reflect.defineMetadata('custom:paramtypes', existing, target, key);
+  };
+}
+
+// ========== 2. 迷你 IoC 容器 ==========
+
+const container = new Map&lt;any, any&gt;();
+
+function resolveDependencies(target: any): any[] {
+  // 读 tsc 自动 emit 的 design:paramtypes(构造函数参数类型列表)
+  const paramTypes: any[] = Reflect.getMetadata('design:paramtypes', target) || [];
+  // 也读自定义的 @Inject 标记
+  const customTypes: any[] = Reflect.getMetadata('custom:paramtypes', target.prototype, undefined) || [];
+  return paramTypes.map((type, i) =&gt; {
+    if (customTypes[i]) {
+      // @Inject(TOKEN) 优先
+      return container.get(customTypes[i]) ?? createInstance(type);
+    }
+    return createInstance(type);
+  });
+}
+
+function createInstance(target: any): any {
+  if (container.has(target)) return container.get(target);
+  const deps = resolveDependencies(target);
+  const instance = new target(...deps);
+  container.set(target, instance);
+  return instance;
+}
+
+function bootstrap(controllerClass: any) {
+  const prefix = Reflect.getMetadata('prefix', controllerClass) || '';
+  // 扫所有 method,挂到 fake router
+  const proto = controllerClass.prototype;
+  Object.getOwnPropertyNames(proto).forEach((methodName) =&gt; {
+    const method = proto[methodName];
+    const path = Reflect.getMetadata('path', method);
+    const method_ = Reflect.getMetadata('method', method);
+    if (path &amp;&amp; method_) {
+      console.log(`[路由注册] ${method_} ${prefix}${path}  →  ${controllerClass.name}.${methodName}`);
+    }
+  });
+
+  // 实例化 controller(顺便验证 DI)
+  const instance = createInstance(controllerClass);
+  console.log(`[controller 实例化] ${controllerClass.name} 的依赖:`,
+    resolveDependencies(controllerClass).map((d) =&gt; d.constructor.name));
+  return instance;
+}
+
+// ========== 3. demo ==========
+
+@Injectable()
+class UserService {
+  getAll() { return ['alice', 'bob']; }
+}
+
+@Injectable()
+class LoggerService {
+  log(msg: string) { console.log(`[log] ${msg}`); }
+}
+
+@Controller('/api/users')
+class UserController {
+  constructor(
+    private userService: UserService,
+    private logger: LoggerService,
+  ) {}
+
+  @Get('/list')
+  list() {
+    this.logger.log('list called');
+    return this.userService.getAll();
+  }
+}
+
+bootstrap(UserController);</code></pre>
+</div>
+
+<div class="task">
+  <h3>4.2 · 跑 demo</h3>
+  <p>用项目已有的 ts-node(已在 devDependencies)跑:</p>
+  <pre><code>npx ts-node apps/gateway/src/decorators-demo/index.ts</code></pre>
+  <p>期望输出:</p>
+  <pre><code>[路由注册] GET /api/users/list  →  UserController.list
+[controller 实例化] UserController 的依赖: [ UserService, LoggerService ]</code></pre>
+  <p>两个值表示:</p>
+  <ul>
+  <li>扫描类方法,读出 <code>path</code> + <code>method</code> metadata → 自动注册路由</li>
+  <li>实例化时读 <code>design:paramtypes</code> → 自动注入 <code>UserService</code> + <code>LoggerService</code></li>
+  </ul>
+  <p><strong>这就是 NestJS 路由 + DI 的本质</strong>。NestJS 实际代码更长(带模块系统、scope 控制、循环依赖检测…),但核心机制就是你看到的 30 行。</p>
+</div>
+
+<div class="task">
+  <h3>4.3 · 试错:把 <code>emitDecoratorMetadata</code> 关闭看效果</h3>
+  <p>为了看 <code>emitDecoratorMetadata</code> 的关键作用,我们做对比实验:</p>
+  <ol>
+  <li>打开 <code>tsconfig.json</code>,把 <code>emitDecoratorMetadata</code> 暂时改成 <code>false</code></li>
+  <li>重新跑 <code>npx ts-node apps/gateway/src/decorators-demo/index.ts</code></li>
+  <li>期望: <code>UserController 的依赖</code> 那一行打印 <code>[]</code> — 因为编译时没写 design:paramtypes,运行时读不到参数类型</li>
+  <li>改回 <code>true</code>,重启 → 正常</li>
+  </ol>
+  <p>这是为什么"没开 <code>emitDecoratorMetadata</code> 时 NestJS 自动 DI 失效"的根源。</p>
+</div>
+
+<h2>4.5 · 实战:给 nest-search 写 <code>@Roles()</code> 装饰器</h2>
+<p>理论是抽象的,实践才出真知。把 0004 那个 <code>@Public()</code> 装饰器从"0 业务逻辑"升级为"携带参数" — 写一个真正能用的 <code>@Roles(...)</code> 装饰器。</p>
+
+<div class="task">
+  <h3>5.1 · 新建 <code>roles.decorator.ts</code></h3>
+  <p>新建 <code>apps/gateway/src/common/decorators/roles.decorator.ts</code>:</p>
+  <pre><code>import { SetMetadata } from '@nestjs/common';
+
+export const ROLES_KEY = 'roles';
+
+/**
+ * 给 handler 标记"需要哪些角色才能访问"
+ * 用法: @Roles('admin', 'editor')
+ */
+export const Roles = (...roles: string[]) =&gt; SetMetadata(ROLES_KEY, roles);</code></pre>
+  <p>对比 0004 的 <code>@Public()</code>:<strong>唯一区别是工厂函数接 rest 参数 <code>...roles</code></strong>。就这么简单 — SetMetadata 把 roles 数组写到 metadata,谁读是读的人的事。</p>
+</div>
+
+<div class="task">
+  <h3>5.2 · 改 <code>app.controller.ts</code>,挂到 syncFull</h3>
+  <p>打开 <code>apps/gateway/src/app.controller.ts</code>:</p>
+  <ol>
+    <li>顶部加 import:<br>
+      <pre><code>import { Roles } from './common/decorators/roles.decorator';</code></pre>
+    </li>
+    <li>在 <code>syncFull</code> 上加 <code>@Roles('admin', 'editor')</code>:<br>
+      <pre><code>@ApiOperation({ summary: "触发全量同步(管理员)" })
+@ApiParam({ name: "businessLine", example: "ds" })
+@ApiResponse({ status: 200, description: "同步任务已启动" })
+@ApiResponse({ status: 403, description: "非管理员" })
+@Roles('admin', 'editor')     // ← 新加
+@UseGuards(AdminGuard)
+@Post("api/sync/full/:businessLine")
+async syncFull(@Param("businessLine") bl: string) {
+  return this.proxyService.forward("sync", "POST", `/api/sync/full/${bl}`);
+}</code></pre>
+    </li>
+  </ol>
+  <p>现在 <code>syncFull</code> 的 metadata 里有:<br>
+  <code>'roles' = ['admin', 'editor']</code><br>
+  <code>'path' = '/api/sync/full/:businessLine'</code>(0004 装的)<br>
+  <code>'method' = 'POST'</code>(0004 装的)</p>
+</div>
+
+<div class="task">
+  <h3>5.3 · 验证 metadata 真的写上了(用 script,不走 HTTP)</h3>
+  <p>写一个一次性 script,直接读 metadata — <strong>不走 HTTP、不走 guard、最干净</strong>。</p>
+  <p>新建 <code>apps/gateway/src/decorators-demo/check-roles.ts</code>:</p>
+  <pre><code>import 'reflect-metadata';
+import { AppController } from '../app.controller';
+
+console.log('=== 验证 @Roles metadata 是否真的写到 method 上 ===\n');
+
+const syncFullRoles = Reflect.getMetadata('roles', AppController.prototype.syncFull);
+console.log('syncFull roles:', syncFullRoles);
+
+const syncFullPath = Reflect.getMetadata('path', AppController.prototype.syncFull);
+console.log('syncFull path:', syncFullPath);
+
+const syncFullMethod = Reflect.getMetadata('method', AppController.prototype.syncFull);
+console.log('syncFull method:', syncFullMethod);
+
+const listFormsRoles = Reflect.getMetadata('roles', AppController.prototype.listForms);
+console.log('\nlistForms roles (期望 undefined):', listFormsRoles);</code></pre>
+  <p>跑:</p>
+  <pre><code>npx ts-node apps/gateway/src/decorators-demo/check-roles.ts</code></pre>
+  <p>期望输出:</p>
+  <pre><code>syncFull roles: [ 'admin', 'editor' ]
+syncFull path: api/sync/full/:businessLine
+syncFull method: 1
+listForms roles (期望 undefined): undefined</code></pre>
+  <p>解读:</p>
+  <ul>
+  <li><code>roles: [ 'admin', 'editor' ]</code> ✅ @Roles 写上了</li>
+  <li><code>method: 1</code> 是 NestJS <code>RequestMethod.POST</code> 的 enum 值(不是字符串 "POST")</li>
+  <li><code>path</code> 不带前导 <code>/</code> 是 NestJS 设计(启动时拼上)</li>
+  <li><code>listForms roles: undefined</code> ✅ @Get 没有 @Roles,符合预期</li>
+  </ul>
+  <p><strong>之前版本的 5.3 写的是"用 console.error + curl"</strong>,但 <code>@UseGuards(AdminGuard)</code> 会在 handler 之前拒绝请求,console.error 永远跑不到。<strong>这个 script 方案不走 HTTP 不走 guard,直接读 metadata,稳。</strong></p>
+</div>
+
+<div class="task">
+  <h3>5.4 · 留口:真正读 metadata 的 <code>RolesGuard</code> 留给 0011</h3>
+  <p><code>@Roles()</code> 装饰器<strong>写好了</strong> metadata,但<strong>还没人读</strong>。谁来检查"用户角色 in ['admin', 'editor']"这件事?答案是 <code>RolesGuard</code>。</p>
+  <p>而 <code>Guard</code> 是 AOP 切面的一种 — 这正是 0011 那节课的主题(Guard / Pipe / Interceptor / Filter 统一视角)。</p>
+  <p>这一节只做"写 metadata",<strong>"读"留给 0011</strong>。这是有意的渐进式 — 你不会一次吃透所有概念。</p>
+</div>
+
+<h2>5. 自我检测(3 道题)</h2>
+
+<div class="quiz">
+  <div class="quiz-q" data-correct="a">
+    <p>1. TypeScript class 装饰器本质是?</p>
+    <label class="quiz-opt"><input type="radio" name="q1" value="a"> 一个函数,在类定义时被调用,可以读 / 写 metadata、修改类</label>
+    <label class="quiz-opt"><input type="radio" name="q1" value="b"> TypeScript 关键字,等价于 Java 的 <code>@Annotation</code></label>
+    <label class="quiz-opt"><input type="radio" name="q1" value="c"> 运行时 JavaScript 引擎识别的语法</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz-q" data-correct="b">
+    <p>2. 为什么 NestJS 项目必须开 <code>emitDecoratorMetadata: true</code>?</p>
+    <label class="quiz-opt"><input type="radio" name="q2" value="a"> 让 TypeScript 跑得更快</label>
+    <label class="quiz-opt"><input type="radio" name="q2" value="b"> 让 tsc 自动 emit <code>Reflect.defineMetadata('design:paramtypes', ...)</code> 调用,运行时 NestJS 能读到构造函数参数类型,做自动 DI</label>
+    <label class="quiz-opt"><input type="radio" name="q2" value="c"> 启用 async/await</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz-q" data-correct="b">
+    <p>3. <code>@Get('/api/users')</code> 这个"魔法"实际是?</p>
+    <label class="quiz-opt"><input type="radio" name="q3" value="a"> NestJS 用正则扫描源码找装饰器</label>
+    <label class="quiz-opt"><input type="radio" name="q3" value="b"> 装饰器函数把 <code>path='/api/users'</code> 和 <code>method='GET'</code> 写到函数对象的 metadata;NestJS 启动时扫所有 method 读 metadata,挂到 Express</label>
+    <label class="quiz-opt"><input type="radio" name="q3" value="c"> 它修改了 V8 引擎,拦截函数调用</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+</div>
+
+<h2 id="what-next">下一节预告</h2>
+<p>0009 把"装饰器"拆开了 — 你现在知道 <code>@Injectable</code> 自己不做任何事,DI 靠 tsc 自动 emit 的 metadata。0010 我们顺着这条线走深: <strong>IoC 容器是什么、NestJS 的容器内部是怎么实现的、3 种 Provider(useClass / useValue / useFactory)各自场景、ModuleRef 怎么手动取实例</strong>。这些是 senior 跟 mid 的分水岭。</p>
+
+<h2>收口 · 这一节你 commit 什么</h2>
+<p>2 个新文件 + 1 处小改:</p>
+<ul>
+  <li><code>apps/gateway/src/decorators-demo/index.ts</code> — 单文件 demo,30 行还原 NestJS 路由 + DI 核心机制</li>
+  <li><code>apps/gateway/src/common/decorators/roles.decorator.ts</code> — 实战 <code>@Roles(...)</code> 自定义装饰器</li>
+  <li><code>apps/gateway/src/app.controller.ts</code> — <code>syncFull</code> 上挂 <code>@Roles('admin', 'editor')</code></li>
+</ul>
+
+<p>commit message(直接复制):</p>
+<pre><code>chore(gateway): add @Roles() decorator + decorators demo (0009)
+
+- Single-file demo at apps/gateway/src/decorators-demo/index.ts shows
+  the essence of NestJS: 4 custom decorators + mini-IoC container +
+  reflection-based route registration (~80 lines)
+- Add @Roles(...roles) decorator at
+  apps/gateway/src/common/decorators/roles.decorator.ts. SetMetadata
+  with a custom ROLES_KEY — 4-line implementation
+- Apply @Roles('admin', 'editor') to AppController.syncFull as first
+  real-world use. Note: no reader yet; RolesGuard comes in 0011 AOP
+  lesson
+
+Refs: docs/teaching/lessons/0009-decorators-and-metadata.html
+</code></pre>
+
+<p>4.2 demo 跑通 + 4.3 对比实验也跑通 + 5.1-5.3 实战做完 + quiz 三道选完,告诉我结果。我跑 commit + 写 LR-0012(principles 模式反思)+ 开 0010。</p>
+
+<h2>延伸阅读</h2>
+<ul>
+  <li><a href="https://www.typescriptlang.org/docs/handbook/decorators.html">TypeScript Handbook — Decorators</a>(官方规范)</li>
+  <li><a href="https://rbuckton.github.io/reflect-metadata/">reflect-metadata polyfill</a>(所有 NestJS 魔法的源头)</li>
+  <li><a href="https://github.com/nestjs/nest/blob/master/packages/common/decorators/http/request-method.decorator.ts">NestJS 源码 <code>@Get</code> 实现</a>(30 行,真不长)</li>
+  <li>《Node.js Design Patterns》第 9 章: Decorator Pattern(对比 JS 装饰器跟 GoF 经典装饰器模式)</li>
+  <li><a href="../MISSION.md">MISSION.md</a> · <a href="../RESOURCES.md">RESOURCES.md</a> · <a href="../learning-records/0011-main-arc-finale.md">LR-0011</a></li>
+</ul>
+
+<p style="margin-top: 1.6rem; color: var(--accent); font-weight: 600;">📌 4.2 跑通的那个 30 行 demo,是你理解 NestJS 所有"魔法"的钥匙。**把它保存好**,后续 0010 / 0011 还会回来引用它。</p>
+
+<hr>
+<footer>
+  nest-search · teach workspace · 课时 0009 · Track 2 起步<br>
+  有问题直接问 Claude
+</footer>
+
+<script>
+function check(btn) {
+  const q = btn.closest('.quiz-q');
+  const correct = q.dataset.correct;
+  const picked = q.querySelector('input[type=radio]:checked');
+  const fb = q.querySelector('.quiz-feedback');
+  if (!picked) {
+    fb.textContent = '⚠️ 选一个再提交。';
+    fb.className = 'quiz-feedback show bad';
+    return;
+  }
+  if (picked.value === correct) {
+    fb.textContent = '✅ 对了。';
+    fb.className = 'quiz-feedback show good';
+  } else {
+    fb.textContent = '❌ 不对,回到 §1 / §2 / §3 重读一遍,再试一次。';
+    fb.className = 'quiz-feedback show bad';
+  }
+}
+
+// 一键复制:给每个 <pre> 块右上角加按钮
+document.querySelectorAll('pre').forEach(function(pre) {
+  if (pre.classList.contains('json-block')) return;
+  if (pre.querySelector('.copy-btn')) return;
+
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.textContent = 'Copy';
+  btn.setAttribute('aria-label', '复制代码');
+  pre.appendChild(btn);
+
+  btn.addEventListener('click', async function() {
+    var codeEl = pre.querySelector('code');
+    if (!codeEl) return;
+    var text = codeEl.textContent;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+    } catch (err) {
+      btn.textContent = 'Failed';
+      btn.classList.add('failed');
+      console.error('Copy failed:', err);
+    }
+    setTimeout(function() {
+      btn.textContent = 'Copy';
+      btn.classList.remove('copied', 'failed');
+    }, 1500);
+  });
+});
+</script>
+
+</body>
+</html>
