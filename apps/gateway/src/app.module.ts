@@ -13,10 +13,12 @@ import { LoggerModule } from "nestjs-pino";
 import { randomUUID } from "node:crypto";
 import { HealthModule } from "./health/health.module";
 import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
+import { HttpClientModule } from "./common/http-client/http-client.module";
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    HttpClientModule, // ← 新加,放最前(其他 module 都依赖)
     LoggerModule.forRoot({
       pinoHttp: {
         level: process.env.LOG_LEVEL || "info",

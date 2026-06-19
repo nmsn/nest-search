@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>0010 · IoC 容器深入:Provider 4 种写法 + Scope + ModuleRef</title>
+<style>
+  :root {
+    --bg: #fbfaf7;
+    --ink: #1d1d1d;
+    --ink-soft: #4a4a4a;
+    --ink-faint: #8a8a8a;
+    --rule: #d6d2c4;
+    --accent: #b04a2f;
+    --code-bg: #f1efe8;
+    --code-inline: #ece8db;
+    --good: #2c6e3e;
+    --bad: #b04a2f;
+    --pad: 2.4rem;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "SF Pro Text", "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  body { max-width: 760px; margin: 0 auto; padding: var(--pad); }
+  h1, h2, h3 { font-family: Georgia, "Source Han Serif SC", "Songti SC", serif; font-weight: 600; letter-spacing: -0.01em; }
+  h1 { font-size: 2.1rem; line-height: 1.15; margin: 0 0 0.4rem 0; }
+  h2 { font-size: 1.45rem; margin: 3rem 0 0.6rem 0; border-bottom: 1px solid var(--rule); padding-bottom: 0.3rem; }
+  h3 { font-size: 1.12rem; margin: 1.6rem 0 0.4rem 0; color: var(--ink-soft); }
+  p { margin: 0.8rem 0; }
+  .lede { font-size: 1.05rem; color: var(--ink-soft); font-style: italic; border-left: 3px solid var(--accent); padding-left: 0.9rem; margin: 1rem 0 1.6rem 0; }
+  .meta { color: var(--ink-faint); font-size: 0.85rem; margin-bottom: 1.6rem; }
+  .meta a { color: var(--ink-faint); }
+  code, pre, kbd { font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace; font-size: 0.92em; }
+  p code, li code, td code { background: var(--code-inline); padding: 0.08em 0.36em; border-radius: 3px; color: var(--ink); }
+  pre { background: var(--code-bg); border: 1px solid var(--rule); padding: 0.9rem 1rem; border-radius: 4px; overflow-x: auto; line-height: 1.5; margin: 0.8rem 0; position: relative; }
+  pre code { background: transparent; padding: 0; }
+  pre .copy-btn {
+    position: absolute;
+    top: 0.4rem;
+    right: 0.4rem;
+    padding: 0.25rem 0.55rem;
+    background: rgba(255,255,255,0.85);
+    color: var(--ink-soft);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    font-family: -apple-system, "SF Pro Text", sans-serif;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    opacity: 0.65;
+    transition: opacity 0.15s, background 0.15s, color 0.15s;
+  }
+  pre .copy-btn:hover { opacity: 1; }
+  pre .copy-btn.copied { background: var(--good); color: white; border-color: var(--good); opacity: 1; }
+  pre .copy-btn.failed { background: var(--bad); color: white; border-color: var(--bad); opacity: 1; }
+  .task { background: #fff; border: 1px solid var(--rule); border-left: 4px solid var(--accent); padding: 1rem 1.2rem; margin: 1.4rem 0; border-radius: 3px; }
+  .task h3 { margin-top: 0; color: var(--accent); text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.85rem; font-family: -apple-system, sans-serif; font-weight: 700; }
+  .quiz { margin: 1.6rem 0; }
+  .quiz-q { background: #fff; border: 1px solid var(--rule); padding: 1rem 1.2rem; border-radius: 3px; margin: 0.8rem 0; }
+  .quiz-q p:first-child { margin-top: 0; font-weight: 600; }
+  .quiz-opt { display: block; margin: 0.3rem 0; cursor: pointer; }
+  .quiz-opt input { margin-right: 0.5rem; }
+  .quiz-feedback { display: none; margin-top: 0.6rem; padding: 0.5rem 0.8rem; border-radius: 3px; font-size: 0.95rem; }
+  .quiz-feedback.show { display: block; }
+  .quiz-feedback.good { background: #e8f3ea; color: var(--good); border: 1px solid #b6d8be; }
+  .quiz-feedback.bad { background: #fbeae5; color: var(--bad); border: 1px solid #e8b9a8; }
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+  th, td { padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--rule); text-align: left; vertical-align: top; }
+  th { color: var(--ink-soft); font-weight: 600; }
+  code.block { display: block; margin: 0.4rem 0; }
+  hr { border: none; border-top: 1px solid var(--rule); margin: 2.4rem 0 1.2rem 0; }
+  footer { color: var(--ink-faint); font-size: 0.85rem; }
+  footer a { color: var(--ink-soft); }
+  @media print {
+    body { background: white; max-width: none; padding: 1.2rem; }
+    .task, .quiz-q { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>IoC 容器深入:Provider 4 种写法 + Scope + ModuleRef</h1>
+  <p class="lede">从"用 @Injectable"升级到"理解容器怎么管理一切"。Provider 的 4 种写法 + Scope 三档 + 手动取 instance 的兜底 — senior 跟 mid 的分水岭。</p>
+  <p class="meta">
+    课时 0010 · 预计 60 分钟 · 锚定项目 <code>nest-search</code>
+    · 上一节: <a href="0009-decorators-and-metadata.html">装饰器与元数据</a>
+    · 下一节: <a href="#what-next">0011 AOP 切面</a>
+  </p>
+</header>
+
+<hr>
+
+<h2>你今天会拿到什么</h2>
+<ol class="steps">
+  <li>理解 <strong>Provider 的 4 种写法</strong>(class / useValue / useClass / useFactory)— 决定"实例怎么来"</li>
+  <li>理解 <code>useExisting</code> alias 模式 — 同一 instance,不同 token</li>
+  <li>理解 <code>ModuleRef</code> — 框架拿不到时手动取 instance</li>
+  <li>理解 <strong>Provider Scope</strong>:singleton / request / transient — 内存 / 性能 / 并发的根因</li>
+  <li>亲手做一次 HttpClientService 抽离 — 用 <code>useFactory</code> 拿 REQUEST + 自动加 x-request-id</li>
+  <li>一个可提交的 commit,把 0008 留的"手写 forwardedHeaders"清理掉</li>
+</ol>
+
+<p><strong>前置阅读</strong>: <a href="../learning-records/0012-module-di-primer.md">LR-0012(MR/DI primer)</a> — 10 个问答,这次会引用 Q1 / Q2 / Q9。</p>
+
+<h2>1. Provider 的 4 种写法 — 决定"实例怎么来"</h2>
+<p>上节课用了最简单的一种:</p>
+
+<pre><code>// 第 1 种:class(直接列)
+providers: [CartService]
+// 解读: NestJS 自己 new CartService() + 自动注入依赖</code></pre>
+
+<p>实际上 NestJS 提供了 <strong>4 种写法</strong>,每种背后是"实例怎么来"的 4 种决策:</p>
+
+<table>
+  <thead>
+    <tr><th>写法</th><th>实例来源</th><th>典型场景</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>providers: [X]</code></td><td>框架 new + 自动注入</td><td>普通 service(最常见)</td></tr>
+    <tr><td><code>{ provide: 'T', useValue: v }</code></td><td>直接给一个值</td><td>常量、配置、第三方实例</td></tr>
+    <tr><td><code>{ provide: A, useClass: B }</code></td><td>new B 但 token 是 A</td><td>动态选实现、interface 注入</td></tr>
+    <tr><td><code>{ provide: 'T', useFactory: fn, inject: [...] }</code></td><td>调 fn 算出来</td><td>运行时决策、动态创建</td></tr>
+  </tbody>
+</table>
+
+<h3>每种写法的实战</h3>
+
+<p><strong>写法 1:class(已用 30+ 次)</strong></p>
+<pre><code>providers: [CartService]   // 框架 new + 自动注入依赖</code></pre>
+
+<p><strong>写法 2:useValue(给常量 / 第三方实例)</strong></p>
+<pre><code>providers: [
+  CartService,
+  { provide: 'CART_OPTIONS', useValue: { currency: 'USD', tax: 0.08 } },
+  //                            ↑ 这个值就当 instance 用了
+]
+
+// 用:
+@Injectable()
+export class CartService {
+  constructor(
+    @Inject('CART_OPTIONS') private options: { currency: string; tax: number },
+  ) {}
+}</code></pre>
+
+<p><strong>写法 3:useClass(动态选实现)</strong></p>
+<pre><code>// 接口
+abstract class CacheService { abstract get(key: string): Promise&lt;any&gt;; }
+
+// 实现 A
+class RedisCacheService extends CacheService { /* ... */ }
+
+// 实现 B
+class MemoryCacheService extends CacheService { /* ... */ }
+
+// 在 module 里"绑定"
+@Module({
+  providers: [
+    { provide: CacheService, useClass: process.env.REDIS_URL ? RedisCacheService : MemoryCacheService },
+    //                     ↑ 运行时决定用哪个
+  ],
+})
+export class CacheModule {}
+
+// 用(只认 interface,不认具体类):
+@Injectable()
+export class CartService {
+  constructor(private cache: CacheService) {}   // ← interface
+}</code></pre>
+
+<p><strong>写法 4:useFactory(运行时计算)</strong></p>
+<pre><code>providers: [
+  {
+    provide: 'DATABASE_CONNECTION',
+    useFactory: (config: ConfigService) =&gt; {
+      return new Pool({   // 任何"需要复杂初始化"的对象
+        host: config.get('DB_HOST'),
+        port: config.get('DB_PORT'),
+      });
+    },
+    inject: [ConfigService],   // ← useFactory 的依赖
+  },
+]</code></pre>
+
+<h2>2. useExisting — 同一 instance,不同 token</h2>
+
+<pre><code>// 接口 + 实现
+abstract class ILogger { abstract log(msg: string): void; }
+@Injectable() class PinoLogger extends ILogger { /* ... */ }
+
+@Module({
+  providers: [
+    PinoLogger,
+    { provide: 'ILogger', useExisting: PinoLogger },
+    //            ↑ 跟 PinoLogger 是<strong>同一个 instance</strong>
+  ],
+  exports: ['ILogger'],
+})
+export class CoreModule {}
+
+// 用:
+@Injectable()
+export class CartService {
+  constructor(@Inject('ILogger') private logger: ILogger) {}   // interface 注入
+}</code></pre>
+
+<p><strong>useClass 是"new 一个新 instance",useExisting 是"指向已有 instance"</strong>。后者省一次 new,语义更清晰。</p>
+
+<h2>3. ModuleRef — 框架拿不到时手动取</h2>
+
+<p>大多数情况,NestJS 自动注入就够了。但有 3 种场景需要 <code>ModuleRef</code>:</p>
+<ol>
+<li><strong>动态选实现</strong>:<code>moduleRef.get(SERVICE_A, { strict: false })</code> — 根据配置拿不同 service</li>
+<li><strong>条件注入</strong>:<code>if (feature) moduleRef.get(FeatureService)</code></li>
+<li><strong>测试 mock</strong>:用 ModuleRef 取 instance 后手动调 method(避开 nestjs-testing 框架)</li>
+</ol>
+
+<pre><code>import { ModuleRef } from '@nestjs/core';
+
+@Injectable()
+export class CartService {
+  constructor(private moduleRef: ModuleRef) {}
+
+  async checkout(userId: string) {
+    // 条件注入:有 cache 就用,没有就跳过
+    const cache = this.moduleRef.get(CacheService, { strict: false });
+    if (cache) {
+      const items = await cache.get(`cart:${userId}`);
+      if (items) return items;
+    }
+    // 真正查 DB
+    return this.db.query(...);
+  }
+}</code></pre>
+
+<p><strong>不要过度使用</strong> — 大多数情况自动注入就够,ModuleRef 是"框架拿不到时的兜底"。</p>
+
+<h2>4. Provider Scope — singleton / request / transient</h2>
+
+<p>这是 0010 <strong>最重要的概念</strong>。Scope 决定 instance 的<strong>生命周期</strong>:</p>
+
+<table>
+  <thead>
+    <tr><th>Scope</th><th>什么时候 new</th><th>内存</th><th>典型场景</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>singleton</code>(默认)</td><td>整个 app 启动时 1 次</td><td>1 个 instance</td><td>绝大多数 service</td></tr>
+    <tr><td><code>request</code></td><td>每个 HTTP 请求 1 个</td><td>N 个(N=并发请求数)</td><td>需要"每个请求独立状态"的 service</td></tr>
+    <tr><td><code>transient</code></td><td>每次注入都 new</td><td>每次注入 +1</td><td>几乎不用,有副作用隔离需求时</td></tr>
+  </tbody>
+</table>
+
+<h3>使用方式</h3>
+
+<pre><code>// 1. singleton(默认,什么都不写)
+@Injectable()
+export class CartService {}
+
+// 2. request scope
+@Injectable({ scope: Scope.REQUEST })
+export class RequestScopedService {}
+
+// 3. transient scope
+@Injectable({ scope: Scope.TRANSIENT })
+export class TransientService {}</code></pre>
+
+<h3>陷阱 1:request scope 会让所有依赖它的人变 request scope</h3>
+
+<p><strong>传染性</strong>:</p>
+<pre><code>@Injectable({ scope: Scope.REQUEST })
+class FooService {}
+
+@Injectable()
+class BarService {  // ← 也会变 REQUEST scope,因为依赖了 FooService
+  constructor(private foo: FooService) {}
+}</code></pre>
+
+<p>实际后果:每个 HTTP 请求都会 new BarService(本来 singleton 现在变 request)。**频繁 new 拖慢响应**。</p>
+
+<h3>陷阱 2:request scope 跟 Gate 是冲突的</h3>
+
+<p>你 nest-search 当前 <strong>global Guard(CasGuard, ApiKeyGuard, ThrottlerGuard)是 singleton</strong>。如果它们注入了 request scope 的 service,Guard 启动时就会因为"没 request context"报错。</p>
+
+<p>要解决,Guard 也要变 request scope,或者 Guard 不用 request scope 的 service。**这是为什么默认 singleton 是好选择**。</p>
+
+<h3>陷阱 3:transient 频繁 new 拖慢 + 内存涨</h3>
+
+<p>transient 的 service 每次 inject 都 new。**1000 个请求 × 5 个 transient 依赖 = 5000 次 new**。如果 service 构造里有 IO 操作(读 config / 拉 connection),性能雪崩。</p>
+
+<h3>什么时候用 request / transient?</h3>
+
+<table>
+  <thead>
+    <tr><th>场景</th><th>用</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>服务需要"当前用户信息"做决策(每个请求不同)</td><td><strong>request</strong> + 用 CLS(Continuation Local Storage)读</td></tr>
+    <tr><td>服务构造里读 request body / header(必须有 request context)</td><td><strong>request</strong></td></tr>
+    <tr><td>其他 99% 情况</td><td><strong>singleton</strong>(默认)</td></tr>
+  </tbody>
+</table>
+
+<p><strong>关键事实</strong>: 0008 那个 keep-alive 阻塞 dispose 的 bug,根因是 <strong>disableShutdownHooks + keep-alive 连接没断</strong>,不是 scope 问题。但 <strong>scope 选错会引发类似"实例不释放"或"每次请求 new 太慢"的 bug</strong>。</p>
+
+<h2>5. 动手 · HttpClientService 抽离</h2>
+
+<p>上节课 0008 留的"手写 forwardedHeaders" 是**反模式** — 工业级做法是用 interceptor / useFactory 集中处理。这次把它清理掉。</p>
+
+<div class="task">
+  <h3>5.1 · 新建 <code>HttpClientService</code></h3>
+  <p>新建 <code>apps/gateway/src/common/http-client/http-client.service.ts</code>:</p>
+  <pre><code>import { Inject, Injectable } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios';
+import { REQUEST } from '@nestjs/core';
+import { Request } from 'express';
+import { firstValueFrom } from 'rxjs';
+import { AxiosRequestConfig } from 'axios';
+
+@Injectable()
+export class HttpClientService {
+  constructor(
+    private readonly http: HttpService,
+    @Inject(REQUEST) private readonly request: Request,
+  ) {}
+
+  async request&lt;T = any&gt;(config: AxiosRequestConfig): Promise&lt;T&gt; {
+    // 自动从当前 request 拿 requestId,加到 x-request-id 头
+    const requestId = (this.request as any).id;
+    const headers = {
+      'Content-Type': 'application/json',
+      ...config.headers,
+      ...(requestId ? { 'x-request-id': requestId } : {}),
+    };
+
+    const response = await firstValueFrom(
+      this.http.request&lt;T&gt;({ ...config, headers }),
+    );
+    return response.data;
+  }
+}</code></pre>
+  <p><strong>这个 service 集中做了 3 件事</strong>:① 用 @nestjs/axios(而不是裸 axios)② 自动加 x-request-id 头 ③ 把 Observable 转 Promise(更顺手)。</p>
+</div>
+
+<div class="task">
+  <h3>5.2 · 新建 <code>HttpClientModule</code></h3>
+  <p>新建 <code>apps/gateway/src/common/http-client/http-client.module.ts</code>:</p>
+  <pre><code>import { Module } from '@nestjs/common';
+import { HttpModule } from '@nestjs/axios';
+import { HttpClientService } from './http-client.service';
+
+@Module({
+  imports: [HttpModule],   // ← HttpModule 是 @nestjs/axios 的 module
+  providers: [HttpClientService],
+  exports: [HttpClientService],
+})
+export class HttpClientModule {}</code></pre>
+</div>
+
+<div class="task">
+  <h3>5.3 · <code>ProxyService</code> 改用 <code>HttpClientService</code></h3>
+  <p>打开 <code>apps/gateway/src/proxy/proxy.service.ts</code>,改 3 处:</p>
+  <ol>
+    <li>删 axios / REQUEST 相关 import(改用 HttpClientService)</li>
+    <li>constructor 改注入 HttpClientService</li>
+    <li>forward() 删手写 forwardedHeaders</li>
+  </ol>
+  <p>改完核心片段:</p>
+  <pre><code>import { HttpException, Injectable } from '@nestjs/common';
+import { Method } from 'axios';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+import { HttpClientService } from '../common/http-client/http-client.service';
+
+@Injectable()
+export class ProxyService {
+  constructor(
+    @InjectPinoLogger(ProxyService.name) private readonly logger: PinoLogger,
+    private readonly httpClient: HttpClientService,   // ← 新注入
+  ) {}
+
+  async forward(service, method, path, body?, headers?) {
+    const url = `${SERVICE_MAP[service]}${path}`;
+    this.logger.info(`Proxying ${method} ${path} → ${service}-service`);
+
+    try {
+      // HttpClientService 自动加 x-request-id,ProxyService 不管
+      return await this.httpClient.request({
+        method,
+        url,
+        data: body,
+        headers,
+        timeout: 30000,
+      });
+    } catch (error) {
+      if (error.response) {
+        this.logger.error(`Downstream error: ${error.response.status} ${error.response.data?.message}`);
+        throw new HttpException(error.response.data, error.response.status);
+      }
+      this.logger.error(`Proxy error: ${error.message}`);
+      throw error;
+    }
+  }
+}</code></pre>
+  <p><strong>代码短了 20 行</strong>(不用手写 forwardedHeaders 也不用 REQUEST 注入)。HttpClientService 集中处理 x-request-id。</p>
+</div>
+
+<div class="task">
+  <h3>5.4 · <code>app.module.ts</code> 注册 <code>HttpClientModule</code></h3>
+  <p>打开 <code>apps/gateway/src/app.module.ts</code>:</p>
+  <ol>
+    <li>顶部加 <code>import { HttpClientModule } from './common/http-client/http-client.module';</code></li>
+    <li>在 <code>imports</code> 数组加 <code>HttpClientModule</code>(放最上面,因为其他 module 都要用)</li>
+  </ol>
+  <pre><code>@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    HttpClientModule,        // ← 新加(放最前,其他 module 都依赖)
+    LoggerModule.forRoot({ ... }),
+    HealthModule,
+    ThrottlerModule.forRoot([...]),
+  ],
+  ...
+})
+export class AppModule {}</code></pre>
+</div>
+
+<div class="task">
+  <h3>5.5 · 验证 3 件事</h3>
+  <ol class="steps">
+    <li>重启 <code>pnpm start:gateway</code> + <code>pnpm start:auth</code>。期望启动无报错(说明 HttpClientModule 装配正确)</li>
+    <li>curl gateway 测一次端到端:<br>
+      <pre><code>curl -i -X POST -H "X-API-Key: ds_key_123" -H "Content-Type: application/json" -d '{"username":"a","password":"xxxxxx"}' http://localhost:3000/api/auth/login</code></pre>
+      期望 401(密码错),但<strong>requestId 在 gateway 和 auth-service 日志里一致</strong>(跨服务追踪仍然工作)
+    </li>
+    <li>在 gateway 和 auth-service 两个终端 grep 同一个 requestId(从任一终端复制),期望两个终端都看到那条日志</li>
+  </ol>
+  <p>这是 0010 的金样本 — <strong>HttpClientService 重构后,跨服务追踪依然工作,代码更短</strong>。</p>
+</div>
+
+<h2>6. 自我检测(3 道题)</h2>
+
+<div class="quiz">
+  <div class="quiz-q" data-correct="b">
+    <p>1. <code>useFactory</code> 比 <code>useClass</code> 多出的核心能力是?</p>
+    <label class="quiz-opt"><input type="radio" name="q1" value="a"> 运行时决定用哪个实现</label>
+    <label class="quiz-opt"><input type="radio" name="q1" value="b"> <strong>计算后再决定 instance</strong>(不是简单的 new,可以传参 + 拿依赖 + 做逻辑)</label>
+    <label class="quiz-opt"><input type="radio" name="q1" value="c"> 自动注入</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz-q" data-correct="c">
+    <p>2. 把 Provider scope 设为 <code>REQUEST</code> 会发生什么?</p>
+    <label class="quiz-opt"><input type="radio" name="q2" value="a"> 整个 app 共享 1 个 instance</label>
+    <label class="quiz-opt"><input type="radio" name="q2" value="b"> 每次注入都新建一个</label>
+    <label class="quiz-opt"><input type="radio" name="q2" value="c"> 每个 HTTP 请求共享一个 instance,跨请求独立</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz-q" data-correct="b">
+    <p>3. <code>ModuleRef.get(Token)</code> 是干什么的?</p>
+    <label class="quiz-opt"><input type="radio" name="q3" value="a"> 拿当前 HTTP 请求的 body</label>
+    <label class="quiz-opt"><input type="radio" name="q3" value="b"> <strong>从 DI 容器里手动拿 instance</strong>(框架拿不到时的兜底)</label>
+    <label class="quiz-opt"><input type="radio" name="q3" value="c"> 注册新 provider</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+</div>
+
+<h2 id="what-next">下一节预告</h2>
+<p>你学完了 Provider 怎么写、scope 怎么选、ModuleRef 怎么用 — <strong>container 的"装"</strong>会了。0011 我们看 container 的"切" — <strong>Guard / Pipe / Interceptor / Filter</strong>,这 4 个 AOP 切面分别处理请求的什么阶段,怎么写自己的 AOP 切面把 @Roles 真正用起来。<strong>这一节会让 0009 那个"只写不读"的 @Roles 装饰器真正发挥作用</strong>。</p>
+
+<h2>收口 · 这一节你 commit 什么</h2>
+<p>3 个新文件 + 2 处改:</p>
+<ul>
+  <li><code>apps/gateway/src/common/http-client/http-client.service.ts</code> — 新建,用 @nestjs/axios 包装,自动加 x-request-id</li>
+  <li><code>apps/gateway/src/common/http-client/http-client.module.ts</code> — 新建,export HttpClientService</li>
+  <li><code>apps/gateway/src/proxy/proxy.service.ts</code> — 改用 HttpClientService,删手写 forwardedHeaders</li>
+  <li><code>apps/gateway/src/app.module.ts</code> — imports 加 HttpClientModule</li>
+</ul>
+
+<p>commit message(直接复制):</p>
+<pre><code>feat(gateway): extract HttpClientService via useFactory pattern
+
+- Add HttpClientService wrapping @nestjs/axios HttpService. Auto
+  injects x-request-id header from REQUEST into every outgoing
+  request — replaces the manual forwardedHeaders object in
+  ProxyService (LR-0010 follow-up from 0008)
+- Add HttpClientModule exporting HttpClientService. All modules
+  needing outbound HTTP should import this and inject the service
+- Refactor ProxyService to use HttpClientService. Code shrinks
+  ~20 lines (no more REQUEST injection, no more forwardedHeaders
+  object building)
+- Verify: cross-service requestId still flows from gateway to
+  auth-service after refactor (LR-0009 lesson's "write metadata"
+  demo validated the chain end-to-end)
+
+Refs: docs/teaching/lessons/0010-ioc-container.html
+</code></pre>
+
+<p>5.5 三个验证跑通 + quiz 三道选完,告诉我结果。我跑 commit + 写 LR-0014(0010 lesson 盲点)+ 开 0011(AOP 切面)。</p>
+
+<h2>延伸阅读</h2>
+<ul>
+  <li><a href="https://docs.nestjs.com/fundamentals/custom-providers">NestJS Docs — Custom providers</a>(必读,4 种写法 + useExisting 详解)</li>
+  <li><a href="https://docs.nestjs.com/fundamentals/lifecycle-events">NestJS Docs — Injection scopes</a>(singleton / request / transient)</li>
+  <li><a href="https://docs.nestjs.com/fundamentals/module-ref">NestJS Docs — ModuleRef</a>(手动取 instance)</li>
+  <li>《Dependency Injection in .NET》— Mark Seemann(scope 概念,跨语言适用)</li>
+  <li><a href="../learning-records/0012-module-di-primer.md">LR-0012(MR/DI primer)</a> — 10 个问答前置</li>
+</ul>
+
+<p style="margin-top: 1.6rem; color: var(--accent); font-weight: 600;">📌 5.5 步骤 3 的"两个终端 grep 同一个 requestId"是 0010 的金样本 — 重构后跨服务追踪仍然无缝。如果看不到,说明 HttpClientService 没正确接 REQUEST。</p>
+
+<hr>
+<footer>
+  nest-search · teach workspace · 课时 0010 · Track 2 第 2 课<br>
+  有问题直接问 Claude
+</footer>
+
+<script>
+function check(btn) {
+  const q = btn.closest('.quiz-q');
+  const correct = q.dataset.correct;
+  const picked = q.querySelector('input[type=radio]:checked');
+  const fb = q.querySelector('.quiz-feedback');
+  if (!picked) {
+    fb.textContent = '⚠️ 选一个再提交。';
+    fb.className = 'quiz-feedback show bad';
+    return;
+  }
+  if (picked.value === correct) {
+    fb.textContent = '✅ 对了。';
+    fb.className = 'quiz-feedback show good';
+  } else {
+    fb.textContent = '❌ 不对,回到 §1 / §4 重读一遍,再试一次。';
+    fb.className = 'quiz-feedback show bad';
+  }
+}
+
+// 一键复制
+document.querySelectorAll('pre').forEach(function(pre) {
+  if (pre.classList.contains('json-block')) return;
+  if (pre.querySelector('.copy-btn')) return;
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.textContent = 'Copy';
+  btn.setAttribute('aria-label', '复制代码');
+  pre.appendChild(btn);
+  btn.addEventListener('click', async function() {
+    var codeEl = pre.querySelector('code');
+    if (!codeEl) return;
+    var text = codeEl.textContent;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+    } catch (err) {
+      btn.textContent = 'Failed';
+      btn.classList.add('failed');
+    }
+    setTimeout(function() {
+      btn.textContent = 'Copy';
+      btn.classList.remove('copied', 'failed');
+    }, 1500);
+  });
+});
+</script>
+
+</body>
+</html>

@@ -1,8 +1,7 @@
-import { Inject, Injectable, HttpException } from '@nestjs/common';
-import { REQUEST } from '@nestjs/core';
-import { Request } from 'express';
-import axios, { Method } from 'axios';
+import { Injectable, HttpException } from '@nestjs/common';
+import { Method } from 'axios';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+import { HttpClientService } from '../common/http-client/http-client.service';
 
 const SERVICE_MAP: Record<string, string> = {
   sync: process.env.SYNC_SERVICE_URL || 'http://localhost:3001',
@@ -14,8 +13,8 @@ const SERVICE_MAP: Record<string, string> = {
 @Injectable()
 export class ProxyService {
   constructor(
-    @InjectPinoLogger(ProxyService.name) private readonly logger: PinoLogger,   // ← 保留(0005 装的)
-    @Inject(REQUEST) private readonly request: Request,                            // ← 新增
+    @InjectPinoLogger(ProxyService.name) private readonly logger: PinoLogger,
+    private readonly httpClient: HttpClientService, // ← 用 HttpClientService
   ) {}
 
   async forward(
@@ -33,27 +32,21 @@ export class ProxyService {
     const url = `${baseUrl}${path}`;
     this.logger.info(`Proxying ${method} ${path} → ${service}-service`);
 
-    // ✅ 自动把当前请求的 reqId 加到转发头里
-    const requestId = (this.request as any).id;   // nestjs-pino 注入的
-    const forwardedHeaders = {
-      'Content-Type': 'application/json',
-      ...(requestId ? { 'x-request-id': requestId } : {}),
-      ...headers,
-    };
-
+    // HttpClientService 自动加 x-request-id 头,ProxyService 不管
     try {
-      const response = await axios({
+      return await this.httpClient.request({
         method,
         url,
         data: body,
-        headers: forwardedHeaders,
+        headers,
         timeout: 30000,
       });
-
-      return response.data;
     } catch (error: any) {
       if (error.response) {
-        this.logger.error(`Downstream error: ${error.response.status} ${error.response.data?.message}`);
+        this.logger.error(
+          `Downstream error: ${error.response.status} ${error.response.data?.message}`,
+        );
+        // ✅ 抛 HttpException,不是裸 data
         throw new HttpException(error.response.data, error.response.status);
       }
       this.logger.error(`Proxy error: ${error.message}`);
