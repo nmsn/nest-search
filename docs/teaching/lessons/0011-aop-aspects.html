@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>0011 · AOP 切面:Guard / Pipe / Interceptor / Filter 统一视角</title>
+<style>
+  :root {
+    --bg: #fbfaf7;
+    --ink: #1d1d1d;
+    --ink-soft: #4a4a4a;
+    --ink-faint: #8a8a8a;
+    --rule: #d6d2c4;
+    --accent: #b04a2f;
+    --code-bg: #f1efe8;
+    --code-inline: #ece8db;
+    --good: #2c6e3e;
+    --bad: #b04a2f;
+    --pad: 2.4rem;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "SF Pro Text", "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  body { max-width: 760px; margin: 0 auto; padding: var(--pad); }
+  h1, h2, h3 { font-family: Georgia, "Source Han Serif SC", "Songti SC", serif; font-weight: 600; letter-spacing: -0.01em; }
+  h1 { font-size: 2.1rem; line-height: 1.15; margin: 0 0 0.4rem 0; }
+  h2 { font-size: 1.45rem; margin: 3rem 0 0.6rem 0; border-bottom: 1px solid var(--rule); padding-bottom: 0.3rem; }
+  h3 { font-size: 1.12rem; margin: 1.6rem 0 0.4rem 0; color: var(--ink-soft); }
+  p { margin: 0.8rem 0; }
+  .lede { font-size: 1.05rem; color: var(--ink-soft); font-style: italic; border-left: 3px solid var(--accent); padding-left: 0.9rem; margin: 1rem 0 1.6rem 0; }
+  .meta { color: var(--ink-faint); font-size: 0.85rem; margin-bottom: 1.6rem; }
+  .meta a { color: var(--ink-faint); }
+  code, pre, kbd { font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace; font-size: 0.92em; }
+  p code, li code, td code { background: var(--code-inline); padding: 0.08em 0.36em; border-radius: 3px; color: var(--ink); }
+  pre { background: var(--code-bg); border: 1px solid var(--rule); padding: 0.9rem 1rem; border-radius: 4px; overflow-x: auto; line-height: 1.5; margin: 0.8rem 0; position: relative; }
+  pre code { background: transparent; padding: 0; }
+  pre .copy-btn {
+    position: absolute;
+    top: 0.4rem; right: 0.4rem;
+    padding: 0.25rem 0.55rem;
+    background: rgba(255,255,255,0.85);
+    color: var(--ink-soft);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    font-family: -apple-system, "SF Pro Text", sans-serif;
+    font-size: 0.72rem; font-weight: 600;
+    cursor: pointer; opacity: 0.65;
+    transition: opacity 0.15s, background 0.15s, color 0.15s;
+  }
+  pre .copy-btn:hover { opacity: 1; }
+  pre .copy-btn.copied { background: var(--good); color: white; border-color: var(--good); opacity: 1; }
+  pre .copy-btn.failed { background: var(--bad); color: white; border-color: var(--bad); opacity: 1; }
+  .task { background: #fff; border: 1px solid var(--rule); border-left: 4px solid var(--accent); padding: 1rem 1.2rem; margin: 1.4rem 0; border-radius: 3px; }
+  .task h3 { margin-top: 0; color: var(--accent); text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.85rem; font-family: -apple-system, sans-serif; font-weight: 700; }
+  .quiz { margin: 1.6rem 0; }
+  .quiz-q { background: #fff; border: 1px solid var(--rule); padding: 1rem 1.2rem; border-radius: 3px; margin: 0.8rem 0; }
+  .quiz-q p:first-child { margin-top: 0; font-weight: 600; }
+  .quiz-opt { display: block; margin: 0.3rem 0; cursor: pointer; }
+  .quiz-opt input { margin-right: 0.5rem; }
+  .quiz-feedback { display: none; margin-top: 0.6rem; padding: 0.5rem 0.8rem; border-radius: 3px; font-size: 0.95rem; }
+  .quiz-feedback.show { display: block; }
+  .quiz-feedback.good { background: #e8f3ea; color: var(--good); border: 1px solid #b6d8be; }
+  .quiz-feedback.bad { background: #fbeae5; color: var(--bad); border: 1px solid #e8b9a8; }
+  .diagram { background: var(--code-bg); border: 1px solid var(--rule); padding: 1rem 1.2rem; border-radius: 3px; margin: 1rem 0; font-family: "SF Mono", "JetBrains Mono", monospace; font-size: 0.88em; line-height: 1.5; overflow-x: auto; white-space: pre; }
+  hr { border: none; border-top: 1px solid var(--rule); margin: 2.4rem 0 1.2rem 0; }
+  footer { color: var(--ink-faint); font-size: 0.85rem; }
+  footer a { color: var(--ink-soft); }
+  @media print {
+    body { background: white; max-width: none; padding: 1.2rem; }
+    .task, .quiz-q { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>AOP 切面:Guard / Pipe / Interceptor / Filter 统一视角</h1>
+  <p class="lede">NestJS 把"在请求生命周期的不同阶段插入行为"做成了 4 个切面 — 这一节是 senior 跟 mid 的分水岭。</p>
+  <p class="meta">
+    课时 0011 · 预计 60 分钟 · 锚定项目 <code>nest-search</code>
+    · 上一节: <a href="0010-ioc-container.html">IoC 容器</a>
+    · 下一节: <a href="#what-next">0012 Module 系统</a>
+  </p>
+</header>
+
+<hr>
+
+<h2>你今天会拿到什么</h2>
+<ol class="steps">
+  <li>理解 <strong>4 个切面的统一视角</strong> — 都做"在请求上插一段逻辑",但插入位置不同</li>
+  <li>理解 <code>CanActivate</code> / <code>ExecutionContext</code> / <code>Reflector</code> 怎么串起来</li>
+  <li>亲手写 <code>RolesGuard</code> — <strong>读 @Roles metadata</strong>(0009 那个"只写不读"终于有 reader 了)</li>
+  <li>了解 Pipe / Interceptor / Filter 的边界 — 知道什么时候用哪个</li>
+  <li>一个可提交的 commit,RolesGuard 上线</li>
+</ol>
+
+<p><strong>前置阅读</strong>: LR-0012(MR/DI primer)Q1 / Q2 / Q6 / Q9 — 这次会引用。</p>
+
+<h2>1. 4 个切面 + 请求生命周期</h2>
+
+<p>NestJS 的请求生命周期里,有 4 个"切面"(aspect)可以插入你的逻辑:</p>
+
+<div class="diagram">HTTP Request
+  │
+  ▼
+[Middleware]            ← Express 层(早就有了)
+  │
+  ▼
+[Guard(s)]              ← "该不该进?"    AuthGuard / RolesGuard
+  │
+  ▼
+[Interceptor.before]    ← "请求前后包起来"    Logging / Caching
+  │
+  ▼
+[Pipe]                  ← "参数转换 + 校验"    ValidationPipe
+  │
+  ▼
+[Handler]               ← "业务逻辑"
+  │
+  ▼
+[Interceptor.after]     ← 同上,后半段
+  │
+  ▼
+[Filter]                ← "出错了怎么格式化"    AllExceptionsFilter
+  │
+  ▼
+HTTP Response</div>
+
+<p>每个切面负责不同的"横切关注"(cross-cutting concern)。</p>
+
+<table>
+  <thead>
+    <tr><th>切面</th><th>接口</th><th>关心什么</th><th>典型用途</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><strong>Guard</strong></td><td><code>CanActivate</code></td><td>请求该不该进入</td><td>鉴权、角色校验</td></tr>
+    <tr><td><strong>Pipe</strong></td><td><code>Transform</code></td><td>参数转换 / 校验</td><td><code>ValidationPipe</code>、<code>ParseIntPipe</code></td></tr>
+    <tr><td><strong>Interceptor</strong></td><td><code>NestInterceptor</code></td><td>请求前后包起来</td><td>Logging、Cache、Timeout</td></tr>
+    <tr><td><strong>Filter</strong></td><td><code>ExceptionFilter</code></td><td>异常怎么格式化</td><td>统一错误响应格式</td></tr>
+  </tbody>
+</table>
+
+<h2>2. Guard 深入 — 切面里最常用的</h2>
+
+<p>Guard 是 4 个切面里<strong>最常手写</strong>的,所以我们重点讲。其他 3 个有大量内置实现,理解就好。</p>
+
+<h3>2.1 Guard 接口</h3>
+
+<pre><code>import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+
+@Injectable()
+export class MyGuard implements CanActivate {
+  canActivate(context: ExecutionContext): boolean {
+    // 返回 true → 请求继续
+    // 返回 false → 请求被拒(默认 403 Forbidden)
+    // 抛异常 → 请求被拒(异常会被 Filter 处理)
+    return true;
+  }
+}</code></pre>
+
+<h3>2.2 ExecutionContext — 拿到请求的所有上下文</h3>
+
+<pre><code>canActivate(context: ExecutionContext) {
+  // 切换到 HTTP context(也可能是 RPC / WebSocket)
+  const http = context.switchToHttp();
+
+  // 拿请求 / 响应
+  const request = http.getRequest&lt;Request&gt;();
+  const response = http.getResponse&lt;Response&gt;();
+
+  // 拿 handler metadata(哪个 method、哪个 controller)
+  const handler = context.getHandler();
+  const classRef = context.getClass();
+}</code></pre>
+
+<h3>2.3 Reflector — 读装饰器 metadata</h3>
+
+<pre><code>import { Reflector } from '@nestjs/core';
+
+@Injectable()
+export class MyGuard implements CanActivate {
+  constructor(private reflector: Reflector) {}
+
+  canActivate(context: ExecutionContext): boolean {
+    // 读 @Roles('admin', 'editor') 写的 metadata
+    const roles = this.reflector.getAllAndOverride&lt;string[]&gt;(ROLES_KEY, [
+      context.getHandler(),  // 先看 method 上的 @Roles
+      context.getClass(),    // 再看 class 上的 @Roles
+    ]);
+    // getAllAndOverride = "method 覆盖 class"
+    return true;
+  }
+}</code></pre>
+
+<h2>3. 动手 · 写 RolesGuard(0011 的金样本)</h2>
+
+<p>0009 lesson 你写了 <code>@Roles('admin', 'editor')</code> 但<strong>只写不读</strong>。这一节给它写 reader。</p>
+
+<div class="task">
+  <h3>3.1 · 新建 <code>roles.guard.ts</code></h3>
+  <p>新建 <code>apps/gateway/src/guards/roles.guard.ts</code>:</p>
+  <pre><code>import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import { ROLES_KEY } from '../common/decorators/roles.decorator';
+
+@Injectable()
+export class RolesGuard implements CanActivate {
+  constructor(private reflector: Reflector) {}
+
+  canActivate(context: ExecutionContext): boolean {
+    // 1. 读 @Roles metadata
+    const requiredRoles = this.reflector.getAllAndOverride&lt;string[]&gt;(ROLES_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
+    // 2. 没有 @Roles = 不限制,放行
+    if (!requiredRoles || requiredRoles.length === 0) return true;
+
+    // 3. 从 request 拿 user roles(本节简化:从 header 读)
+    const req = context.switchToHttp().getRequest();
+    const userRolesHeader = req.headers['x-user-roles'];
+    const userRoles: string[] = typeof userRolesHeader === 'string'
+      ? userRolesHeader.split(',').map(r =&gt; r.trim())
+      : [];
+
+    // 4. 用户有任意一个所需角色即可
+    return requiredRoles.some(role =&gt; userRoles.includes(role));
+  }
+}</code></pre>
+  <p><strong>为什么从 header 读 user roles</strong>:简化测试。生产应该从 JWT / session 读。0011 是 AOP 入门,JWT 解码是另一节课(0023)。</p>
+</div>
+
+<div class="task">
+  <h3>3.2 · 在 <code>app.module.ts</code> 注册为全局 Guard</h3>
+  <p>打开 <code>apps/gateway/src/app.module.ts</code>,加 import + 在 <code>providers</code> 数组加一项:</p>
+  <pre><code>import { RolesGuard } from './guards/roles.guard';
+
+// ...providers 数组里加(放最后,跑得最晚):
+{
+  provide: APP_GUARD,
+  useClass: RolesGuard,
+},</code></pre>
+  <p><strong>放最后</strong>: global guard 按声明顺序跑。RolesGuard 在 CasGuard / ApiKeyGuard / ThrottlerGuard <strong>之后</strong>跑,先过鉴权再过角色。</p>
+</div>
+
+<div class="task">
+  <h3>3.3 · 给 <code>syncIncremental</code> 也加 <code>@Roles</code></h3>
+  <p>0009 只给 syncFull 加了 @Roles,这一节给 syncIncremental 也加(同样 admin):</p>
+  <p>打开 <code>apps/gateway/src/app.controller.ts</code>,在 <code>syncIncremental</code> 上加:</p>
+  <pre><code>@ApiOperation({ summary: "触发增量同步(管理员)" })
+@ApiParam({ name: "businessLine", example: "ds" })
+@ApiResponse({ status: 200, description: "同步任务已启动" })
+@ApiResponse({ status: 403, description: "非管理员" })
+@Roles("admin", "editor")              // ← 新加
+@UseGuards(AdminGuard)
+@Post("api/sync/incremental/:businessLine")
+async syncIncremental(@Param("businessLine") bl: string) { ... }</code></pre>
+</div>
+
+<div class="task">
+  <h3>3.4 · 验证(用 script,绕过 CasGuard)</h3>
+  <p>CasGuard / ApiKeyGuard 仍在跑,直接 curl 会被它挡。所以用 script 方式:<strong>直接构造 ExecutionContext mock,调 RolesGuard.canActivate()</strong>。</p>
+  <p>新建 <code>apps/gateway/src/decorators-demo/test-roles-guard.ts</code>:</p>
+  <pre><code>import { ExecutionContext } from '@nestjs/common';
+import { RolesGuard } from '../guards/roles.guard';
+import { Reflector } from '@nestjs/core';
+import { ROLES_KEY } from '../common/decorators/roles.decorator';
+import { AppController } from '../app.controller';
+
+// 用真实的 RolesGuard + 真实的 AppController
+const guard = new RolesGuard(new Reflector());
+
+// 构造一个 mock ExecutionContext
+function makeContext(userRolesHeader?: string): ExecutionContext {
+  return {
+    switchToHttp: () =&gt; ({
+      getRequest: () =&gt; ({
+        headers: userRolesHeader ? { 'x-user-roles': userRolesHeader } : {},
+      }),
+      getResponse: () =&gt; ({}),
+      getNext: () =&gt; undefined,
+    }),
+    getHandler: () =&gt; AppController.prototype.syncFull,
+    getClass: () =&gt; AppController,
+    getArgs: () =&gt; [],
+    getArgByIndex: () =&gt; undefined,
+    switchToRpc: () =&gt; ({} as any),
+    switchToWs: () =&gt; ({} as any),
+    getType: () =&gt; 'http' as const,
+    getRequest: undefined,
+  } as any;
+}
+
+// 测试 1:有 admin 角色 → 通过
+console.log('admin: ', guard.canActivate(makeContext('admin,user')));  // 期望: true
+
+// 测试 2:有 guest 角色 → 拒绝
+console.log('guest: ', guard.canActivate(makeContext('guest')));  // 期望: false
+
+// 测试 3:无角色 header → 拒绝
+console.log('no header: ', guard.canActivate(makeContext()));  // 期望: false
+
+// 测试 4:listForms(没有 @Roles) → 通过
+function makeContextForListForms(): ExecutionContext {
+  return {
+    switchToHttp: () =&gt; ({
+      getRequest: () =&gt; ({ headers: {} }),
+      getResponse: () =&gt; ({}),
+      getNext: () =&gt; undefined,
+    }),
+    getHandler: () =&gt; AppController.prototype.listForms,
+    getClass: () =&gt; AppController,
+    getArgs: () =&gt; [],
+    getArgByIndex: () =&gt; undefined,
+    switchToRpc: () =&gt; ({} as any),
+    switchToWs: () =&gt; ({} as any),
+    getType: () =&gt; 'http' as const,
+    getRequest: undefined,
+  } as any;
+}
+console.log('listForms no @Roles: ', guard.canActivate(makeContextForListForms()));  // 期望: true</code></pre>
+  <p>跑:</p>
+  <pre><code>npx ts-node apps/gateway/src/decorators-demo/test-roles-guard.ts</code></pre>
+  <p>期望输出:</p>
+  <pre><code>admin:  true
+guest:  false
+no header:  false
+listForms no @Roles:  true</code></pre>
+  <p>这是 0011 的金样本 — <strong>@Roles metadata 真的被 RolesGuard 读出来 + 真的能拒绝无权限用户</strong>。</p>
+</div>
+
+<h2>4. Pipe — 转换 + 校验(简版)</h2>
+<p>Pipe 有两个动作:<strong>transform</strong>(参数变形,如 <code>"5"</code> → <code>5</code>)和 <strong>validate</strong>(参数校验,如必须是 email)。</p>
+
+<pre><code>// 内置 ParseIntPipe:把字符串 "5" 转成数字 5,失败抛 BadRequestException
+@Param('id', ParseIntPipe) id: number
+
+// 内置 ValidationPipe:校验 @Body 是不是 LoginDto
+@UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+@Post('login')
+async login(@Body() body: LoginDto) {}
+
+// 自定义 Pipe
+@Injectable()
+export class TrimPipe implements PipeTransform {
+  transform(value: string) {
+    return value?.trim();
+  }
+}</code></pre>
+
+<p><strong>实战里 80% 用内置</strong>(ValidationPipe + ParseIntPipe)。手写 Pipe 是少数(自定义转换逻辑)。</p>
+
+<h2>5. Interceptor — 包裹 handler(简版)</h2>
+<p>Interceptor 像"洋葱皮" — 包在 handler 外面,能写 pre-hook 和 post-hook。</p>
+
+<pre><code>@Injectable()
+export class TimingInterceptor implements NestInterceptor {
+  intercept(context: ExecutionContext, next: CallHandler): Observable&lt;any&gt; {
+    const start = Date.now();
+    return next.handle().pipe(
+      tap(() =&gt; {
+        const ms = Date.now() - start;
+        console.log(`request took ${ms}ms`);
+      }),
+    );
+  }
+}</code></pre>
+
+<p>你 0004 装的 <code>TimingInterceptor</code> 就是这个模式。后续 0035(Observability)会扩展 — 加 response size、correlation id 等。</p>
+
+<p><strong>Interceptor 跟 Middleware 的区别</strong>:Middleware 是 Express 层(早于 NestJS),Interceptor 是 NestJS 层,能拿到 ExecutionContext(知道哪个 handler、哪个 class)。</p>
+
+<h2>6. Filter — 异常怎么格式化(简版)</h2>
+<p>Filter 专门处理<strong>异常</strong>。当 handler throw 异常时,Filter 接住,转成 HTTP response。</p>
+
+<pre><code>@Catch()
+export class AllExceptionsFilter implements ExceptionFilter {
+  catch(exception: unknown, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse();
+
+    const status = exception instanceof HttpException
+      ? exception.getStatus()
+      : 500;
+
+    response.status(status).json({
+      statusCode: status,
+      message: 'something broke',
+    });
+  }
+}</code></pre>
+
+<p>你 0002 装的 <code>AllExceptionsFilter</code> 是这个模式。<code>@Catch()</code> 不带参数 = 捕获所有异常。</p>
+
+<p><strong>Filter 跟 Interceptor 的区别</strong>:Interceptor 是"正常路径"(pre + post),Filter 是"异常路径"(异常发生才触发)。</p>
+
+<h2>7. 4 个切面的统一心智模型</h2>
+<p>把 4 个切面放一张图:</p>
+
+<div class="diagram">正常请求:
+  Request
+    → [Guard]        "该不该进?"       ← 鉴权 / 角色
+    → [Interceptor]  "前后包一下"      ← logging / cache
+    → [Pipe]         "参数转换"        ← validate / parse
+    → [Handler]      "干正事"
+    → [Filter?]      (正常路径不触发)
+
+异常请求:
+  → [Guard throws]      → Filter
+  → [Handler throws]    → Filter
+  → [Pipe throws]       → Filter
+  → [Interceptor throws] → Filter</div>
+
+<p>一张口诀:<strong>Guard 守门、Interceptor 包边、Pipe 转换、Filter 兜底</strong>。</p>
+
+<h2>8. 自我检测(3 道题)</h2>
+
+<div class="quiz">
+  <div class="quiz-q" data-correct="b">
+    <p>1. Guard 的 <code>canActivate</code> 返回 <code>false</code> 时,NestJS 默认返回的 HTTP 状态码是?</p>
+    <label class="quiz-opt"><input type="radio" name="q1" value="a"> 401 Unauthorized</label>
+    <label class="quiz-opt"><input type="radio" name="q1" value="b"> 403 Forbidden</label>
+    <label class="quiz-opt"><input type="radio" name="q1" value="c"> 404 Not Found</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz-q" data-correct="b">
+    <p>2. <code>ExecutionContext.switchToHttp().getRequest()</code> 拿到的是什么?</p>
+    <label class="quiz-opt"><input type="radio" name="q2" value="a"> NestJS 框架的 Request 对象(框架特有)</label>
+    <label class="quiz-opt"><input type="radio" name="q2" value="b"> 当前 HTTP 请求的 <code>Request</code> 对象(就是 Express 那个)</label>
+    <label class="quiz-opt"><input type="radio" name="q2" value="c"> 当前 handler 的所有参数列表</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz-q" data-correct="b">
+    <p>3. Interceptor 和 Middleware 的核心区别是?</p>
+    <label class="quiz-opt"><input type="radio" name="q3" value="a"> Interceptor 比 Middleware 性能更好</label>
+    <label class="quiz-opt"><input type="radio" name="q3" value="b"> Interceptor 能拿到 ExecutionContext(handler / class 信息),Middleware 拿不到</label>
+    <label class="quiz-opt"><input type="radio" name="q3" value="c"> Middleware 只能用于 HTTP,Interceptor 可以用于任何协议</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+</div>
+
+<h2 id="what-next">下一节预告</h2>
+<p>0011 完成了"装上 4 个切面" — Guard / Pipe / Interceptor / Filter 都会写了。<strong>0012 我们把这些切面按<em>业务域</em>组织</strong>:把 gateway 拆成 AuthProxyModule / SearchProxyModule / SyncProxyModule / FormProxyModule,每个 module 自带自己的 Controller + Guard + Pipe。Module 系统 = NestJS 的"宏观切面"。</p>
+
+<h2>收口 · 这一节你 commit 什么</h2>
+<p>2 个新文件 + 2 处改:</p>
+<ul>
+  <li><code>apps/gateway/src/guards/roles.guard.ts</code> — 新建,读 @Roles metadata</li>
+  <li><code>apps/gateway/src/decorators-demo/test-roles-guard.ts</code> — 新建,验证脚本</li>
+  <li><code>apps/gateway/src/app.module.ts</code> — 注册 RolesGuard 为 APP_GUARD</li>
+  <li><code>apps/gateway/src/app.controller.ts</code> — syncIncremental 加 @Roles</li>
+</ul>
+
+<p>commit message(直接复制):</p>
+<pre><code>feat(gateway): add RolesGuard + wire @Roles into AOP pipeline (0011)
+
+- Add RolesGuard that reads @Roles metadata via Reflector. Allows
+  request when user has any of the required roles; denies with 403
+  otherwise. No @Roles = allow (default)
+- Register RolesGuard as APP_GUARD (runs after CasGuard, ApiKeyGuard,
+  ThrottlerGuard so auth happens before role check)
+- Apply @Roles('admin', 'editor') to syncIncremental alongside
+  the 0009 syncFull decorator. Reader is now in place
+- Add test-roles-guard.ts script that mocks ExecutionContext and
+  validates the guard logic without going through HTTP/auth guards.
+  Verifies: admin passes, guest fails, no header fails, no @Roles
+  handler passes
+
+Refs: docs/teaching/lessons/0011-aop-aspects.html
+</code></pre>
+
+<p>3.4 验证脚本跑通 + quiz 三道选完,告诉我结果。我跑 commit + 写 LR-0015(0011 lesson 盲点)+ 开 0012(Module 系统深入)。</p>
+
+<h2>延伸阅读</h2>
+<ul>
+  <li><a href="https://docs.nestjs.com/guards">NestJS Docs — Guards</a>(必读)</li>
+  <li><a href="https://docs.nestjs.com/pipes">NestJS Docs — Pipes</a></li>
+  <li><a href="https://docs.nestjs.com/interceptors">NestJS Docs — Interceptors</a></li>
+  <li><a href="https://docs.nestjs.com/exception-filters">NestJS Docs — Exception filters</a></li>
+  <li>《Spring in Action》第 5 章 — AOP 概念在 Spring 里的对照(NestJS 的 4 切面就是 GoF AOP 的 NestJS 化)</li>
+  <li><a href="../learning-records/0012-module-di-primer.md">LR-0012(MR/DI primer)</a> — 这次引用 Q1 / Q2 / Q6</li>
+</ul>
+
+<p style="margin-top: 1.6rem; color: var(--accent); font-weight: 600;">📌 3.4 那个 script 跑通的瞬间是 0011 的金样本 — <strong>0009 那个"只写不读"的 @Roles 终于有 reader 了</strong>,而且验证不依赖 HTTP 走真实 auth(用 mock ExecutionContext)。</p>
+
+<hr>
+<footer>
+  nest-search · teach workspace · 课时 0011 · Track 2 第 3 课<br>
+  有问题直接问 Claude
+</footer>
+
+<script>
+function check(btn) {
+  const q = btn.closest('.quiz-q');
+  const correct = q.dataset.correct;
+  const picked = q.querySelector('input[type=radio]:checked');
+  const fb = q.querySelector('.quiz-feedback');
+  if (!picked) {
+    fb.textContent = '⚠️ 选一个再提交。';
+    fb.className = 'quiz-feedback show bad';
+    return;
+  }
+  if (picked.value === correct) {
+    fb.textContent = '✅ 对了。';
+    fb.className = 'quiz-feedback show good';
+  } else {
+    fb.textContent = '❌ 不对,回到 §2 / §7 重读一遍,再试一次。';
+    fb.className = 'quiz-feedback show bad';
+  }
+}
+
+// 一键复制
+document.querySelectorAll('pre').forEach(function(pre) {
+  if (pre.classList.contains('json-block')) return;
+  if (pre.querySelector('.copy-btn')) return;
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.textContent = 'Copy';
+  btn.setAttribute('aria-label', '复制代码');
+  pre.appendChild(btn);
+  btn.addEventListener('click', async function() {
+    var codeEl = pre.querySelector('code');
+    if (!codeEl) return;
+    var text = codeEl.textContent;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+    } catch (err) {
+      btn.textContent = 'Failed';
+      btn.classList.add('failed');
+    }
+    setTimeout(function() {
+      btn.textContent = 'Copy';
+      btn.classList.remove('copied', 'failed');
+    }, 1500);
+  });
+});
+</script>
+
+</body>
+</html>

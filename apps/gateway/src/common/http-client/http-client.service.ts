@@ -9,12 +9,12 @@ import { AxiosRequestConfig } from 'axios';
 export class HttpClientService {
   constructor(
     private readonly http: HttpService,
-    @Inject(REQUEST) private readonly request: Request,
+    @Inject(REQUEST) private readonly currentRequest: Request,
   ) {}
 
   async request<T = any>(config: AxiosRequestConfig): Promise<T> {
     // 自动从当前 request 拿 requestId,加到 x-request-id 头
-    const requestId = (this.request as any).id;
+    const requestId = (this.currentRequest as any).id;
     const headers = {
       'Content-Type': 'application/json',
       ...config.headers,

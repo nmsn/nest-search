@@ -100,6 +100,7 @@ export class AppController {
   @ApiParam({ name: "businessLine", example: "ds" })
   @ApiResponse({ status: 200, description: "同步任务已启动" })
   @ApiResponse({ status: 403, description: "非管理员" })
+  @Roles("admin", "editor")  
   @UseGuards(AdminGuard)
   @Post("api/sync/incremental/:businessLine")
   async syncIncremental(@Param("businessLine") bl: string) {

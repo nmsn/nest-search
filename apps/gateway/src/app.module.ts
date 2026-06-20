@@ -14,6 +14,7 @@ import { randomUUID } from "node:crypto";
 import { HealthModule } from "./health/health.module";
 import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
 import { HttpClientModule } from "./common/http-client/http-client.module";
+import { RolesGuard } from "./guards/roles.guard";
 
 @Module({
   imports: [
@@ -57,6 +58,10 @@ import { HttpClientModule } from "./common/http-client/http-client.module";
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard, // ← 新加,全局生效
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
     },
   ],
 })
