@@ -26,63 +26,6 @@ import { Roles } from "./common/decorators/roles.decorator";
 export class AppController {
   constructor(private readonly proxyService: ProxyService) {}
 
-  // ============= Auth 代理 =============
-
-  @ApiOperation({ summary: "用户注册(代理到 auth-service)" })
-  @ApiResponse({ status: 201, description: "注册成功" })
-  @ApiResponse({ status: 400, description: "参数校验失败" })
-  @Post("api/auth/register")
-  async register(@Body() body: RegisterDto) {
-    return this.proxyService.forward(
-      "auth",
-      "POST",
-      "/api/auth/register",
-      body,
-    );
-  }
-
-  @ApiOperation({ summary: "用户登录(代理到 auth-service)" })
-  @ApiResponse({ status: 200, description: "登录成功,返回 token" })
-  @ApiResponse({ status: 401, description: "凭证错" })
-  @Throttle({ default: { limit: 5, ttl: 60_000 } }) // ← 新加:1 分钟最多 5 次
-  @Post("api/auth/login")
-  async login(@Body() body: LoginDto) {
-    return this.proxyService.forward("auth", "POST", "/api/auth/login", body);
-  }
-
-  @ApiOperation({ summary: "校验 token(代理到 auth-service)" })
-  @ApiResponse({ status: 200, description: "token 有效" })
-  @ApiResponse({ status: 401, description: "token 无效或过期" })
-  @Post("api/auth/validate")
-  async validate(@Body() body: any) {
-    return this.proxyService.forward(
-      "auth",
-      "POST",
-      "/api/auth/validate",
-      body,
-    );
-  }
-
-  @ApiOperation({ summary: "登出(代理到 auth-service)" })
-  @ApiResponse({ status: 200, description: "登出成功" })
-  @ApiResponse({ status: 401, description: "未登录" })
-  @Post("api/auth/logout")
-  async logout() {
-    return this.proxyService.forward("auth", "POST", "/api/auth/logout");
-  }
-
-  @ApiOperation({
-    summary: "获取当前用户信息(代理到 auth-service,需要 Bearer token)",
-  })
-  @ApiResponse({ status: 200, description: "返回当前用户" })
-  @ApiResponse({ status: 401, description: "未提供或无效 token" })
-  @Get("api/auth/me")
-  async me(@Req() req: Request) {
-    return this.proxyService.forward("auth", "GET", "/api/auth/me", undefined, {
-      authorization: req.headers.authorization || "",
-    });
-  }
-
   // ============= Sync 代理(管理员) =============
 
   @ApiOperation({ summary: "触发全量同步(管理员)" })

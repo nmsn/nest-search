@@ -15,6 +15,8 @@ import { HealthModule } from "./health/health.module";
 import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
 import { HttpClientModule } from "./common/http-client/http-client.module";
 import { RolesGuard } from "./guards/roles.guard";
+import { ProxyModule } from "./proxy/proxy.module";
+import { AuthProxyModule } from "./auth-proxy/auth-proxy.module";
 
 @Module({
   imports: [
@@ -34,10 +36,12 @@ import { RolesGuard } from "./guards/roles.guard";
       { name: "short", ttl: 1_000, limit: 5 },
       { name: "long", ttl: 60_000, limit: 100 },
     ]),
+    ProxyModule, // ← 0012 新加,@Global,export ProxyService
+    AuthProxyModule, // ← 0012 新拆,/api/auth/* 5 个 routes
   ],
   controllers: [AppController],
   providers: [
-    ProxyService,
+    // ProxyService 已搬到 ProxyModule(由 ProxyModule @Global 导出)
     LifecycleProbeService, // ← 新加
     {
       provide: APP_INTERCEPTOR,

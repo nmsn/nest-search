@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>0012 · Module 系统深入:把 gateway 拆成 feature modules(principles 轨道最后一课)</title>
+<style>
+  :root {
+    --bg: #fbfaf7;
+    --ink: #1d1d1d;
+    --ink-soft: #4a4a4a;
+    --ink-faint: #8a8a8a;
+    --rule: #d6d2c4;
+    --accent: #b04a2f;
+    --code-bg: #f1efe8;
+    --code-inline: #ece8db;
+    --good: #2c6e3e;
+    --bad: #b04a2f;
+    --pad: 2.4rem;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "SF Pro Text", "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  body { max-width: 760px; margin: 0 auto; padding: var(--pad); }
+  h1, h2, h3 { font-family: Georgia, "Source Han Serif SC", "Songti SC", serif; font-weight: 600; letter-spacing: -0.01em; }
+  h1 { font-size: 2.1rem; line-height: 1.15; margin: 0 0 0.4rem 0; }
+  h2 { font-size: 1.45rem; margin: 3rem 0 0.6rem 0; border-bottom: 1px solid var(--rule); padding-bottom: 0.3rem; }
+  h3 { font-size: 1.12rem; margin: 1.6rem 0 0.4rem 0; color: var(--ink-soft); }
+  p { margin: 0.8rem 0; }
+  .lede { font-size: 1.05rem; color: var(--ink-soft); font-style: italic; border-left: 3px solid var(--accent); padding-left: 0.9rem; margin: 1rem 0 1.6rem 0; }
+  .meta { color: var(--ink-faint); font-size: 0.85rem; margin-bottom: 1.6rem; }
+  .meta a { color: var(--ink-faint); }
+  code, pre, kbd { font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace; font-size: 0.92em; }
+  p code, li code, td code { background: var(--code-inline); padding: 0.08em 0.36em; border-radius: 3px; color: var(--ink); }
+  pre { background: var(--code-bg); border: 1px solid var(--rule); padding: 0.9rem 1rem; border-radius: 4px; overflow-x: auto; line-height: 1.5; margin: 0.8rem 0; position: relative; }
+  pre code { background: transparent; padding: 0; }
+  pre .copy-btn {
+    position: absolute;
+    top: 0.4rem; right: 0.4rem;
+    padding: 0.25rem 0.55rem;
+    background: rgba(255,255,255,0.85);
+    color: var(--ink-soft);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    font-family: -apple-system, "SF Pro Text", sans-serif;
+    font-size: 0.72rem; font-weight: 600;
+    cursor: pointer; opacity: 0.65;
+  }
+  pre .copy-btn:hover { opacity: 1; }
+  pre .copy-btn.copied { background: var(--good); color: white; border-color: var(--good); opacity: 1; }
+  pre .copy-btn.failed { background: var(--bad); color: white; border-color: var(--bad); opacity: 1; }
+  .task { background: #fff; border: 1px solid var(--rule); border-left: 4px solid var(--accent); padding: 1rem 1.2rem; margin: 1.4rem 0; border-radius: 3px; }
+  .task h3 { margin-top: 0; color: var(--accent); text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.85rem; font-family: -apple-system, sans-serif; font-weight: 700; }
+  .quiz { margin: 1.6rem 0; }
+  .quiz-q { background: #fff; border: 1px solid var(--rule); padding: 1rem 1.2rem; border-radius: 3px; margin: 0.8rem 0; }
+  .quiz-q p:first-child { margin-top: 0; font-weight: 600; }
+  .quiz-opt { display: block; margin: 0.3rem 0; cursor: pointer; }
+  .quiz-opt input { margin-right: 0.5rem; }
+  .quiz-feedback { display: none; margin-top: 0.6rem; padding: 0.5rem 0.8rem; border-radius: 3px; font-size: 0.95rem; }
+  .quiz-feedback.show { display: block; }
+  .quiz-feedback.good { background: #e8f3ea; color: var(--good); border: 1px solid #b6d8be; }
+  .quiz-feedback.bad { background: #fbeae5; color: var(--bad); border: 1px solid #e8b9a8; }
+  .callout { background: #fff8e1; border: 1px solid #f0c674; padding: 0.8rem 1.2rem; border-radius: 3px; margin: 1rem 0; }
+  .callout strong { color: var(--accent); }
+  .diagram { background: var(--code-bg); border: 1px solid var(--rule); padding: 1rem 1.2rem; border-radius: 3px; margin: 1rem 0; font-family: "SF Mono", "JetBrains Mono", monospace; font-size: 0.88em; line-height: 1.5; overflow-x: auto; white-space: pre; }
+  hr { border: none; border-top: 1px solid var(--rule); margin: 2.4rem 0 1.2rem 0; }
+  footer { color: var(--ink-faint); font-size: 0.85rem; }
+  footer a { color: var(--ink-soft); }
+  @media print {
+    body { background: white; max-width: none; padding: 1.2rem; }
+    .task, .quiz-q { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Module 系统深入:把 gateway 拆成 feature modules(principles 轨道最后一课)</h1>
+  <p class="lede">8 节主线 + 3 节 principles(0009-0011)= 11 节。现在把"宏观切面"装上 — Module 怎么组织。</p>
+  <p class="meta">
+    课时 0012 · 预计 60 分钟 · 锚定项目 <code>nest-search</code>
+    · 上一节: <a href="0011-aop-aspects.html">AOP 切面</a>
+    · 下一节: <a href="#what-next">principles 轨道完成 · 副线开启</a>
+  </p>
+</header>
+
+<hr>
+
+<h2>你今天会拿到什么</h2>
+<ol class="steps">
+  <li>理解 <code>@Global()</code> 真正解决了什么问题 — <strong>别随便用</strong>,只用在"真正全局"的 service</li>
+  <li>理解 <code>DynamicModule</code> 模式 — LoggerModule / ConfigModule 怎么做到的</li>
+  <li>理解 <code>forwardRef</code> — 解决循环依赖</li>
+  <li><strong>亲手把 gateway 拆 feature module</strong> — AppController 20 个 handler 拆到 AuthProxyModule / SearchProxyModule / SyncProxyModule / FormProxyModule</li>
+  <li>原则轨道最后一课 commit + 副线选择</li>
+</ol>
+
+<p><strong>前置阅读(必读)</strong>: <a href="../learning-records/0012-module-di-primer.md">LR-0012(MR/DI primer)</a> — 这次会大量引用 Q3 / Q5 / Q6 / Q7。</p>
+
+<h2>1. imports / exports 实战回顾(LR-0012 Q3 + Q5 + Q6 + Q7)</h2>
+
+<p>LR-0012 写过 7 个相关问答。快速回顾最关键的 3 条:</p>
+
+<div class="callout">
+<strong>关键回顾(单独成块,免得扫过去)</strong>
+<p>① <strong>Service 在它归属业务域的 module 里</strong>(CartService → CartModule.providers,不是 AppModule)<br>
+② <strong>AppModule 必须显式 import 子 module</strong> — exports 不是 transitive,AppModule 看不到 BusinessModule 导入的 CartService<br>
+③ <strong>module 不在 AppModule.imports = 死代码</strong> — routes / providers / exports 全部失效</p>
+</div>
+
+<h2>2. @Global() — 真正全局的 service</h2>
+
+<p><code>@Global()</code> 装饰器让 module 的 exports 全 app 可见 — 不需要在每个 module 的 imports 里列。</p>
+
+<pre><code>@Global()                          // ← 加这一行
+@Module({
+  providers: [ConfigService],
+  exports: [ConfigService],
+})
+export class ConfigModule {}</code></pre>
+
+<p>任何 module 都能直接 inject ConfigService — 不需要在 imports 列 ConfigModule。</p>
+
+<div class="callout">
+<strong>什么时候用 @Global()(重要)</strong>
+<p>✅ 用:ConfigService / LoggerService / DateUtil / 加密 key — <strong>全 app 通用</strong>,到处用<br>
+❌ 不用:BusinessService / CartService / OrderService — <strong>业务服务</strong>,只在一两个 module 用</p>
+<p><strong>判断标准</strong>:"我能不能想象这个 service 在 80% 的 module 里被用到?" 是 → @Global,否 → 不加</p>
+</div>
+
+<p><strong>你的 nest-search 当前状态</strong>:ConfigModule 和 LoggerModule 已经设了 isGlobal(注意 ConfigModule.forRoot 的 isGlobal 不是 @Global 装饰器,而是 ConfigModule 自己的机制 — 等价)。</p>
+
+<h2>3. DynamicModule — 可配置参数的 module</h2>
+
+<p>普通 module 是装饰器装饰一个 class:</p>
+
+<pre><code>@Module({...})
+export class TypeOrmModule {}</code></pre>
+
+<p>DynamicModule 是返回<strong>对象</strong>(不是 class instance):</p>
+
+<pre><code>@Module({})
+export class LoggerModule {
+  static forRoot(config: LoggerConfig): DynamicModule {
+    // 根据 config 动态生成 providers / exports
+    return {
+      module: LoggerModule,
+      providers: [
+        { provide: 'LOGGER_CONFIG', useValue: config },
+        PinoLogger,
+      ],
+      exports: [PinoLogger],
+      global: true,                 // ← 也可以动态决定是否全局
+    };
+  }
+}
+
+// 用法:
+@Module({
+  imports: [LoggerModule.forRoot({ level: 'info', transport: 'pino-pretty' })],
+})
+export class AppModule {}</code></pre>
+
+<p><strong>为什么需要</strong>:</p>
+<ul>
+<li>配置可参数化(LoggerModule.forRoot(config))</li>
+<li>异步加载(返回 Promise)</li>
+<li>多实例(测试 / 生产用不同配置)</li>
+</ul>
+
+<p><strong>你的 nest-search 当前状态</strong>:LoggerModule.forRoot / ConfigModule.forRoot / ThrottlerModule.forRoot 都是 DynamicModule 模式 — 整个 NestJS 生态的"配置型 module"都用这个。</p>
+
+<h2>4. forwardRef — 解决循环依赖</h2>
+
+<p>两个 class 互相 inject 时,DI 容器不知道先 new 哪个:</p>
+
+<pre><code>class CartService {
+  constructor(private orderService: OrderService) {}   // ← A 依赖 B
+}
+
+class OrderService {
+  constructor(private cartService: CartService) {}   // ← B 依赖 A
+}</code></pre>
+
+<p>运行时 NestJS 报错:<code>Circular dependency detected</code>。</p>
+
+<p><strong>修法:forwardRef</strong></p>
+
+<pre><code>import { forwardRef, Inject } from '@nestjs/common';
+
+class CartService {
+  constructor(
+    @Inject(forwardRef(() =&gt; OrderService))    // ← 告诉 DI "先实例化 Cart,Order 之后再注入"
+    private orderService: OrderService,
+  ) {}
+}
+
+class OrderService {
+  constructor(
+    @Inject(forwardRef(() =&gt; CartService))
+    private cartService: CartService,
+  ) {}
+}</code></pre>
+
+<div class="callout">
+<strong>什么时候用 forwardRef</strong>
+<p>✅ 用:<strong>真正不可避免的循环依赖</strong>(A 用 B,B 用 A,删不掉)<br>
+❌ <strong>不要用</strong>:"模块拆得不好"的擦屁股 — <strong>正确做法是重构 module 边界</strong>,让依赖单向</p>
+<p>你的 nest-search 目前没循环依赖(dependencies 都是单向的)。</p>
+</div>
+
+<h2>5. 动手 · gateway 拆 feature module(0012 金样本)</h2>
+
+<p>你 nest-search 当前状态:AppController 20 个 handler 全堆一起,AppModule 5+ provider 全平铺 — 这是"demo 状态",不是"production"。</p>
+
+<p>这次把它拆成 4 个 feature module + 1 个 shared module:</p>
+
+<div class="diagram">AppModule (composition root)
+├── imports:
+│   ├── ConfigModule.forRoot({ isGlobal: true })      ← 已装
+│   ├── LoggerModule.forRoot({ ... })                  ← 已装
+│   ├── ThrottlerModule.forRoot([...])                 ← 已装
+│   ├── HttpClientModule                               ← 0010 加的(shared HTTP)
+│   ├── HealthModule                                   ← 已装
+│   ├── ProxyModule (@Global)                           ← 0012 新加(shared ProxyService)
+│   ├── AuthProxyModule                                ← 0012 新拆
+│   ├── SearchProxyModule                              ← 0012 新拆
+│   ├── SyncProxyModule                                ← 0012 新拆
+│   └── FormProxyModule                                ← 0012 新拆(本节不做,留 follow-up)
+└── providers:
+    ├── (顶层守卫/过滤器)CasGuard / ApiKeyGuard / ThrottlerGuard / RolesGuard
+    ├── AllExceptionsFilter / TimingInterceptor / LifecycleProbeService</div>
+
+<p><strong>4 个 feature module 拆出来后</strong>,AppModule 就只剩"组合" — 这是 NestJS 推荐的"composition root"模式。</p>
+
+<div class="task">
+  <h3>5.1 · 新建 ProxyModule(shared,@Global)</h3>
+  <p>ProxyService 在所有 feature module 都用 — 抽到共享 module + @Global,避免每个 module 都 import。</p>
+  <p>新建 <code>apps/gateway/src/proxy/proxy.module.ts</code>:</p>
+  <pre><code>import { Global, Module } from '@nestjs/common';
+import { ProxyService } from './proxy.service';
+
+@Global()                                  // ← 全 app 可见,feature module 不用再 import
+@Module({
+  providers: [ProxyService],
+  exports: [ProxyService],
+})
+export class ProxyModule {}</code></pre>
+</div>
+
+<div class="task">
+  <h3>5.2 · 新建 AuthProxyController(5 个 auth 路由搬过来)</h3>
+  <p>新建 <code>apps/gateway/src/auth-proxy/auth-proxy.controller.ts</code>:</p>
+  <pre><code>import { Body, Controller, Get, Post, Req } from '@nestjs/common';
+import { Request } from 'express';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
+import { LoginDto } from '../common/dto/login.dto';
+import { RegisterDto } from '../common/dto/register.dto';
+import { ProxyService } from '../proxy/proxy.service';
+
+@ApiTags('Auth 代理')
+@Controller('api/auth')
+export class AuthProxyController {
+  constructor(private readonly proxyService: ProxyService) {}
+
+  @ApiOperation({ summary: "用户注册" })
+  @Post('register')
+  async register(@Body() body: RegisterDto) {
+    return this.proxyService.forward('auth', 'POST', '/api/auth/register', body);
+  }
+
+  @ApiOperation({ summary: "用户登录" })
+  @ApiResponse({ status: 200, description: "登录成功" })
+  @ApiResponse({ status: 401, description: "凭证错" })
+  @ApiResponse({ status: 429, description: "请求过于频繁" })
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Post('login')
+  async login(@Body() body: LoginDto) {
+    return this.proxyService.forward('auth', 'POST', '/api/auth/login', body);
+  }
+
+  @ApiOperation({ summary: "校验 token" })
+  @Post('validate')
+  async validate(@Body() body: any) {
+    return this.proxyService.forward('auth', 'POST', '/api/auth/validate', body);
+  }
+
+  @ApiOperation({ summary: "登出" })
+  @Post('logout')
+  async logout() {
+    return this.proxyService.forward('auth', 'POST', '/api/auth/logout');
+  }
+
+  @ApiOperation({ summary: "获取当前用户信息" })
+  @Get('me')
+  async me(@Req() req: Request) {
+    return this.proxyService.forward('auth', 'GET', '/api/auth/me', undefined, {
+      authorization: req.headers.authorization || '',
+    });
+  }
+}</code></pre>
+</div>
+
+<div class="task">
+  <h3>5.3 · 新建 AuthProxyModule(composes controller + provider)</h3>
+  <p>新建 <code>apps/gateway/src/auth-proxy/auth-proxy.module.ts</code>:</p>
+  <pre><code>import { Module } from '@nestjs/common';
+import { AuthProxyController } from './auth-proxy.controller';
+
+@Module({
+  controllers: [AuthProxyController],   // ← controller 自动注册,5 个 routes 暴露
+  // providers: []                       ← 不需要,ProxyService 是 @Global 自动可见
+})
+export class AuthProxyModule {}</code></pre>
+  <p><strong>关键</strong>:AuthProxyModule <strong>不需要 imports: [ProxyModule]</strong>,因为 ProxyModule 是 @Global。这是用 @Global 的好处。</p>
+</div>
+
+<div class="task">
+  <h3>5.4 · 改 AppModule + 删 AppController 的 5 个 auth 路由</h3>
+  <p>打开 <code>apps/gateway/src/app.module.ts</code>,加 import + imports 加 AuthProxyModule:</p>
+  <pre><code>import { AuthProxyModule } from './auth-proxy/auth-proxy.module';
+import { ProxyModule } from './proxy/proxy.module';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    HttpClientModule,
+    LoggerModule.forRoot({ ... }),
+    ThrottlerModule.forRoot([...]),
+    HealthModule,
+    ProxyModule,                       // ← 新加,@Global 让其他 module 自动可见
+    AuthProxyModule,                   // ← 新加
+  ],
+  ...
+})
+export class AppModule {}</code></pre>
+  <p>打开 <code>apps/gateway/src/app.controller.ts</code>,删 5 个 auth handler (register / login / validate / logout / me)。</p>
+</div>
+
+<div class="task">
+  <h3>5.5 · 验证(从外部看不出区别)</h3>
+  <p>重构后端,5 个 auth 路由应该完全一样工作:</p>
+  <pre><code>curl -i -X POST -H "X-API-Key: ds_key_123" -H "Content-Type: application/json" -d '{"username":"a","password":"xxxxxx"}' http://localhost:3000/api/auth/login</code></pre>
+  <p>期望 401(账号不存在),status code / requestId 跨服务追踪一切照旧。</p>
+  <p><strong>用户视角看不出任何区别</strong>。但代码层面:AppController 短了 60 行,AppModule 简洁了,每个 feature module 可以独立测 / 独立重构 / 独立部署(未来微服务化)。</p>
+</div>
+
+<h2>6. 自我检测(3 道题)</h2>
+
+<div class="quiz">
+  <div class="quiz-q" data-correct="a">
+    <p>1. <code>@Global()</code> 装饰的 module 有什么效果?</p>
+    <label class="quiz-opt"><input type="radio" name="q1" value="a"> <strong>它的 exports 全 app 可见,其他 module 不需要 imports 它就能用</strong></label>
+    <label class="quiz-opt"><input type="radio" name="q1" value="b"> 它的 providers 自动变成 singleton,且永远不会被销毁</label>
+    <label class="quiz-opt"><input type="radio" name="q1" value="c"> 它会自动注册为全局 APP_GUARD</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz-q" data-correct="b">
+    <p>2. <code>DynamicModule</code> 跟普通 module 最大的区别是?</p>
+    <label class="quiz-opt"><input type="radio" name="q2" value="a"> 它跑得更快</label>
+    <label class="quiz-opt"><input type="radio" name="q2" value="b"> <strong>可以接受参数,动态生成 providers / exports</strong>(LoggerModule.forRoot(config) 这种)</label>
+    <label class="quiz-opt"><input type="radio" name="q2" value="c"> 它只能用在 HTTP context</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz-q" data-correct="b">
+    <p>3. 出现循环依赖时(<code>A 依赖 B,B 依赖 A</code>),正确处理方式是?</p>
+    <label class="quiz-opt"><input type="radio" name="q3" value="a"> 直接 forwardRef,问题解决</label>
+    <label class="quiz-opt"><input type="radio" name="q3" value="b"> <strong>先想能否重构边界消除循环,真的不可避免才用 forwardRef</strong></label>
+    <label class="quiz-opt"><input type="radio" name="q3" value="c"> 在 module 加 providers 强制注入</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+</div>
+
+<h2 id="what-next">下一节 · principles 轨道完成</h2>
+<p><strong>0012 是 principles 轨道最后一课</strong>(0009-0012 共 4 节)。4 节把 NestJS 的核心心智模型装完:</p>
+<table>
+  <thead>
+    <tr><th>课</th><th>主题</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>0009</td><td>装饰器与元数据原理(微观:method / property)</td></tr>
+    <tr><td>0010</td><td>IoC 容器深入(微观:Provider 怎么来)</td></tr>
+    <tr><td>0011</td><td>AOP 切面(微观:请求生命周期切面)</td></tr>
+    <tr><td><strong>0012</strong></td><td><strong>Module 系统深入(宏观:怎么组织)</strong></td></tr>
+  </tbody>
+</table>
+<p>从 0013 起,<strong>副线开启</strong>。可选方向:</p>
+<ul>
+  <li><strong>副线 1</strong>:把 observability / 限流 / DTO 模式迁到 auth / search / form 服务(2-3 节)</li>
+  <li><strong>副线 2</strong>:Jest 单元测试 + Supertest e2e(2-3 节)</li>
+  <li><strong>副线 3</strong>:GitHub Actions CI/CD(1 节)</li>
+  <li><strong>副线 4</strong>:Docker / K8s 部署(1-2 节)</li>
+</ul>
+
+<h2>收口 · 这一节你 commit 什么</h2>
+<p>3 个新文件 + 2 处改:</p>
+<ul>
+  <li><code>apps/gateway/src/proxy/proxy.module.ts</code> — 新建,@Global,export ProxyService</li>
+  <li><code>apps/gateway/src/auth-proxy/auth-proxy.controller.ts</code> — 新建,5 个 auth 路由</li>
+  <li><code>apps/gateway/src/auth-proxy/auth-proxy.module.ts</code> — 新建,composition</li>
+  <li><code>apps/gateway/src/app.module.ts</code> — imports 加 ProxyModule + AuthProxyModule</li>
+  <li><code>apps/gateway/src/app.controller.ts</code> — 删 5 个 auth handler</li>
+</ul>
+
+<p>commit message(直接复制):</p>
+<pre><code>refactor(gateway): split AppController into feature modules (0012)
+
+- Create ProxyModule (@Global) wrapping ProxyService. All feature
+  modules can now inject ProxyService without explicit imports
+- Create AuthProxyModule + AuthProxyController with the 5 /api/auth/*
+  routes (register/login/validate/logout/me). Demonstrates the
+  feature module pattern; same pattern applies to search/sync/form
+- Remove the 5 auth handlers from AppController. AppController
+  shrinks by ~60 lines
+- AppModule now imports ProxyModule + AuthProxyModule, becoming
+  a pure composition root
+
+Search/Sync/Form modules follow the same pattern (left as follow-up
+to keep this lesson focused).
+
+Refs: docs/teaching/lessons/0012-module-system.html
+</code></pre>
+
+<p>5.5 curl auth 路由工作 + quiz 三道选完,告诉我结果。我跑 commit + 写 LR-0016(principles 轨道收官反思)+ 跟你选副线。</p>
+
+<h2>延伸阅读</h2>
+<ul>
+  <li><a href="https://docs.nestjs.com/modules">NestJS Docs — Modules</a>(必读,@Global / DynamicModule 详解)</li>
+  <li><a href="https://docs.nestjs.com/fundamentals/circular-dependency">NestJS Docs — Circular dependency</a>(forwardRef 详解)</li>
+  <li>《Clean Architecture》Robert C. Martin — chapter 16 "Component Coupling"(Module 边界设计原则)</li>
+  <li>《Domain-Driven Design》Eric Evans — 限界上下文(NestJS module ≈ bounded context)</li>
+  <li><a href="../learning-records/0012-module-di-primer.md">LR-0012(MR/DI primer)</a> — 这次必读</li>
+</ul>
+
+<p style="margin-top: 1.6rem; color: var(--accent); font-weight: 600;">📌 5.5 的 curl 验证是 0012 金样本 — <strong>用户视角看不出任何区别</strong>,但代码层面 AppController 短了 60 行 + AppModule 变 composition root + feature module 自治。这就是"好的重构"的样子。</p>
+
+<hr>
+<footer>
+  nest-search · teach workspace · 课时 0012 · <strong>principles 轨道最后一课</strong><br>
+  有问题直接问 Claude
+</footer>
+
+<script>
+function check(btn) {
+  const q = btn.closest('.quiz-q');
+  const correct = q.dataset.correct;
+  const picked = q.querySelector('input[type=radio]:checked');
+  const fb = q.querySelector('.quiz-feedback');
+  if (!picked) {
+    fb.textContent = '⚠️ 选一个再提交。';
+    fb.className = 'quiz-feedback show bad';
+    return;
+  }
+  if (picked.value === correct) {
+    fb.textContent = '✅ 对了。';
+    fb.className = 'quiz-feedback show good';
+  } else {
+    fb.textContent = '❌ 不对,回到 §2 / §3 / §4 重读一遍,再试一次。';
+    fb.className = 'quiz-feedback show bad';
+  }
+}
+
+// 一键复制
+document.querySelectorAll('pre').forEach(function(pre) {
+  if (pre.classList.contains('json-block')) return;
+  if (pre.querySelector('.copy-btn')) return;
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.textContent = 'Copy';
+  btn.setAttribute('aria-label', '复制代码');
+  pre.appendChild(btn);
+  btn.addEventListener('click', async function() {
+    var codeEl = pre.querySelector('code');
+    if (!codeEl) return;
+    var text = codeEl.textContent;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+    } catch (err) {
+      btn.textContent = 'Failed';
+      btn.classList.add('failed');
+    }
+    setTimeout(function() {
+      btn.textContent = 'Copy';
+      btn.classList.remove('copied', 'failed');
+    }, 1500);
+  });
+});
+</script>
+
+</body>
+</html>
