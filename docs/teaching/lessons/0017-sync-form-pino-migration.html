@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>0017 · 跨服务迁移第 2 课:把 pino 装到 sync + form-service</title>
+<style>
+  :root {
+    --bg: #fbfaf7;
+    --ink: #1d1d1d;
+    --ink-soft: #4a4a4a;
+    --ink-faint: #8a8a8a;
+    --rule: #d6d2c4;
+    --accent: #b04a2f;
+    --code-bg: #f1efe8;
+    --code-inline: #ece8db;
+    --good: #2c6e3e;
+    --bad: #b04a2f;
+    --pad: 2.4rem;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "SF Pro Text", "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  body { max-width: 760px; margin: 0 auto; padding: var(--pad); }
+  h1, h2, h3 { font-family: Georgia, "Source Han Serif SC", "Songti SC", serif; font-weight: 600; letter-spacing: -0.01em; }
+  h1 { font-size: 2.1rem; line-height: 1.15; margin: 0 0 0.4rem 0; }
+  h2 { font-size: 1.45rem; margin: 3rem 0 0.6rem 0; border-bottom: 1px solid var(--rule); padding-bottom: 0.3rem; }
+  h3 { font-size: 1.12rem; margin: 1.6rem 0 0.4rem 0; color: var(--ink-soft); }
+  p { margin: 0.8rem 0; }
+  .lede { font-size: 1.05rem; color: var(--ink-soft); font-style: italic; border-left: 3px solid var(--accent); padding-left: 0.9rem; margin: 1rem 0 1.6rem 0; }
+  .meta { color: var(--ink-faint); font-size: 0.85rem; margin-bottom: 1.6rem; }
+  .meta a { color: var(--ink-faint); }
+  code, pre, kbd { font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace; font-size: 0.92em; }
+  p code, li code, td code { background: var(--code-inline); padding: 0.08em 0.36em; border-radius: 3px; color: var(--ink); }
+  pre { background: var(--code-bg); border: 1px solid var(--rule); padding: 0.9rem 1rem; border-radius: 4px; overflow-x: auto; line-height: 1.5; margin: 0.8rem 0; position: relative; }
+  pre code { background: transparent; padding: 0; }
+  pre .copy-btn {
+    position: absolute;
+    top: 0.4rem; right: 0.4rem;
+    padding: 0.25rem 0.55rem;
+    background: rgba(255,255,255,0.85);
+    color: var(--ink-soft);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    font-family: -apple-system, "SF Pro Text", sans-serif;
+    font-size: 0.72rem; font-weight: 600;
+    cursor: pointer; opacity: 0.65;
+  }
+  pre .copy-btn:hover { opacity: 1; }
+  pre .copy-btn.copied { background: var(--good); color: white; border-color: var(--good); opacity: 1; }
+  pre .copy-btn.failed { background: var(--bad); color: white; border-color: var(--bad); opacity: 1; }
+  .task { background: #fff; border: 1px solid var(--rule); border-left: 4px solid var(--accent); padding: 1rem 1.2rem; margin: 1.4rem 0; border-radius: 3px; }
+  .task h3 { margin-top: 0; color: var(--accent); text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.85rem; font-family: -apple-system, sans-serif; font-weight: 700; }
+  .warn { background: #fff8e8; border-left: 4px solid #c08a30; padding: 0.8rem 1rem; margin: 1rem 0; border-radius: 3px; font-size: 0.95rem; }
+  .warn::before { content: "⚠️ "; }
+  .quiz { margin: 1.6rem 0; }
+  .quiz-q { background: #fff; border: 1px solid var(--rule); padding: 1rem 1.2rem; border-radius: 3px; margin: 0.8rem 0; }
+  .quiz-q p:first-child { margin-top: 0; font-weight: 600; }
+  .quiz-opt { display: block; margin: 0.3rem 0; cursor: pointer; }
+  .quiz-opt input { margin-right: 0.5rem; }
+  .quiz-feedback { display: none; margin-top: 0.6rem; padding: 0.5rem 0.8rem; border-radius: 3px; font-size: 0.95rem; }
+  .quiz-feedback.show { display: block; }
+  .quiz-feedback.good { background: #e8f3ea; color: var(--good); border: 1px solid #b6d8be; }
+  .quiz-feedback.bad { background: #fbeae5; color: var(--bad); border: 1px solid #e8b9a8; }
+  hr { border: none; border-top: 1px solid var(--rule); margin: 2.4rem 0 1.2rem 0; }
+  footer { color: var(--ink-faint); font-size: 0.85rem; }
+  footer a { color: var(--ink-soft); }
+  @media print {
+    body { background: white; max-width: none; padding: 1.2rem; }
+    .task, .quiz-q { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>跨服务迁移第 2 课:把 pino 装到 sync + form-service</h1>
+  <p class="lede">副线 2(跨服务迁移)第 2 课。"复制 + 实操验证" — 改完代码 ≠ 装好,跑起来看 log 才算。</p>
+  <p class="meta">
+    课时 0017 · 预计 30 分钟 · 锚定项目 <code>nest-search</code>
+    · 上一节: <a href="0016-search-pino-migration.html">search-service 加 pino</a>
+    · 下一节: <a href="#what-next">副线 2 收官</a>
+  </p>
+</header>
+
+<hr>
+
+<h2>你今天会拿到什么</h2>
+<ol>
+  <li>把同一段 pino 配置<strong>复制 2 次</strong>:sync-service + form-service</li>
+  <li>实际<strong>起两个服务</strong>,用 <code>lsof</code> 检查端口,用 <code>curl</code> 发请求</li>
+  <li>看启动 log 确认 <code>LoggerModule dependencies initialized</code></li>
+  <li><strong>故意改坏验证</strong>:删掉 <code>genReqId</code> 看会发生什么(加深理解)</li>
+  <li>3 道 quiz — 不加粗答案,Ctrl+F 找不到</li>
+</ol>
+
+<h2>1. 0016 复习 + 0017 范围</h2>
+
+<p>0016 把 pino 装到 search-service。0017 复制同一段配置到剩下两个服务:</p>
+
+<table style="width:100%; border-collapse: collapse; margin: 1rem 0;">
+<tr><th style="text-align:left; padding:0.4rem; border-bottom:1px solid var(--rule)">服务</th><th style="text-align:left; padding:0.4rem; border-bottom:1px solid var(--rule)">0016 后</th><th style="text-align:left; padding:0.4rem; border-bottom:1px solid var(--rule)">0017 后</th></tr>
+<tr><td style="padding:0.4rem;">gateway</td><td style="padding:0.4rem;">✅</td><td style="padding:0.4rem;">✅</td></tr>
+<tr><td style="padding:0.4rem;">auth-service</td><td style="padding:0.4rem;">✅</td><td style="padding:0.4rem;">✅</td></tr>
+<tr><td style="padding:0.4rem;">search-service</td><td style="padding:0.4rem;">✅</td><td style="padding:0.4rem;">✅</td></tr>
+<tr><td style="padding:0.4rem;">sync-service</td><td style="padding:0.4rem;">❌</td><td style="padding:0.4rem;"><strong>✅ 本节</strong></td></tr>
+<tr><td style="padding:0.4rem;">form-service</td><td style="padding:0.4rem;">❌</td><td style="padding:0.4rem;"><strong>✅ 本节</strong></td></tr>
+</table>
+
+<p>完成后 nest-search 5 个服务(4 后端 + gateway)<strong>全部</strong>有 pino + requestId 透传。</p>
+
+<h2>2. 动手 · sync-service 加 pino</h2>
+
+<div class="task">
+  <h3>2.1 · 改代码(10 行)</h3>
+  <p>打开 <code>apps/sync-service/src/app.module.ts</code>,在 <code>ConfigModule.forRoot</code> 之后插入:</p>
+  <pre><code>import { LoggerModule } from 'nestjs-pino';
+import { randomUUID } from 'node:crypto';
+
+// ...
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    LoggerModule.forRoot({
+      pinoHttp: {
+        level: process.env.LOG_LEVEL || 'info',
+        genReqId: (req) =&gt; req.headers['x-request-id'] || randomUUID(),
+        customProps: (req) =&gt; ({ requestId: req.id }),
+        autoLogging: false,
+      },
+    }),
+    SyncModule,
+  ],
+})</code></pre>
+  <p><strong>改动</strong>:加 2 个 import + 1 个 LoggerModule.forRoot 块。</p>
+</div>
+
+<div class="task">
+  <h3>2.2 · 实操 · 起 sync-service + 检查端口 + 看 log</h3>
+  <p><strong>第 1 步</strong>:先确认端口 3001 没被占:</p>
+  <pre><code>lsof -i :3001 -P</code></pre>
+  <p>无输出 = 端口空。如果有输出 → <code>kill &lt;PID&gt;</code>。</p>
+  <p><strong>第 2 步</strong>:后台起 sync-service:</p>
+  <pre><code>pnpm start:sync &gt; /tmp/sync.log 2&gt;&amp;1 &amp;
+echo $! &gt; /tmp/sync.pid
+sleep 6</code></pre>
+  <p><strong>第 3 步</strong>:看启动 log:</p>
+  <pre><code>grep "LoggerModule\|running on port" /tmp/sync.log</code></pre>
+  <p>期望看到:</p>
+  <pre><code>[InstanceLoader] LoggerModule dependencies initialized
+Sync Service running on port 3001 (HTTP + RabbitMQ)</code></pre>
+  <p><strong>第 4 步</strong>:发个请求 + 看 log 是否有副作用:</p>
+  <pre><code>curl -s http://localhost:3001/health -o /dev/null -w "status=%{http_code}\n"</code></pre>
+  <p><strong>第 5 步</strong>:杀进程:</p>
+  <pre><code>kill $(cat /tmp/sync.pid) 2&gt;/dev/null
+# 双保险:用 lsof 强制清
+lsof -ti :3001 -P | xargs kill -9 2&gt;/dev/null</code></pre>
+  <div class="warn">
+    sync-service 同时跑 HTTP(3001)+ RabbitMQ consumer。如果只 kill <code>nest start</code> 父进程,RabbitMQ 连接可能残留。**lsof 兜底必加**。
+  </div>
+</div>
+
+<h2>3. 动手 · form-service 加 pino(同样套路)</h2>
+
+<div class="task">
+  <h3>3.1 · 改代码</h3>
+  <p>打开 <code>apps/form-service/src/app.module.ts</code>,完全一样:</p>
+  <pre><code>import { LoggerModule } from 'nestjs-pino';
+import { randomUUID } from 'node:crypto';
+
+// 在 ConfigModule.forRoot 之后,其他业务 module 之前插 LoggerModule.forRoot
+LoggerModule.forRoot({
+  pinoHttp: {
+    level: process.env.LOG_LEVEL || 'info',
+    genReqId: (req) =&gt; req.headers['x-request-id'] || randomUUID(),
+    customProps: (req) =&gt; ({ requestId: req.id }),
+    autoLogging: false,
+  },
+})</code></pre>
+</div>
+
+<div class="task">
+  <h3>3.2 · 实操 · 起 form-service + 验证</h3>
+  <pre><code>lsof -i :3003 -P                              # 空
+pnpm start:form &gt; /tmp/form.log 2&gt;&amp;1 &amp;
+echo $! &gt; /tmp/form.pid
+sleep 6
+grep "LoggerModule\|running on port" /tmp/form.log
+kill $(cat /tmp/form.pid) 2&gt;/dev/null
+lsof -ti :3003 -P | xargs kill -9 2&gt;/dev/null</code></pre>
+  <p>期望看到 <code>LoggerModule dependencies initialized</code> + <code>Form Service running on port 3003</code>。</p>
+</div>
+
+<h2>4. 反向验证 · 故意改坏 pino 配置</h2>
+
+<p>光"装好"不算真懂。<strong>故意删一行</strong>,看会出什么问题。</p>
+
+<div class="task">
+  <h3>4.1 · 删掉 <code>genReqId</code> 试试</h3>
+  <p>在 form-service 的 <code>app.module.ts</code> 里,把:</p>
+  <pre><code>genReqId: (req) =&gt; req.headers['x-request-id'] || randomUUID(),</code></pre>
+  <p>改成:</p>
+  <pre><code>// genReqId 删了</code></pre>
+  <p>重启 form-service,curl 发请求看 log:</p>
+  <pre><code>pnpm start:form &gt; /tmp/form.log 2&gt;&amp;1 &amp;
+echo $! &gt; /tmp/form.pid
+sleep 6
+curl -s -H "x-request-id: my-trace-abc" http://localhost:3003/health -o /dev/null
+grep "my-trace-abc" /tmp/form.log     # 找不到!
+grep "requestId" /tmp/form.log | head -2
+kill $(cat /tmp/form.pid) 2&gt;/dev/null
+lsof -ti :3003 -P | xargs kill -9 2&gt;/dev/null</code></pre>
+  <p><strong>观察</strong>:</p>
+  <ul>
+    <li><code>x-request-id: my-trace-abc</code> 这条 trace 在 form-service log 里**找不到了**</li>
+    <li><code>customProps</code> 里的 <code>requestId</code> 字段变成 <code>undefined</code>(nestjs-pino 默认 fallback,但 requestId 不可用)</li>
+  </ul>
+  <p><strong>结论</strong>:<code>genReqId</code> 是把"上游 trace"接到"本服务 log"的关键桥。删了就跨服务追踪断。</p>
+  <p><strong>恢复</strong>:把 <code>genReqId</code> 那行加回去。</p>
+</div>
+
+<h2>5. 跑测试</h2>
+<pre><code>pnpm test</code></pre>
+<p>期望:<code>Test Suites: 4 passed / Tests: 18 passed</code>。</p>
+<p>sync + form 加 pino 是 module-level 配置改动,不碰 service 业务 → 现有 18 测试不受影响。</p>
+
+<h2>6. 自我检测(3 道题 — 不加粗答案)</h2>
+
+<div class="quiz">
+  <div class="quiz-q" data-correct="b">
+    <p>1. 0017 改了 sync + form 两个服务,但只验证了"能起 + 18 测试通过",<strong>为什么不在 form-service 写 e2e</strong>?</p>
+    <label class="quiz-opt"><input type="radio" name="q1" value="a"> form 没业务不重要</label>
+    <label class="quiz-opt"><input type="radio" name="q1" value="b"> 改的是 module-level 配置不是 service 业务,现有 18 测试覆盖的边界没动</label>
+    <label class="quiz-opt"><input type="radio" name="q1" value="c"> e2e 跑得慢</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz-q" data-correct="c">
+    <p>2. 故意删 <code>genReqId</code> 后,跨服务追踪为什么断?</p>
+    <label class="quiz-opt"><input type="radio" name="q2" value="a"> nestjs-pino 报错崩溃</label>
+    <label class="quiz-opt"><input type="radio" name="q2" value="b"> 服务起不来</label>
+    <label class="quiz-opt"><input type="radio" name="q2" value="c"> 上游传来的 x-request-id 头不被读取,本服务 log 里没有 requestId,跨服务对不上号</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz-q" data-correct="a">
+    <p>3. sync-service 启动后为什么必须 <code>lsof -ti :3001 | xargs kill -9</code> 兜底?</p>
+    <label class="quiz-opt"><input type="radio" name="q3" value="a"> 因为 sync 同时跑 HTTP + RabbitMQ consumer,kill 父进程可能漏掉 RabbitMQ 连接残留</label>
+    <label class="quiz-opt"><input type="radio" name="q3" value="b"> pnpm 自带这个 bug</label>
+    <label class="quiz-opt"><input type="radio" name="q3" value="c"> 因为端口 3001 被其他服务占用</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+</div>
+
+<h2 id="what-next">下一节预告</h2>
+<p>0017 装完 pino 后,nest-search 5 个服务 100% 对齐。<strong>0018 是副线 2 收官</strong> — 把"跨服务追踪"实测一遍(gateway 转发请求到 sync/form,看同一个 x-request-id 出现在 3 个服务的 log 里),然后写 LR-0022(副线 2 收官反思)。</p>
+
+<h2>收口 · 这一节你 commit 什么</h2>
+<p>3 个文件改动:</p>
+<ul>
+  <li><code>apps/sync-service/src/app.module.ts</code> — 加 LoggerModule.forRoot</li>
+  <li><code>apps/form-service/src/app.module.ts</code> — 加 LoggerModule.forRoot</li>
+  <li><code>docs/teaching/lessons/0017-sync-form-pino-migration.html</code> — 本课 lesson</li>
+</ul>
+
+<p>commit message(直接复制):</p>
+<pre><code>feat(sync+form-service): migrate pino structured logging (0017)
+
+- sync-service AppModule: add LoggerModule.forRoot (same config
+  as gateway 0005 / search-service 0016)
+- form-service AppModule: same
+- Verified: both services start with LoggerModule dependencies
+  initialized, listening on 3001 and 3003
+- Tested: deliberately removing genReqId breaks x-request-id
+  propagation (proves the config is meaningful, not boilerplate)
+- Lesson 0017 docs/teaching/lessons/0017-sync-form-pino-migration.html
+  with new hands-on template (lsof / curl / 故意改坏验证)
+
+After this commit, nest-search has pino on all 4 backend services +
+gateway = full cross-service requestId tracking ready.
+
+Refs: docs/teaching/lessons/0017-sync-form-pino-migration.html
+</code></pre>
+
+<p>实操跑完 + quiz 答完,告诉我结果。我开 0018(副线 2 收官 — 跨服务追踪实测 + LR-0022)。</p>
+
+<h2>延伸阅读</h2>
+<ul>
+  <li>0016 lesson — 前置课</li>
+  <li><a href="https://docs.nestjs.com/recipes/logger">NestJS Logger recipe</a>(pino + customProps)</li>
+  <li><code>lsof</code> man page — 端口/进程调试必会</li>
+</ul>
+
+<p style="margin-top: 1.6rem; color: var(--accent); font-weight: 600;">📌 4.1 那个 <code>grep "my-trace-abc" /tmp/form.log</code> 返回空,是 0017 的金样本 — 你亲手证明了 <code>genReqId</code> 不是装饰品。</p>
+
+<hr>
+<footer>
+  nest-search · teach workspace · 课时 0017 · 副线 2 第 2 课<br>
+  有问题直接问 Claude
+</footer>
+
+<script>
+function check(btn) {
+  const q = btn.closest('.quiz-q');
+  const correct = q.dataset.correct;
+  const picked = q.querySelector('input[type=radio]:checked');
+  const fb = q.querySelector('.quiz-feedback');
+  if (!picked) {
+    fb.textContent = '⚠️ 选一个再提交。';
+    fb.className = 'quiz-feedback show bad';
+  } else if (picked.value === correct) {
+    fb.textContent = '✅ 对了。';
+    fb.className = 'quiz-feedback show good';
+  } else {
+    fb.textContent = '❌ 不对,回到 §4.1 重读一遍,再试一次。';
+    fb.className = 'quiz-feedback show bad';
+  }
+}
+
+// 一键复制
+document.querySelectorAll('pre').forEach(function(pre) {
+  if (pre.classList.contains('json-block')) return;
+  if (pre.querySelector('.copy-btn')) return;
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.textContent = 'Copy';
+  btn.setAttribute('aria-label', '复制代码');
+  pre.appendChild(btn);
+  btn.addEventListener('click', async function() {
+    var codeEl = pre.querySelector('code');
+    if (!codeEl) return;
+    var text = codeEl.textContent;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+    } catch (err) {
+      btn.textContent = 'Failed';
+      btn.classList.add('failed');
+    }
+    setTimeout(function() {
+      btn.textContent = 'Copy';
+      btn.classList.remove('copied', 'failed');
+    }, 1500);
+  });
+});
+</script>
+
+</body>
+</html>
