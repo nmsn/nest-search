@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>0016 · 跨服务迁移第 1 课:把 pino 装到 search-service</title>
+<style>
+  :root {
+    --bg: #fbfaf7;
+    --ink: #1d1d1d;
+    --ink-soft: #4a4a4a;
+    --ink-faint: #8a8a8a;
+    --rule: #d6d2c4;
+    --accent: #b04a2f;
+    --code-bg: #f1efe8;
+    --code-inline: #ece8db;
+    --good: #2c6e3e;
+    --bad: #b04a2f;
+    --pad: 2.4rem;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "SF Pro Text", "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  body { max-width: 760px; margin: 0 auto; padding: var(--pad); }
+  h1, h2, h3 { font-family: Georgia, "Source Han Serif SC", "Songti SC", serif; font-weight: 600; letter-spacing: -0.01em; }
+  h1 { font-size: 2.1rem; line-height: 1.15; margin: 0 0 0.4rem 0; }
+  h2 { font-size: 1.45rem; margin: 3rem 0 0.6rem 0; border-bottom: 1px solid var(--rule); padding-bottom: 0.3rem; }
+  h3 { font-size: 1.12rem; margin: 1.6rem 0 0.4rem 0; color: var(--ink-soft); }
+  p { margin: 0.8rem 0; }
+  .lede { font-size: 1.05rem; color: var(--ink-soft); font-style: italic; border-left: 3px solid var(--accent); padding-left: 0.9rem; margin: 1rem 0 1.6rem 0; }
+  .meta { color: var(--ink-faint); font-size: 0.85rem; margin-bottom: 1.6rem; }
+  .meta a { color: var(--ink-faint); }
+  code, pre, kbd { font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace; font-size: 0.92em; }
+  p code, li code, td code { background: var(--code-inline); padding: 0.08em 0.36em; border-radius: 3px; color: var(--ink); }
+  pre { background: var(--code-bg); border: 1px solid var(--rule); padding: 0.9rem 1rem; border-radius: 4px; overflow-x: auto; line-height: 1.5; margin: 0.8rem 0; position: relative; }
+  pre code { background: transparent; padding: 0; }
+  pre .copy-btn {
+    position: absolute;
+    top: 0.4rem; right: 0.4rem;
+    padding: 0.25rem 0.55rem;
+    background: rgba(255,255,255,0.85);
+    color: var(--ink-soft);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    font-family: -apple-system, "SF Pro Text", sans-serif;
+    font-size: 0.72rem; font-weight: 600;
+    cursor: pointer; opacity: 0.65;
+  }
+  pre .copy-btn:hover { opacity: 1; }
+  pre .copy-btn.copied { background: var(--good); color: white; border-color: var(--good); opacity: 1; }
+  pre .copy-btn.failed { background: var(--bad); color: white; border-color: var(--bad); opacity: 1; }
+  .task { background: #fff; border: 1px solid var(--rule); border-left: 4px solid var(--accent); padding: 1rem 1.2rem; margin: 1.4rem 0; border-radius: 3px; }
+  .task h3 { margin-top: 0; color: var(--accent); text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.85rem; font-family: -apple-system, sans-serif; font-weight: 700; }
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; margin: 1rem 0; }
+  .compare > div { background: #fff; border: 1px solid var(--rule); padding: 0.8rem 1rem; border-radius: 3px; }
+  .compare h4 { margin: 0 0 0.4rem 0; font-size: 0.9rem; color: var(--ink-soft); }
+  .quiz { margin: 1.6rem 0; }
+  .quiz-q { background: #fff; border: 1px solid var(--rule); padding: 1rem 1.2rem; border-radius: 3px; margin: 0.8rem 0; }
+  .quiz-q p:first-child { margin-top: 0; font-weight: 600; }
+  .quiz-opt { display: block; margin: 0.3rem 0; cursor: pointer; }
+  .quiz-opt input { margin-right: 0.5rem; }
+  .quiz-feedback { display: none; margin-top: 0.6rem; padding: 0.5rem 0.8rem; border-radius: 3px; font-size: 0.95rem; }
+  .quiz-feedback.show { display: block; }
+  .quiz-feedback.good { background: #e8f3ea; color: var(--good); border: 1px solid #b6d8be; }
+  .quiz-feedback.bad { background: #fbeae5; color: var(--bad); border: 1px solid #e8b9a8; }
+  hr { border: none; border-top: 1px solid var(--rule); margin: 2.4rem 0 1.2rem 0; }
+  footer { color: var(--ink-faint); font-size: 0.85rem; }
+  footer a { color: var(--ink-soft); }
+  @media print {
+    body { background: white; max-width: none; padding: 1.2rem; }
+    .task, .quiz-q { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>跨服务迁移第 1 课:把 pino 装到 search-service</h1>
+  <p class="lede">副线 2(跨服务迁移)第 1 课。"模式从 1 个服务到 N 个服务" — 复制,不是重新发明。</p>
+  <p class="meta">
+    课时 0016 · 预计 30 分钟 · 锚定项目 <code>nest-search</code>
+    · 上一节: <a href="0015-github-actions-ci.html">CI 集成</a>
+    · 下一节: <a href="#what-next">0017 sync/form 加 pino</a>
+  </p>
+</header>
+
+<hr>
+
+<h2>你今天会拿到什么</h2>
+<ol>
+  <li>理解<strong>"模式迁移"</strong> vs "新功能开发"的区别 — 复制粘贴 + 微调</li>
+  <li>回顾 gateway 0005 的 pino 模式 + auth-service 怎么对齐的</li>
+  <li>亲手把同一模式装到 <strong>search-service</strong>(10 行代码改动)</li>
+  <li>验证:启动 search-service + 发请求 + 看 log 带 requestId</li>
+  <li>跑一次 <code>pnpm test</code> 确认 18 个测试还过</li>
+</ol>
+
+<h2>1. 为什么需要"跨服务迁移"</h2>
+
+<p>你 nest-search 现在 4 个后端服务。pino 结构化日志的覆盖:</p>
+
+<table style="width:100%; border-collapse: collapse; margin: 1rem 0;">
+<tr><th style="text-align:left; padding:0.4rem; border-bottom:1px solid var(--rule)">服务</th><th style="text-align:left; padding:0.4rem; border-bottom:1px solid var(--rule)">pino 状态</th><th style="text-align:left; padding:0.4rem; border-bottom:1px solid var(--rule)">负责人</th></tr>
+<tr><td style="padding:0.4rem;">gateway</td><td style="padding:0.4rem;">✅ 0005 装好</td><td style="padding:0.4rem;">principles 轨道</td></tr>
+<tr><td style="padding:0.4rem;">auth-service</td><td style="padding:0.4rem;">✅ 主线收官时加</td><td style="padding:0.4rem;">主线</td></tr>
+<tr><td style="padding:0.4rem;"><strong>search-service</strong></td><td style="padding:0.4rem;">❌ <strong>裸 NestJS logger</strong></td><td style="padding:0.4rem;"><strong>0016(本节)</strong></td></tr>
+<tr><td style="padding:0.4rem;">sync-service</td><td style="padding:0.4rem;">❌ 裸 logger</td><td style="padding:0.4rem;">0017</td></tr>
+<tr><td style="padding:0.4rem;">form-service</td><td style="padding:0.4rem;">❌ 裸 logger</td><td style="padding:0.4rem;">0017</td></tr>
+</table>
+
+<p><strong>后果</strong>:用户在 search 失败时报错,<strong>gateway 知道 requestId</strong>(有 pino),<strong>search-service 不知道</strong>(只有 console.log)。要追"这次失败是哪个请求触发的",<strong>对不上号</strong>。</p>
+
+<blockquote>
+<p><strong>原则</strong>:nest-search 的 4 个后端服务 = 4 个独立进程 = 4 套日志。<br>
+要串起来,必须 <strong>都装 pino + 都透传 x-request-id</strong>。</p>
+</blockquote>
+
+<h2>2. 回顾 gateway 模式(0005)</h2>
+
+<p>gateway 装 pino 时用的代码(已经写好,你不用再写):</p>
+<pre><code>// apps/gateway/src/app.module.ts
+import { LoggerModule } from 'nestjs-pino';
+import { randomUUID } from 'node:crypto';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    LoggerModule.forRoot({
+      pinoHttp: {
+        level: process.env.LOG_LEVEL || 'info',
+        genReqId: (req) =&gt; req.headers['x-request-id'] || randomUUID(),
+        customProps: (req) =&gt; ({ requestId: req.id }),
+        autoLogging: false,    // ← 不打每个 HTTP 请求(降噪)
+      },
+    }),
+    // ...其他 module
+  ],
+})</code></pre>
+
+<p><strong>4 个核心配置</strong>:</p>
+<table style="width:100%; border-collapse: collapse; margin: 1rem 0;">
+<tr><th style="text-align:left; padding:0.4rem; border-bottom:1px solid var(--rule)">配置</th><th style="text-align:left; padding:0.4rem; border-bottom:1px solid var(--rule)">作用</th></tr>
+<tr><td style="padding:0.4rem;"><code>level</code></td><td style="padding:0.4rem;">日志级别(env 控)</td></tr>
+<tr><td style="padding:0.4rem;"><code>genReqId</code></td><td style="padding:0.4rem;">从 <code>x-request-id</code> 头拿;没有就生成 UUID</td></tr>
+<tr><td style="padding:0.4rem;"><code>customProps</code></td><td style="padding:0.4rem;">每条日志都附 <code>requestId</code> 字段</td></tr>
+<tr><td style="padding:0.4rem;"><code>autoLogging: false</code></td><td style="padding:0.4rem;">不打每个 HTTP 请求日志(显式 log 才打,降噪)</td></tr>
+</table>
+
+<p>auth-service 用的是<strong>同一个模式</strong>(除了 <code>autoLogging: true</code>,因为 auth 路由少)。</p>
+
+<h2>3. 动手 · 把同一模式装到 search-service</h2>
+
+<div class="task">
+  <h3>3.1 · 改 <code>apps/search-service/src/app.module.ts</code></h3>
+  <p>在 <code>ConfigModule.forRoot</code> 后加 <code>LoggerModule.forRoot</code>,完全复制 gateway 模式:</p>
+  <pre><code>import { Module, OnModuleInit } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { LoggerModule } from 'nestjs-pino';
+import { randomUUID } from 'node:crypto';
+import { ElasticsearchModule } from './elasticsearch/elasticsearch.module';
+import { ElasticsearchService } from './elasticsearch/elasticsearch.service';
+import { SearchModule } from './search/search.module';
+import { initIndices } from './elasticsearch/elasticsearch.init';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    // ← 0016: 对齐 gateway 0005 模式 — pino + 跨服务 requestId 透传
+    LoggerModule.forRoot({
+      pinoHttp: {
+        level: process.env.LOG_LEVEL || 'info',
+        genReqId: (req) =&gt; req.headers['x-request-id'] || randomUUID(),
+        customProps: (req) =&gt; ({ requestId: req.id }),
+        autoLogging: false,
+      },
+    }),
+    ElasticsearchModule,
+    SearchModule,
+  ],
+})
+export class AppModule implements OnModuleInit {
+  constructor(private readonly esService: ElasticsearchService) {}
+
+  async onModuleInit() {
+    await initIndices(this.esService);
+  }
+}</code></pre>
+  <p><strong>改动量</strong>:1 个 import + 1 个 LoggerModule.forRoot 块 ≈ <strong>10 行新增</strong>。没有改业务逻辑。</p>
+</div>
+
+<div class="task">
+  <h3>3.2 · 验证 — 启动 search-service 看 LoggerModule 初始化</h3>
+  <pre><code>pnpm start:search</code></pre>
+  <p>期望在启动 log 里看到:</p>
+  <pre><code>[Nest] LOG [InstanceLoader] LoggerModule dependencies initialized</code></pre>
+  <p>看到这一行 = pino 装好了。</p>
+</div>
+
+<div class="task">
+  <h3>3.3 · 验证 — 跑测试没 break</h3>
+  <pre><code>pnpm test</code></pre>
+  <p>期望:<code>Test Suites: 4 passed / Tests: 18 passed</code> — auth-service e2e 不受 search-service 改动影响。</p>
+</div>
+
+<h2>4. 副线 2 的统一心智模型</h2>
+
+<p>0016 + 0017 + 0018(把 sync / form 也装上)走完后,nest-search 4 个服务会<strong>完全一致</strong>:</p>
+
+<div class="compare">
+  <div>
+    <h4>原则轨道 (0009-0012)</h4>
+    <p>把 1 个服务做到"完整"</p>
+    <p><strong>gateway 是样板</strong></p>
+  </div>
+  <div>
+    <h4>副线 2 (0016-0018)</h4>
+    <p>把"完整"复制到 N 个服务</p>
+    <p><strong>其他 3 个服务对齐 gateway</strong></p>
+  </div>
+</div>
+
+<p><strong>经验法则</strong>:</p>
+<ul>
+  <li>每改一个新服务 = 打开 gateway 对比 — 看哪些 module / config 已经装了</li>
+  <li>新功能先在 gateway 跑通 → 复制到其他服务</li>
+  <li>复制时<strong>只改必要差异</strong>(端口 / 数据库名 / 业务 module),不改 pino 配置</li>
+</ul>
+
+<h2>5. 自我检测(3 道题)</h2>
+
+<div class="quiz">
+  <div class="quiz-q" data-correct="c">
+    <p>1. 副线 2 的本质是什么?</p>
+    <label class="quiz-opt"><input type="radio" name="q1" value="a"> 给所有服务加新功能</label>
+    <label class="quiz-opt"><input type="radio" name="q1" value="b"> 优化已有代码性能</label>
+    <label class="quiz-opt"><input type="radio" name="q1" value="c"> <strong>把 gateway 已经验证的模式复制到 N 个服务,保证 nest-search 整套服务一致</strong></label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz-q" data-correct="a">
+    <p>2. <code>genReqId</code> 接收 <code>x-request-id</code> 头的目的是什么?</p>
+    <label class="quiz-opt"><input type="radio" name="q2" value="a"> <strong>让 gateway 传来的 requestId 在 search-service 日志里延续,跨服务追问题</strong></label>
+    <label class="quiz-opt"><input type="radio" name="q2" value="b"> 性能优化</label>
+    <label class="quiz-opt"><input type="radio" name="q2" value="c"> 鉴权</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz-q" data-correct="b">
+    <p>3. 0016 改了 search-service,但只验证了 search 自己能起 + 18 测试还过 — <strong>为什么不用写 search-service 的 e2e</strong>?</p>
+    <label class="quiz-opt"><input type="radio" name="q3" value="a"> 因为 search 没重要业务</label>
+    <label class="quiz-opt"><input type="radio" name="q3" value="b"> <strong>因为 0016 改的是 module-level 配置,不是 service 业务逻辑;现有 18 测试覆盖的边界没动</strong></label>
+    <label class="quiz-opt"><input type="radio" name="q3" value="c"> 因为 pino 不影响行为</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+</div>
+
+<h2 id="what-next">下一节预告</h2>
+<p>0016 把 pino 装到 search-service。**0017 把同一模式复制到 sync + form-service",3 个服务全部对齐"—— nest-search 全栈第一次有"跨服务 requestId 追踪"**。</p>
+
+<h2>收口 · 这一节你 commit 什么</h2>
+<p>3 个文件改动:</p>
+<ul>
+  <li><code>apps/search-service/src/app.module.ts</code> — 加 LoggerModule.forRoot</li>
+  <li><code>docs/teaching/lessons/0016-search-pino-migration.html</code> — 本课 lesson HTML</li>
+  <li>(可选) LR-0020 — 副线 2 第 1 课反思</li>
+</ul>
+
+<p>commit message(直接复制):</p>
+<pre><code>feat(search-service): migrate pino structured logging from gateway (0016)
+
+- Add LoggerModule.forRoot to search-service AppModule
+- Reuse exact same pino config as gateway 0005:
+  - genReqId: pull x-request-id from incoming headers (or randomUUID)
+  - customProps: attach requestId to every log entry
+  - autoLogging: false (reduce noise, explicit logs only)
+- Verified: search-service starts cleanly (LoggerModule dependencies
+  initialized), pnpm test still 18/18 (no auth-side regression)
+
+This is the first leg of 副线 2 (cross-service migration):
+copying proven patterns from gateway to the other 3 services.
+Next: 0017 (sync-service + form-service).
+
+Refs: docs/teaching/lessons/0016-search-pino-migration.html
+</code></pre>
+
+<h2>延伸阅读</h2>
+<ul>
+  <li><a href="https://github.com/iamolegga/nestjs-pino">nestjs-pino docs</a>(必读 20 分钟)</li>
+  <li><a href="https://getpino.io/">Pino — Very low overhead Node.js logger</a>(底层,可选)</li>
+  <li>principles 轨道 0005(<code>0005-pino-structured-logging.html</code>)— 原始设计思路</li>
+</ul>
+
+<p style="margin-top: 1.6rem; color: var(--accent); font-weight: 600;">📌 3.2 那个 <code>LoggerModule dependencies initialized</code> 是 0016 的金样本 — search-service 从"裸 logger"升级成"pino 全栈对齐"的关键标记。</p>
+
+<hr>
+<footer>
+  nest-search · teach workspace · 课时 0016 · 副线 2 第 1 课<br>
+  有问题直接问 Claude
+</footer>
+
+<script>
+function check(btn) {
+  const q = btn.closest('.quiz-q');
+  const correct = q.dataset.correct;
+  const picked = q.querySelector('input[type=radio]:checked');
+  const fb = q.querySelector('.quiz-feedback');
+  if (!picked) {
+    fb.textContent = '⚠️ 选一个再提交。';
+    fb.className = 'quiz-feedback show bad';
+  } else if (picked.value === correct) {
+    fb.textContent = '✅ 对了。';
+    fb.className = 'quiz-feedback show good';
+  } else {
+    fb.textContent = '❌ 不对,回到 §1 / §2 重读一遍,再试一次。';
+    fb.className = 'quiz-feedback show bad';
+  }
+}
+
+// 一键复制
+document.querySelectorAll('pre').forEach(function(pre) {
+  if (pre.classList.contains('json-block')) return;
+  if (pre.querySelector('.copy-btn')) return;
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.textContent = 'Copy';
+  btn.setAttribute('aria-label', '复制代码');
+  pre.appendChild(btn);
+  btn.addEventListener('click', async function() {
+    var codeEl = pre.querySelector('code');
+    if (!codeEl) return;
+    var text = codeEl.textContent;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+    } catch (err) {
+      btn.textContent = 'Failed';
+      btn.classList.add('failed');
+    }
+    setTimeout(function() {
+      btn.textContent = 'Copy';
+      btn.classList.remove('copied', 'failed');
+    }, 1500);
+  });
+});
+</script>
+
+</body>
+</html>
