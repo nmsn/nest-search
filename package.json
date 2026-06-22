@@ -20,7 +20,10 @@
     "dev:auth": "pnpm --filter auth-frontend exec vite dev",
     "dev:ds": "pnpm --filter ds-frontend exec vite dev",
     "dev:zk": "pnpm --filter zk-frontend exec vite dev",
-    "dev:meeting": "pnpm --filter meeting-frontend exec vite dev"
+    "dev:meeting": "pnpm --filter meeting-frontend exec vite dev",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage"
   },
   "repository": {
     "type": "git",

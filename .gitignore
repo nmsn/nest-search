@@ -6,3 +6,4 @@ libs/**/*.d.ts
 apps/**/src/libs/**/*.js
 apps/**/src/libs/**/*.d.ts
 template/
+coverage/

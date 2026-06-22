@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>0013 · Jest 单元测试基础:第一次给 NestJS 代码加安全网</title>
+<style>
+  :root {
+    --bg: #fbfaf7;
+    --ink: #1d1d1d;
+    --ink-soft: #4a4a4a;
+    --ink-faint: #8a8a8a;
+    --rule: #d6d2c4;
+    --accent: #b04a2f;
+    --code-bg: #f1efe8;
+    --code-inline: #ece8db;
+    --good: #2c6e3e;
+    --bad: #b04a2f;
+    --pad: 2.4rem;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "SF Pro Text", "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  body { max-width: 760px; margin: 0 auto; padding: var(--pad); }
+  h1, h2, h3 { font-family: Georgia, "Source Han Serif SC", "Songti SC", serif; font-weight: 600; letter-spacing: -0.01em; }
+  h1 { font-size: 2.1rem; line-height: 1.15; margin: 0 0 0.4rem 0; }
+  h2 { font-size: 1.45rem; margin: 3rem 0 0.6rem 0; border-bottom: 1px solid var(--rule); padding-bottom: 0.3rem; }
+  h3 { font-size: 1.12rem; margin: 1.6rem 0 0.4rem 0; color: var(--ink-soft); }
+  p { margin: 0.8rem 0; }
+  .lede { font-size: 1.05rem; color: var(--ink-soft); font-style: italic; border-left: 3px solid var(--accent); padding-left: 0.9rem; margin: 1rem 0 1.6rem 0; }
+  .meta { color: var(--ink-faint); font-size: 0.85rem; margin-bottom: 1.6rem; }
+  .meta a { color: var(--ink-faint); }
+  code, pre, kbd { font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace; font-size: 0.92em; }
+  p code, li code, td code { background: var(--code-inline); padding: 0.08em 0.36em; border-radius: 3px; color: var(--ink); }
+  pre { background: var(--code-bg); border: 1px solid var(--rule); padding: 0.9rem 1rem; border-radius: 4px; overflow-x: auto; line-height: 1.5; margin: 0.8rem 0; position: relative; }
+  pre code { background: transparent; padding: 0; }
+  pre .copy-btn {
+    position: absolute;
+    top: 0.4rem; right: 0.4rem;
+    padding: 0.25rem 0.55rem;
+    background: rgba(255,255,255,0.85);
+    color: var(--ink-soft);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    font-family: -apple-system, "SF Pro Text", sans-serif;
+    font-size: 0.72rem; font-weight: 600;
+    cursor: pointer; opacity: 0.65;
+  }
+  pre .copy-btn:hover { opacity: 1; }
+  pre .copy-btn.copied { background: var(--good); color: white; border-color: var(--good); opacity: 1; }
+  pre .copy-btn.failed { background: var(--bad); color: white; border-color: var(--bad); opacity: 1; }
+  .task { background: #fff; border: 1px solid var(--rule); border-left: 4px solid var(--accent); padding: 1rem 1.2rem; margin: 1.4rem 0; border-radius: 3px; }
+  .task h3 { margin-top: 0; color: var(--accent); text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.85rem; font-family: -apple-system, sans-serif; font-weight: 700; }
+  .quiz { margin: 1.6rem 0; }
+  .quiz-q { background: #fff; border: 1px solid var(--rule); padding: 1rem 1.2rem; border-radius: 3px; margin: 0.8rem 0; }
+  .quiz-q p:first-child { margin-top: 0; font-weight: 600; }
+  .quiz-opt { display: block; margin: 0.3rem 0; cursor: pointer; }
+  .quiz-opt input { margin-right: 0.5rem; }
+  .quiz-feedback { display: none; margin-top: 0.6rem; padding: 0.5rem 0.8rem; border-radius: 3px; font-size: 0.95rem; }
+  .quiz-feedback.show { display: block; }
+  .quiz-feedback.good { background: #e8f3ea; color: var(--good); border: 1px solid #b6d8be; }
+  .quiz-feedback.bad { background: #fbeae5; color: var(--bad); border: 1px solid #e8b9a8; }
+  hr { border: none; border-top: 1px solid var(--rule); margin: 2.4rem 0 1.2rem 0; }
+  footer { color: var(--ink-faint); font-size: 0.85rem; }
+  footer a { color: var(--ink-soft); }
+  @media print {
+    body { background: white; max-width: none; padding: 1.2rem; }
+    .task, .quiz-q { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Jest 单元测试基础:第一次给 NestJS 代码加安全网</h1>
+  <p class="lede">副线 1(测试体系)第 1 课。project 改任何东西之前,先有测试保护。</p>
+  <p class="meta">
+    课时 0013 · 预计 60 分钟 · 锚定项目 <code>nest-search</code>
+    · 上一节: <a href="0012-module-system.html">Module 系统深入</a>
+    · 下一节: <a href="#what-next">0014 Supertest e2e</a>
+  </p>
+</header>
+
+<hr>
+
+<h2>你今天会拿到什么</h2>
+<ol class="steps">
+  <li>理解<strong>为什么 NestJS 项目必须有测试</strong> — 不然 principles 轨道写的 12 节代码随时 break</li>
+  <li>理解 Jest 基础:<code>describe</code> / <code>it</code> / <code>expect</code> + AAA pattern</li>
+  <li>理解 mocking:<code>jest.fn()</code> / <code>jest.spyOn()</code> 怎么 mock 依赖</li>
+  <li>亲手给 3 个 service 写单元测试:<strong>RolesGuard</strong> + <strong>ProxyService</strong> + <strong>HttpClientService</strong></li>
+  <li>跑一次 <code>pnpm test</code>,看到 11/11 测试通过 + 覆盖率报告</li>
+  <li>一个可提交的 commit,把测试基础设施建起来</li>
+</ol>
+
+<h2>1. 为什么 NestJS 项目必须有测试</h2>
+<p>你 principles 轨道(0009-0012)刚写完 ~12 节 ~2500 行新代码 + 4 次 commit。<strong>没有测试保护,改任何一行都可能 break 另一个角落</strong>。</p>
+
+<p>具体场景:</p>
+<ul>
+<li>0010 改了 ProxyService 的 axios 用法 → 0011 改 RolesGuard 时,谁保证 ProxyService 还工作?</li>
+<li>0011 改了 RolesGuard 的 metadata key → 0009 写的 @Roles 装饰器还能匹配吗?</li>
+<li>0012 把 AppController 拆出去 → 那些 proxy 路由还能正常转发吗?</li>
+</ul>
+
+<p><strong>没有测试,只能"每改一处手动 curl 一遍"</strong> — 慢、漏、不持续。</p>
+
+<p><strong>有测试,改一处 1 秒内知道有没有破坏其他地方</strong>。</p>
+
+<h2>2. Jest 基础 — describe / it / expect</h2>
+<p>Jest 是 Node 生态最常用的测试框架。你项目已经装了 <code>jest 30.4.1</code> + <code>ts-jest 29.4.9</code>(NestJS 测试标配)。</p>
+
+<h3>3 个核心概念</h3>
+<pre><code>describe('RolesGuard', () => {           // ← 一组相关测试(套件)
+  it('allows when no @Roles metadata', () => {       // ← 一个具体测试(用例)
+    expect(guard.canActivate(ctx)).toBe(true);     // ← 断言
+  });
+
+  it('denies when user lacks role', () => {
+    expect(guard.canActivate(ctx)).toBe(false);
+  });
+});</code></pre>
+
+<h3>AAA pattern(准备 / 执行 / 断言)</h3>
+<pre><code>it('xxxxx', () => {
+  // Arrange — 准备数据
+  const ctx = makeMockContext('admin');
+
+  // Act — 执行
+  const result = guard.canActivate(ctx);
+
+  // Assert — 断言
+  expect(result).toBe(true);
+});</code></pre>
+
+<p>三段分清楚 = 测试可读、好维护、好复用。</p>
+
+<h2>3. Mocking — jest.fn() / jest.spyOn()</h2>
+<p>单元测试的核心是<strong>隔离被测代码</strong>。RolesGuard 依赖 Reflector,ProxyService 依赖 HttpClientService — 测试时这些依赖要被 mock。</p>
+
+<h3>jest.fn() — 创建 mock 函数</h3>
+<pre><code>const mockFn = jest.fn();              // ← 一个空 mock
+mockFn.mockReturnValue(42);          // ← 调它返 42
+mockFn.mockResolvedValue({ ok: true }); // ← 调它(异步)返 { ok: true }
+mockFn.mockImplementation((x) =&gt; x * 2);  // ← 自定义逻辑
+
+expect(mockFn).toHaveBeenCalled();    // ← 断言"被调过"
+expect(mockFn).toHaveBeenCalledWith('admin', 'editor');  // ← 断言"用这些参数调过"</code></pre>
+
+<h3>jest.spyOn() — spy 现有方法</h3>
+<pre><code>const spy = jest.spyOn(reflector, 'getAllAndOverride');
+spy.mockReturnValue(['admin']);  // ← 替换方法行为
+
+// 测试结束后恢复
+spy.mockRestore();</code></pre>
+
+<p>区别:<strong>jest.fn() 是创建新 mock;jest.spyOn() 是 spy 已有对象的方法</strong>。</p>
+
+<h2>4. 动手 · 给 3 个 service 写单元测试</h2>
+<p>选这 3 个 service 因为它们是 principles 轨道的核心交付物:</p>
+<ul>
+<li><strong>RolesGuard</strong> — 0009 + 0011 的成果(读 @Roles + 检查角色)</li>
+<li><strong>ProxyService</strong> — 0008 + 0010 的成果(用 HttpClientService 转发)</li>
+<li><strong>HttpClientService</strong> — 0010 的成果(自动加 x-request-id)</li>
+</ul>
+
+<p>这 3 个测试通过 = principles 4 节的代码"安全网"建起来了。</p>
+
+<div class="task">
+  <h3>4.0 · 准备:加 jest 配置 + test script</h3>
+  <p>先建基础设施 — 3 个文件:</p>
+  <p><strong>新建 <code>jest.config.js</code></strong>(项目根):</p>
+  <pre><code>module.exports = {
+  preset: 'ts-jest',
+  testEnvironment: 'node',
+  rootDir: '.',
+  roots: ['&lt;rootDir&gt;/apps/'],           // ← 只测 apps/ 下的代码(忽略前端)
+  testMatch: ['**/*.spec.ts'],         // ← .spec.ts 后缀的文件
+  moduleFileExtensions: ['ts', 'js', 'json'],
+  transform: {
+    '^.+\\.(t|j)s$': ['ts-jest', { tsconfig: 'tsconfig.spec.json' }],
+  },
+};</code></pre>
+  <p><strong>新建 <code>tsconfig.spec.json</code></strong>(项目根,专门给测试用):</p>
+  <pre><code>{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["jest", "node"],   // ← 必须显式声明,否则 .spec.ts 里 describe/it/expect 全找不到
+    "esModuleInterop": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true
+  },
+  "include": ["apps/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}</code></pre>
+  <p><strong>为什么需要这个文件</strong>:NestJS 项目根 <code>tsconfig.json</code> 没显式列 <code>types</code>。当 ts-jest 编译 .spec.ts 时,TypeScript 不自动加载 <code>@types/jest</code>,会报 <code>TS2593: Cannot find name 'describe'</code>。独立 tsconfig.spec.json + <code>types: ["jest", "node"]</code> = 让测试环境独立、显式。</p>
+  <p><strong>改 <code>package.json</code> 加 test script</strong>(在 scripts 段加 3 行):</p>
+  <pre><code>"test": "jest",
+"test:watch": "jest --watch",
+"test:cov": "jest --coverage"</code></pre>
+</div>
+
+<div class="task">
+  <h3>4.1 · 写 RolesGuard 测试</h3>
+  <p>新建 <code>apps/gateway/src/guards/roles.guard.spec.ts</code>:</p>
+  <pre><code>import { RolesGuard } from './roles.guard';
+import { Reflector } from '@nestjs/core';
+import { ExecutionContext } from '@nestjs/common';
+
+describe('RolesGuard', () => {
+  let guard: RolesGuard;
+  let reflector: Reflector;
+
+  beforeEach(() => {
+    reflector = new Reflector();
+    guard = new RolesGuard(reflector);
+  });
+
+  // mock ExecutionContext — 只给测试需要的字段
+  function makeContext(userRolesHeader?: string): ExecutionContext {
+    const headers: Record&lt;string, string&gt; = {};
+    if (userRolesHeader) headers['x-user-roles'] = userRolesHeader;
+    return {
+      switchToHttp: () =&gt; ({
+        getRequest: () =&gt; ({ headers }),
+        getResponse: () =&gt; ({}),
+      }),
+      getHandler: () =&gt; function testHandler() {},
+      getClass: () =&gt; class TestClass {},
+    } as any;
+  }
+
+  it('allows when no @Roles metadata is set', () =&gt; {
+    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(undefined);
+    expect(guard.canActivate(makeContext())).toBe(true);
+  });
+
+  it('allows when user has one of the required roles', () =&gt; {
+    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['admin', 'editor']);
+    expect(guard.canActivate(makeContext('admin,user'))).toBe(true);
+  });
+
+  it('denies when user role does not match', () =&gt; {
+    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['admin']);
+    expect(guard.canActivate(makeContext('guest'))).toBe(false);
+  });
+
+  it('denies when no x-user-roles header', () =&gt; {
+    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['admin']);
+    expect(guard.canActivate(makeContext())).toBe(false);
+  });
+});</code></pre>
+</div>
+
+<div class="task">
+  <h3>4.2 · 写 ProxyService 测试</h3>
+  <p>新建 <code>apps/gateway/src/proxy/proxy.service.spec.ts</code>:</p>
+  <pre><code>import { ProxyService } from './proxy.service';
+import { HttpClientService } from '../common/http-client/http-client.service';
+import { HttpException } from '@nestjs/common';
+
+describe('ProxyService', () =&gt; {
+  let service: ProxyService;
+  let mockHttpClient: jest.Mocked&lt;HttpClientService&gt;;
+  let mockLogger: any;
+
+  beforeEach(() =&gt; {
+    mockHttpClient = { request: jest.fn() } as any;
+    mockLogger = { info: jest.fn(), error: jest.fn() };
+    service = new ProxyService(mockLogger, mockHttpClient);
+  });
+
+  it('forwards to correct downstream URL', async () =&gt; {
+    mockHttpClient.request.mockResolvedValue({ ok: true });
+
+    await service.forward('auth', 'POST', '/api/auth/login', { x: 1 });
+
+    expect(mockHttpClient.request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'POST',
+        url: 'http://localhost:3004/api/auth/login',
+        data: { x: 1 },
+      })
+    );
+  });
+
+  it('throws on unknown service', async () =&gt; {
+    await expect(service.forward('unknown', 'GET', '/x')).rejects.toThrow(
+      'Unknown service: unknown',
+    );
+  });
+
+  it('wraps downstream error as HttpException with status', async () =&gt; {
+    const downstreamErr = {
+      response: { status: 401, data: { message: 'Invalid credentials' } },
+    };
+    mockHttpClient.request.mockRejectedValue(downstreamErr);
+
+    await expect(
+      service.forward('auth', 'POST', '/api/auth/login', {}),
+    ).rejects.toBeInstanceOf(HttpException);
+  });
+
+  it('rethrows plain error when no response field', async () =&gt; {
+    mockHttpClient.request.mockRejectedValue(new Error('ECONNREFUSED'));
+
+    await expect(service.forward('auth', 'GET', '/x')).rejects.toThrow(
+      'ECONNREFUSED',
+    );
+  });
+});</code></pre>
+</div>
+
+<div class="task">
+  <h3>4.3 · 写 HttpClientService 测试</h3>
+  <p>新建 <code>apps/gateway/src/common/http-client/http-client.service.spec.ts</code>:</p>
+  <pre><code>import { HttpClientService } from './http-client.service';
+import { HttpService } from '@nestjs/axios';
+import { of } from 'rxjs';
+
+describe('HttpClientService', () =&gt; {
+  let service: HttpClientService;
+  let mockHttp: jest.Mocked&lt;HttpService&gt;;
+
+  beforeEach(() =&gt; {
+    mockHttp = { request: jest.fn() } as any;
+    const mockRequest = { id: 'test-req-id-123', headers: {} } as any;
+    service = new HttpClientService(mockHttp, mockRequest);
+  });
+
+  it('auto-adds x-request-id header from current REQUEST', async () =&gt; {
+    mockHttp.request.mockReturnValue(of({ data: { ok: true } } as any));
+
+    await service.request({ method: 'GET', url: 'http://x.com/y' });
+
+    expect(mockHttp.request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'GET',
+        url: 'http://x.com/y',
+        headers: expect.objectContaining({
+          'x-request-id': 'test-req-id-123',
+          'Content-Type': 'application/json',
+        }),
+      }),
+    );
+  });
+
+  it('does NOT add x-request-id when request has no id', async () =&gt; {
+    (service as any).currentRequest = { headers: {} };
+    mockHttp.request.mockReturnValue(of({ data: {} } as any));
+
+    await service.request({ method: 'GET', url: 'http://x.com/y' });
+
+    const call = mockHttp.request.mock.calls[0][0] as any;
+    expect(call.headers).not.toHaveProperty('x-request-id');
+  });
+
+  it('preserves caller-provided headers', async () =&gt; {
+    mockHttp.request.mockReturnValue(of({ data: {} } as any));
+
+    await service.request({
+      method: 'POST',
+      url: 'http://x.com/y',
+      headers: { Authorization: 'Bearer xyz' },
+    });
+
+    expect(mockHttp.request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer xyz',
+          'x-request-id': 'test-req-id-123',
+        }),
+      }),
+    );
+  });
+});</code></pre>
+</div>
+
+<div class="task">
+  <h3>4.4 · 跑测试 + 看覆盖率</h3>
+  <p>在你终端跑:</p>
+  <pre><code>pnpm test</code></pre>
+  <p>期望输出:</p>
+  <pre><code>PASS src/guards/roles.guard.spec.ts
+PASS src/proxy/proxy.service.spec.ts
+PASS src/common/http-client/http-client.service.spec.ts
+
+Tests:       11 passed, 11 total
+Snapshots:   0 total
+Time:        ~2s</code></pre>
+  <p>看覆盖率:</p>
+  <pre><code>pnpm test:cov</code></pre>
+  <p>期望:<code>RolesGuard.ts</code> / <code>ProxyService.ts</code> / <code>HttpClientService.ts</code> 三行都是 <code>100%</code> Stmts / Branches / Funcs / Lines。</p>
+</div>
+
+<h2>5. 自我检测(3 道题)</h2>
+
+<div class="quiz">
+  <div class="quiz-q" data-correct="b">
+    <p>1. Jest 里 <code>describe</code> / <code>it</code> / <code>expect</code> 各自是什么?</p>
+    <label class="quiz-opt"><input type="radio" name="q1" value="a"> describe = 测试用例;it = 测试套件;expect = 断言</label>
+    <label class="quiz-opt"><input type="radio" name="q1" value="b"> <strong>describe = 测试套件;it = 测试用例;expect = 断言</strong></label>
+    <label class="quiz-opt"><input type="radio" name="q1" value="c"> describe = 断言;it = 测试套件;expect = 测试用例</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz-q" data-correct="b">
+    <p>2. AAA pattern 的三段分别是什么?</p>
+    <label class="quiz-opt"><input type="radio" name="q2" value="a"> Always Add Assert(总是加断言)</label>
+    <label class="quiz-opt"><input type="radio" name="q2" value="b"> <strong>Arrange / Act / Assert(准备 / 执行 / 断言)</strong></label>
+    <label class="quiz-opt"><input type="radio" name="q2" value="c"> Async / Await / All(异步模式)</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz-q" data-correct="a">
+    <p>3. <code>jest.spyOn()</code> vs <code>jest.fn()</code> 的区别?</p>
+    <label class="quiz-opt"><input type="radio" name="q3" value="a"> <strong>jest.spyOn() 是 spy 现有对象的方法;jest.fn() 是创建新的 mock 函数</strong></label>
+    <label class="quiz-opt"><input type="radio" name="q3" value="b"> 完全一样,可以互换</label>
+    <label class="quiz-opt"><input type="radio" name="q3" value="c"> jest.spyOn() 是异步;jest.fn() 是同步</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+</div>
+
+<h2 id="what-next">下一节预告</h2>
+<p>0013 给 3 个 service 装了"逻辑测试" — 不依赖 HTTP。<strong>0014 我们加 e2e 测试</strong>:用 Supertest 跑真实 HTTP,测 register → login → /me 完整链路 + 数据库容器化 + NestJS Testing module。**这是 CI/CD 前的最后一关</strong>。</p>
+
+<h2>收口 · 这一节你 commit 什么</h2>
+<p>6 个文件改动:</p>
+<ul>
+  <li><code>jest.config.js</code> — 新建,Jest + ts-jest 配置</li>
+  <li><code>tsconfig.spec.json</code> — 新建,测试专用 tsconfig(显式 <code>types: ["jest", "node"]</code>)</li>
+  <li><code>package.json</code> — 加 test / test:watch / test:cov 脚本</li>
+  <li><code>apps/gateway/src/guards/roles.guard.spec.ts</code> — RolesGuard 4 个测试</li>
+  <li><code>apps/gateway/src/proxy/proxy.service.spec.ts</code> — ProxyService 4 个测试</li>
+  <li><code>apps/gateway/src/common/http-client/http-client.service.spec.ts</code> — HttpClientService 3 个测试</li>
+</ul>
+
+<p>commit message(直接复制):</p>
+<pre><code>test(gateway): add Jest unit tests for 3 principles-track services (0013)
+
+- Add jest.config.js using ts-jest preset (testEnvironment=node,
+  testMatch=**/*.spec.ts, roots=apps/)
+- Add tsconfig.spec.json with explicit types: ["jest", "node"] so
+  describe/it/expect resolve under ts-jest 29
+- Add test / test:watch / test:cov scripts to package.json
+- RolesGuard: 4 unit tests covering allow (no metadata, role match)
+  and deny (role mismatch, no header) paths
+- ProxyService: 4 unit tests covering forward to correct URL,
+  unknown service throw, HttpException wrapping for downstream errors,
+  plain error rethrow
+- HttpClientService: 3 unit tests covering x-request-id auto-add,
+  no-id skip, caller header preservation
+- All 11 tests pass; coverage 100% on the 3 files
+
+This is the first test infrastructure in nest-search. Future 0014
+adds e2e (Supertest) on top.
+
+Refs: docs/teaching/lessons/0013-jest-unit-testing.html
+</code></pre>
+
+<p>4.4 跑通(11/11 测试 pass + 3 个文件 100% coverage)+ quiz 三道选完,告诉我结果。我跑 commit + 写 LR-0017(副线 1 反模式)+ 开 0014(Supertest e2e)。</p>
+
+<h2>延伸阅读</h2>
+<ul>
+  <li><a href="https://jestjs.io/docs/getting-started">Jest Docs — Getting Started</a>(必读 30 分钟)</li>
+  <li><a href="https://docs.nestjs.com/fundamentals/testing">NestJS Docs — Testing</a>(@nestjs/testing 介绍,0014 重点)</li>
+  <li><a href="https://martinfowler.com/bliki/TestPyramid.html">Martin Fowler — Test Pyramid</a>(unit / integration / e2e 比例)</li>
+  <li>《单元测试的艺术》Roy Osherove — C# 但概念通用(AAA / mock / 边界)</li>
+</ul>
+
+<p style="margin-top: 1.6rem; color: var(--accent); font-weight: 600;">📌 4.4 那个 <code>11 passed, 11 total</code> 是 0013 的金样本 — principles 轨道写的代码第一次有"自动化保护"。</p>
+
+<hr>
+<footer>
+  nest-search · teach workspace · 课时 0013 · 副线 1 第 1 课<br>
+  有问题直接问 Claude
+</footer>
+
+<script>
+function check(btn) {
+  const q = btn.closest('.quiz-q');
+  const correct = q.dataset.correct;
+  const picked = q.querySelector('input[type=radio]:checked');
+  const fb = q.querySelector('.quiz-feedback');
+  if (!picked) {
+    fb.textContent = '⚠️ 选一个再提交。';
+    fb.className = 'quiz-feedback show bad';
+    return;
+  }
+  if (picked.value === correct) {
+    fb.textContent = '✅ 对了。';
+    fb.className = 'quiz-feedback show good';
+  } else {
+    fb.textContent = '❌ 不对,回到 §2 / §3 重读一遍,再试一次。';
+    fb.className = 'quiz-feedback show bad';
+  }
+}
+
+// 一键复制
+document.querySelectorAll('pre').forEach(function(pre) {
+  if (pre.classList.contains('json-block')) return;
+  if (pre.querySelector('.copy-btn')) return;
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.textContent = 'Copy';
+  btn.setAttribute('aria-label', '复制代码');
+  pre.appendChild(btn);
+  btn.addEventListener('click', async function() {
+    var codeEl = pre.querySelector('code');
+    if (!codeEl) return;
+    var text = codeEl.textContent;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+    } catch (err) {
+      btn.textContent = 'Failed';
+      btn.classList.add('failed');
+    }
+    setTimeout(function() {
+      btn.textContent = 'Copy';
+      btn.classList.remove('copied', 'failed');
+    }, 1500);
+  });
+});
+</script>
+
+</body>
+</html>
