@@ -1,0 +1,87 @@
+name: test
+
+# 触发时机:push 到 main + 所有 PR
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# 取消同分支上一次 in-progress run(避免重复排队)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: unit + e2e tests
+    runs-on: ubuntu-latest
+
+    # ← 核心:service containers 提供真 MySQL + Redis
+    # GitHub Actions 把容器端口映射到 localhost,跟本地 docker-compose 一致
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root123       # 跟 apps/auth-service 默认 DATABASE_URL 匹配
+          MYSQL_DATABASE: nest_search       # 同上,自动建库
+        ports:
+          - 3306:3306
+        # 健康检查 — GitHub Actions 等健康才让下一步跑
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -uroot -proot123"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0   # 跟 package.json packageManager 一致
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'    # 自动 cache pnpm store,跑得快 50%
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # 双保险:service container 的 healthcheck 跟 Drizzle 连接之间可能还有缝隙
+      # 等 10 秒确保 MySQL 完全 ready
+      - name: Wait for MySQL
+        run: |
+          echo "Waiting for MySQL to be ready..."
+          for i in {1..30}; do
+            if mysqladmin ping -h 127.0.0.1 -uroot -proot123 --silent 2>/dev/null; then
+              echo "MySQL is ready"
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Run tests + coverage
+        run: pnpm test:cov
+
+      - name: Upload coverage report
+        if: always()    # 即使测试失败也上传,方便排查
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 7
