@@ -246,13 +246,16 @@ class OrderService {
   <p>新建 <code>apps/gateway/src/proxy/proxy.module.ts</code>:</p>
   <pre><code>import { Global, Module } from '@nestjs/common';
 import { ProxyService } from './proxy.service';
+import { HttpClientModule } from '../common/http-client/http-client.module';
 
-@Global()                                  // ← 全 app 可见,feature module 不用再 import
+@Global()                                  // ← exports 全 app 可见
 @Module({
+  imports: [HttpClientModule],             // ← 必须 import!@Global 不等于"看得见所有 module 的 provider"
   providers: [ProxyService],
   exports: [ProxyService],
 })
 export class ProxyModule {}</code></pre>
+  <p><strong>⚠️ 关键</strong>:<code>@Global()</code> 只让你的 <strong>exports</strong> 全 app 可见,<strong>你自己的 imports 还得列</strong>。ProxyModule 需要 HttpClientService(因为 ProxyService 构造注入),所以必须 imports: [HttpClientModule]。漏写这个 = 启动 UnknownDependenciesException。</p>
 </div>
 
 <div class="task">
