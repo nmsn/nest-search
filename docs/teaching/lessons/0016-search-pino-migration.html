@@ -240,14 +240,14 @@ export class AppModule implements OnModuleInit {
     <p>1. 副线 2 的本质是什么?</p>
     <label class="quiz-opt"><input type="radio" name="q1" value="a"> 给所有服务加新功能</label>
     <label class="quiz-opt"><input type="radio" name="q1" value="b"> 优化已有代码性能</label>
-    <label class="quiz-opt"><input type="radio" name="q1" value="c"> <strong>把 gateway 已经验证的模式复制到 N 个服务,保证 nest-search 整套服务一致</strong></label>
+    <label class="quiz-opt"><input type="radio" name="q1" value="c"> 把 gateway 已经验证的模式复制到 N 个服务,保证 nest-search 整套服务一致</label>
     <button onclick="check(this)">提交</button>
     <div class="quiz-feedback"></div>
   </div>
 
   <div class="quiz-q" data-correct="a">
     <p>2. <code>genReqId</code> 接收 <code>x-request-id</code> 头的目的是什么?</p>
-    <label class="quiz-opt"><input type="radio" name="q2" value="a"> <strong>让 gateway 传来的 requestId 在 search-service 日志里延续,跨服务追问题</strong></label>
+    <label class="quiz-opt"><input type="radio" name="q2" value="a"> 让 gateway 传来的 requestId 在 search-service 日志里延续,跨服务追问题</label>
     <label class="quiz-opt"><input type="radio" name="q2" value="b"> 性能优化</label>
     <label class="quiz-opt"><input type="radio" name="q2" value="c"> 鉴权</label>
     <button onclick="check(this)">提交</button>
@@ -257,7 +257,7 @@ export class AppModule implements OnModuleInit {
   <div class="quiz-q" data-correct="b">
     <p>3. 0016 改了 search-service,但只验证了 search 自己能起 + 18 测试还过 — <strong>为什么不用写 search-service 的 e2e</strong>?</p>
     <label class="quiz-opt"><input type="radio" name="q3" value="a"> 因为 search 没重要业务</label>
-    <label class="quiz-opt"><input type="radio" name="q3" value="b"> <strong>因为 0016 改的是 module-level 配置,不是 service 业务逻辑;现有 18 测试覆盖的边界没动</strong></label>
+    <label class="quiz-opt"><input type="radio" name="q3" value="b"> 因为 0016 改的是 module-level 配置,不是 service 业务逻辑;现有 18 测试覆盖的边界没动</label>
     <label class="quiz-opt"><input type="radio" name="q3" value="c"> 因为 pino 不影响行为</label>
     <button onclick="check(this)">提交</button>
     <div class="quiz-feedback"></div>

@@ -262,7 +262,7 @@ act -j test --dryrun  # 只看 workflow,不真跑(调试用)</code></pre>
   <div class="quiz-q" data-correct="b">
     <p>1. CI 的核心价值是什么?</p>
     <label class="quiz-opt"><input type="radio" name="q1" value="a"> 加速构建</label>
-    <label class="quiz-opt"><input type="radio" name="q1" value="b"> <strong>每次 push 都自动跑测试,跑不过 merge 阻塞 — "代码永远绿"的真闸口</strong></label>
+    <label class="quiz-opt"><input type="radio" name="q1" value="b"> 每次 push 都自动跑测试,跑不过 merge 阻塞 — "代码永远绿"的真闸口</label>
     <label class="quiz-opt"><input type="radio" name="q1" value="c"> 减少手动操作</label>
     <button onclick="check(this)">提交</button>
     <div class="quiz-feedback"></div>
@@ -272,14 +272,14 @@ act -j test --dryrun  # 只看 workflow,不真跑(调试用)</code></pre>
     <p>2. GitHub Actions 的 service container 关键优势?</p>
     <label class="quiz-opt"><input type="radio" name="q2" value="a"> 比 self-hosted runner 便宜</label>
     <label class="quiz-opt"><input type="radio" name="q2" value="b"> 自动 cache</label>
-    <label class="quiz-opt"><input type="radio" name="q2" value="c"> <strong>端口映射到 localhost,跟本地 docker-compose 完全一致 — nest-search 代码零改动</strong></label>
+    <label class="quiz-opt"><input type="radio" name="q2" value="c"> 端口映射到 localhost,跟本地 docker-compose 完全一致 — nest-search 代码零改动</label>
     <button onclick="check(this)">提交</button>
     <div class="quiz-feedback"></div>
   </div>
 
   <div class="quiz-q" data-correct="a">
     <p>3. 为什么 <code>MYSQL_ROOT_PASSWORD=root123</code> 而不是新设一个?</p>
-    <label class="quiz-opt"><input type="radio" name="q3" value="a"> <strong>跟 auth-service 默认 DATABASE_URL 一致 — 不改业务代码,CI 才能跑</strong></label>
+    <label class="quiz-opt"><input type="radio" name="q3" value="a"> 跟 auth-service 默认 DATABASE_URL 一致 — 不改业务代码,CI 才能跑</label>
     <label class="quiz-opt"><input type="radio" name="q3" value="b"> 密码简单好记</label>
     <label class="quiz-opt"><input type="radio" name="q3" value="c"> root123 是 MySQL 官方默认</label>
     <button onclick="check(this)">提交</button>

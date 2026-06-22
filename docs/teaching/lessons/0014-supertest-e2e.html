@@ -426,7 +426,7 @@ Tests:       16 passed, 16 total</code></pre>
 <div class="quiz">
   <div class="quiz-q" data-correct="a">
     <p>1. e2e 测试 vs 单元测试,本质区别是什么?</p>
-    <label class="quiz-opt"><input type="radio" name="q1" value="a"> <strong>e2e 测"用户故事"(完整链路),单测测"一个函数"</strong></label>
+    <label class="quiz-opt"><input type="radio" name="q1" value="a"> e2e 测"用户故事"(完整链路),单测测"一个函数"</label>
     <label class="quiz-opt"><input type="radio" name="q1" value="b"> e2e 比单测慢</label>
     <label class="quiz-opt"><input type="radio" name="q1" value="c"> e2e 不用 mock</label>
     <button onclick="check(this)">提交</button>
@@ -437,7 +437,7 @@ Tests:       16 passed, 16 total</code></pre>
     <p>2. 0014 为什么 mock RedisService 而不是用真的?</p>
     <label class="quiz-opt"><input type="radio" name="q2" value="a"> Redis 太慢</label>
     <label class="quiz-opt"><input type="radio" name="q2" value="b"> Redis 装不上</label>
-    <label class="quiz-opt"><input type="radio" name="q2" value="c"> <strong>业务简单(get/set/del)+ mock 教学价值高(展示 overrideProvider 模式)+ 没必要真打网络</strong></label>
+    <label class="quiz-opt"><input type="radio" name="q2" value="c"> 业务简单(get/set/del)+ mock 教学价值高(展示 overrideProvider 模式)+ 没必要真打网络</label>
     <button onclick="check(this)">提交</button>
     <div class="quiz-feedback"></div>
   </div>
@@ -445,7 +445,7 @@ Tests:       16 passed, 16 total</code></pre>
   <div class="quiz-q" data-correct="b">
     <p>3. <code>Test.createTestingModule</code> 跟 <code>NestFactory.create</code> 的关键差异?</p>
     <label class="quiz-opt"><input type="radio" name="q3" value="a"> 一个用 TS 一个用 JS</label>
-    <label class="quiz-opt"><input type="radio" name="q3" value="b"> <strong>Testing module 支持 .overrideProvider() 等替换,Factory 不支持</strong></label>
+    <label class="quiz-opt"><input type="radio" name="q3" value="b"> Testing module 支持 .overrideProvider() 等替换,Factory 不支持</label>
     <label class="quiz-opt"><input type="radio" name="q3" value="c"> 一个慢一个快</label>
     <button onclick="check(this)">提交</button>
     <div class="quiz-feedback"></div>
