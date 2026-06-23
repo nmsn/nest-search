@@ -34,3 +34,69 @@
 - 改 `.zshrc` 加 PATH(**不应该 commit,这是用户级配置,不是项目代码**)
 - 软链 `~/.docker/cli-plugins/docker-compose`(**不应该 commit**)
 
+## 📋 30-50 课时总体大纲(2026-06-23 校准)
+
+**用户原始规划**:30-50 课时,基于 nest-search,Node/NestJS/DB/Docker 从 0 学起,改造成企业级最佳实践。
+
+**校准后总目标:50 课时**(Phase A 必修 30 + Phase B 全栈深度 38 + Phase C 加分 43 + Phase D 全栈必须补充 50)
+
+### 已完成:18 课时(2026-06-22 截止)
+
+- 主线 0001-0008:Node 运行时基础(8 节)
+- principles 0009-0012:NestJS 原理(4 节)
+- 副线 1 0013-0015:测试体系(3 节)
+- 副线 2 0016-0018:跨服务迁移(3 节)
+
+### Phase A · 必修 12 节(MISSION + LR-0002 缺口)— 18 → 30
+
+| 课 | 主题 | 对应缺口 | 预计 |
+|---|---|---|---|
+| 0019-0021 | Zod 配置校验 + DTO 推断 | LR-0002 #6 | 3 节 |
+| 0022-0024 | Drizzle 深度(schema + 迁移 + 事务) | 你原始 DB | 3 节 |
+| 0025-0026 | 优雅退出 + AllExceptionsFilter 深入 | LR-0002 #9 + #2 | 2 节 |
+| 0027-0028 | JWT 深入(refresh rotation + 黑名单) | LR-0002 #7 | 2 节 |
+| 0029-0030 | 健康检查深度(liveness/readiness + 自定义) | LR-0002 #3 | 2 节 |
+
+### Phase B · 全栈深度 8 节 — 30 → 38
+
+| 课 | 主题 | 备注 |
+|---|---|---|
+| 0031-0033 | Redis 深度(数据结构 + 分布式锁 + Cache-Aside) | user 强调 |
+| 0034-0036 | RabbitMQ 深度(Exchange + 死信 + 幂等) | user 强调 |
+| 0037-0038 | 错误处理模式(retry + circuit breaker + bulkhead) | MISSION 缺 |
+
+### Phase C · 加分项 5 节 — 38 → 43
+
+| 课 | 主题 |
+|---|---|
+| 0039-0040 | 测试进阶(contract / load) |
+| 0041-0042 | 监控告警(SLO/SLI/Prometheus) |
+| 0043 | OpenTelemetry trace 链路追踪 |
+
+### Phase D · 全栈必须补充 7 节 — 43 → 50
+
+| 课 | 主题 | 备注 |
+|---|---|---|
+| 0044-0045 | 认证/授权深入(OAuth 2.0 / OIDC / CAS 完整 flow) | nest-search 现有 CAS 浅做,补深度 |
+| 0046-0047 | WebSocket / SSE(实时通知 / 协同 / 监控大屏) | nest-search 现 0 实时能力 |
+| 0048 | 文件上传 / S3 预签名 URL(头像 / 合同 / 报告) | 企业 90% 场景有文件 |
+| 0049 | 依赖注入 scope 进阶(request / transient 边界) | NestJS 独有,常踩坑 |
+| 0050 | API 版本控制 + 灰度发布(URI/Header 策略 + 渐进迁移) | 多版本共存 + 蓝绿 |
+
+### 选题决策准则
+
+1. **MISSION 优先**:任何 MISSION 写的"3-5 企业级补丁"必修
+2. **LR-0002 缺口**:10 个缺位中未完成的 4 个必修
+3. **用户强调主题**:redis/rabbitmq/zod/drizzle 必修
+4. **依赖深度**:Drizzle + Zod + Joi + Redis + RabbitMQ 都"用过但未深入",要专门课
+5. **全栈补充(Phase D)**:OAuth/WebSocket/文件上传/scope/版本控制 — 企业级必备
+
+### 工作流约束(2026-06-22 起)
+
+- **lesson HTML 由 Claude 写**(纯指南)
+- **业务代码由 user 写**(learn-by-doing 真义)
+- **Claude 负责**:解释概念 + 设计决策 + 卡住时给提示 + 写 LR + commit message
+- **user 负责**:写代码 + 跑测试 + commit
+- **不再有"我替你写完"的伪动手**
+
+
