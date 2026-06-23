@@ -5,10 +5,11 @@ import { randomUUID } from 'node:crypto';
 import { DrizzleModule } from './database/drizzle.module';
 import { SchemeModule } from './scheme/scheme.module';
 import { FormModule } from './form/form.module';
+import { validateEnv } from './config/validate-env';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
     // ← 0017: 对齐 gateway 0005 / search-service 0016 模式
     LoggerModule.forRoot({
       pinoHttp: {

@@ -17,10 +17,11 @@ import { HttpClientModule } from "./common/http-client/http-client.module";
 import { RolesGuard } from "./guards/roles.guard";
 import { ProxyModule } from "./proxy/proxy.module";
 import { AuthProxyModule } from "./auth-proxy/auth-proxy.module";
+import { validateEnv } from "./config/validate-env";
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
     HttpClientModule, // ← 新加,放最前(其他 module 都依赖)
     LoggerModule.forRoot({
       pinoHttp: {

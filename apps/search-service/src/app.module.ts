@@ -6,10 +6,11 @@ import { ElasticsearchModule } from './elasticsearch/elasticsearch.module';
 import { ElasticsearchService } from './elasticsearch/elasticsearch.service';
 import { SearchModule } from './search/search.module';
 import { initIndices } from './elasticsearch/elasticsearch.init';
+import { validateEnv } from './config/validate-env';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
     // ← 0016: 对齐 gateway 0005 模式 — pino + 跨服务 requestId 透传
     LoggerModule.forRoot({
       pinoHttp: {
