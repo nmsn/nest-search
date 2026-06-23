@@ -3,7 +3,8 @@ import { DrizzleService } from '../database/drizzle.service';
 import { users } from '../database/schema/users';
 import { eq } from 'drizzle-orm';
 import * as bcrypt from 'bcrypt';
-import { CreateUserDto } from './dto/create-user.dto';
+// 方案 B:DTO 单一 source of truth 在 database/dto/
+import { RegisterApi as CreateUserDto } from '../database/dto/users.dto';
 
 @Injectable()
 export class UserService {

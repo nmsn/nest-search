@@ -3,7 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from '../user/dto/login.dto';
-import { CreateUserDto, CreateUserDtoSchema } from '../user/dto/create-user.dto';
+// 方案 B:DTO 单一 source of truth 在 database/dto/,user 模块直接 import
+import {
+  RegisterApi as CreateUserDto,
+  RegisterApiSchema as CreateUserDtoSchema,
+} from '../database/dto/users.dto';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { UserService } from '../user/user.service';
 import * as jwt from 'jsonwebtoken';
