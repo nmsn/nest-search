@@ -1,9 +1,10 @@
-import { Controller, Post, Get, Body, Headers, Res, UnauthorizedException } from '@nestjs/common';
+import { Controller, Post, Get, Body, Headers, Res, UnauthorizedException, UsePipes } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from '../user/dto/login.dto';
-import { CreateUserDto } from '../user/dto/create-user.dto';
+import { CreateUserDto, CreateUserDtoSchema } from '../user/dto/create-user.dto';
+import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { UserService } from '../user/user.service';
 import * as jwt from 'jsonwebtoken';
 import { CAS_CONFIG, JwtPayload } from '../libs/shared';
@@ -26,6 +27,8 @@ export class AuthController {
   }
 
   @Post('register')
+  // 0022: 用 drizzle-zod 推断的 Zod schema + 手写 pipe 校验
+  @UsePipes(new ZodValidationPipe(CreateUserDtoSchema))
   async register(@Body() dto: CreateUserDto) {
     const user = await this.userService.create(dto);
     const { passwordHash, ...result } = user as any;
