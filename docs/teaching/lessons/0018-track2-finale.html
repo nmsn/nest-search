@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>0018 · 副线 2 收官 · 跨服务追踪实测 + nest-search 全景</title>
+<style>
+  :root {
+    --bg: #fbfaf7;
+    --ink: #1d1d1d;
+    --ink-soft: #4a4a4a;
+    --ink-faint: #8a8a8a;
+    --rule: #d6d2c4;
+    --accent: #b04a2f;
+    --code-bg: #f1efe8;
+    --code-inline: #ece8db;
+    --good: #2c6e3e;
+    --bad: #b04a2f;
+    --pad: 2.4rem;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "SF Pro Text", "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  body { max-width: 760px; margin: 0 auto; padding: var(--pad); }
+  h1, h2, h3 { font-family: Georgia, "Source Han Serif SC", "Songti SC", serif; font-weight: 600; letter-spacing: -0.01em; }
+  h1 { font-size: 2.1rem; line-height: 1.15; margin: 0 0 0.4rem 0; }
+  h2 { font-size: 1.45rem; margin: 3rem 0 0.6rem 0; border-bottom: 1px solid var(--rule); padding-bottom: 0.3rem; }
+  h3 { font-size: 1.12rem; margin: 1.6rem 0 0.4rem 0; color: var(--ink-soft); }
+  p { margin: 0.8rem 0; }
+  .lede { font-size: 1.05rem; color: var(--ink-soft); font-style: italic; border-left: 3px solid var(--accent); padding-left: 0.9rem; margin: 1rem 0 1.6rem 0; }
+  .meta { color: var(--ink-faint); font-size: 0.85rem; margin-bottom: 1.6rem; }
+  .meta a { color: var(--ink-faint); }
+  code, pre, kbd { font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace; font-size: 0.92em; }
+  p code, li code, td code { background: var(--code-inline); padding: 0.08em 0.36em; border-radius: 3px; color: var(--ink); }
+  pre { background: var(--code-bg); border: 1px solid var(--rule); padding: 0.9rem 1rem; border-radius: 4px; overflow-x: auto; line-height: 1.5; margin: 0.8rem 0; position: relative; }
+  pre code { background: transparent; padding: 0; }
+  pre .copy-btn {
+    position: absolute;
+    top: 0.4rem; right: 0.4rem;
+    padding: 0.25rem 0.55rem;
+    background: rgba(255,255,255,0.85);
+    color: var(--ink-soft);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    font-family: -apple-system, "SF Pro Text", sans-serif;
+    font-size: 0.72rem; font-weight: 600;
+    cursor: pointer; opacity: 0.65;
+  }
+  pre .copy-btn:hover { opacity: 1; }
+  pre .copy-btn.copied { background: var(--good); color: white; border-color: var(--good); opacity: 1; }
+  pre .copy-btn.failed { background: var(--bad); color: white; border-color: var(--bad); opacity: 1; }
+  .task { background: #fff; border: 1px solid var(--rule); border-left: 4px solid var(--accent); padding: 1rem 1.2rem; margin: 1.4rem 0; border-radius: 3px; }
+  .task h3 { margin-top: 0; color: var(--accent); text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.85rem; font-family: -apple-system, sans-serif; font-weight: 700; }
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; margin: 1rem 0; }
+  .compare > div { background: #fff; border: 1px solid var(--rule); padding: 0.8rem 1rem; border-radius: 3px; }
+  .compare h4 { margin: 0 0 0.4rem 0; font-size: 0.9rem; color: var(--ink-soft); }
+  .quiz { margin: 1.6rem 0; }
+  .quiz-q { background: #fff; border: 1px solid var(--rule); padding: 1rem 1.2rem; border-radius: 3px; margin: 0.8rem 0; }
+  .quiz-q p:first-child { margin-top: 0; font-weight: 600; }
+  .quiz-opt { display: block; margin: 0.3rem 0; cursor: pointer; }
+  .quiz-opt input { margin-right: 0.5rem; }
+  .quiz-feedback { display: none; margin-top: 0.6rem; padding: 0.5rem 0.8rem; border-radius: 3px; font-size: 0.95rem; }
+  .quiz-feedback.show { display: block; }
+  .quiz-feedback.good { background: #e8f3ea; color: var(--good); border: 1px solid #b6d8be; }
+  .quiz-feedback.bad { background: #fbeae5; color: var(--bad); border: 1px solid #e8b9a8; }
+  hr { border: none; border-top: 1px solid var(--rule); margin: 2.4rem 0 1.2rem 0; }
+  footer { color: var(--ink-faint); font-size: 0.85rem; }
+  footer a { color: var(--ink-soft); }
+  @media print {
+    body { background: white; max-width: none; padding: 1.2rem; }
+    .task, .quiz-q { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>副线 2 收官 · 跨服务追踪实测 + nest-search 全景</h1>
+  <p class="lede">副线 2(跨服务迁移)收官。亲手跑一次"一次请求,2 个服务 log 看到同一个 trace"。</p>
+  <p class="meta">
+    课时 0018 · 预计 45 分钟 · 锚定项目 <code>nest-search</code>
+    · 上一节: <a href="0017-sync-form-pino-migration.html">sync/form 加 pino</a>
+    · 下一节: <a href="#what-next">副线 3 预告</a>
+  </p>
+</header>
+
+<hr>
+
+<h2>你今天会拿到什么</h2>
+<ol>
+  <li>理解<strong>"跨服务追踪"</strong>是什么 — 一次请求横跨 N 个进程,通过 requestId 串起来</li>
+  <li>亲手跑一次实测:gateway → search-service,看<strong>同一个 trace</strong>出现在两边 log</li>
+  <li>看 nest-search 当前<strong>全景图</strong>:5 个服务 / 18 个测试 / 4 个 LR</li>
+  <li>副线 2 总结:4 条 lesson 设计铁律</li>
+  <li>3 道 quiz(答案不加粗)</li>
+</ol>
+
+<h2>1. 跨服务追踪 — 一句话定义</h2>
+
+<p>用户请求 <code>POST /api/auth/login</code> 时,nest-search 内部实际经过:</p>
+<ol>
+  <li>gateway(3000)— 接收请求 + JwtGuard + 转发</li>
+  <li>auth-service(3004)— bcrypt 校验 + 生成 token + 写 Redis</li>
+  <li>可能 → MySQL / Redis / RabbitMQ</li>
+</ol>
+
+<p><strong>如果某一步报错</strong>,怎么定位"是哪个请求触发的"?</p>
+
+<blockquote>
+<p><strong>跨服务追踪</strong>:在请求进入的第一站(本例 gateway)给请求生成/读取一个 <code>requestId</code>,然后<strong>每经过一站都带上</strong>,该站 log 里都包含这个 id。事后 grep 一个 id,能拉出整个调用链。</p>
+</blockquote>
+
+<h2>2. 实操 · 跨服务追踪实测</h2>
+
+<div class="task">
+  <h3>2.1 · 准备 — 启 gateway + search-service</h3>
+  <p><strong>前提</strong>:MySQL + Redis + Elasticsearch + RabbitMQ 都在 docker-compose up 状态。</p>
+  <pre><code># 检查基础设施
+lsof -i :3000 -i :3002 -P   # 端口空
+docker ps --format "{{.Names}}: {{.Status}}" | grep -E "mysql|redis|elasticsearch"
+
+# 临时打开 autoLogging(为了看到 HTTP 请求 log)
+# 不改业务代码,只改 4 行 autoLogging: false → true
+# gateway: apps/gateway/src/app.module.ts
+# search-service: apps/search-service/src/app.module.ts</code></pre>
+  <div class="warn" style="background:#fff8e8; border-left:4px solid #c08a30; padding:0.8rem 1rem; margin:1rem 0; border-radius:3px;">
+    <strong>⚠️</strong> autoLogging: true 会让每个 HTTP 请求打 1 条 log(prod 不推荐,太吵)。<strong>本节为了实测临时打开,实测完恢复 false</strong>。
+  </div>
+  <pre><code># 启服务
+pnpm start:gateway &gt; /tmp/gateway.log 2&gt;&amp;1 &amp;
+echo $! &gt; /tmp/gateway.pid
+pnpm start:search &gt; /tmp/search.log 2&gt;&amp;1 &amp;
+echo $! &gt; /tmp/search.pid
+sleep 10
+
+# 等"LoggerModule dependencies initialized" + "Mapped" 路由</code></pre>
+</div>
+
+<div class="task">
+  <h3>2.2 · 实操 · 发带 trace 的请求</h3>
+  <pre><code>curl -H "x-request-id: trace-abc-002" \
+     -H "x-api-key: ds_key_123" \
+     "http://localhost:3000/api/search/ds/products?keyword=test"</code></pre>
+  <p>期望响应:<code>200 {"total":{"value":0,"relation":"eq"},"page":1,"size":20,"items":[]}</code>。</p>
+</div>
+
+<div class="task">
+  <h3>2.3 · 实操 · grep 同一 trace</h3>
+  <pre><code>grep "trace-abc-002" /tmp/gateway.log
+grep "trace-abc-002" /tmp/search.log</code></pre>
+
+  <h4 style="margin-top:1.2rem;">✓ gateway log 出现的两条(节选)</h4>
+  <pre><code>{"level":30, ... "req":{"id":"trace-abc-002", "method":"GET",
+ "url":"/api/search/ds/products?keyword=test", ...
+ "x-request-id":"trace-abc-002", ...},
+ "requestId":"trace-abc-002",
+ "context":"ProxyService",
+ "msg":"Proxying GET /api/search/ds/products?keyword=test → search-service"}
+
+{"level":30, ... "requestId":"trace-abc-002",
+ "context":"TimingInterceptor", "method":"GET",
+ "url":"/api/search/ds/products?keyword=test",
+ "statusCode":200, "durationMs":26.18,
+ "msg":"request completed"}</code></pre>
+
+  <h4 style="margin-top:1.2rem;">✓ search-service log 出现的一条(节选)</h4>
+  <pre><code>{"level":30, ... "req":{"id":"trace-abc-002", "method":"GET",
+ "url":"/api/search/ds/products?keyword=test", ...
+ "x-request-id":"trace-abc-002",
+ "user-agent":"axios/1.16.0",   ← 来自 gateway 的 HttpClientService
+ "host":"localhost:3002"},
+ "requestId":"trace-abc-002",
+ "res":{"statusCode":200}, "responseTime":15,
+ "msg":"request completed"}</code></pre>
+
+  <p><strong>关键观察</strong>:</p>
+  <ul>
+    <li>两边都有 <code>"requestId":"trace-abc-002"</code> — 同一 trace</li>
+    <li>search-service log 里 <code>user-agent: axios/1.16.0</code> — 证明请求来自 gateway 的 HttpClientService</li>
+    <li>gateway log 第一条 <code>"context":"ProxyService"</code> — 转发是 ProxyService 干的</li>
+  </ul>
+</div>
+
+<div class="task">
+  <h3>2.4 · 清理 · 恢复 autoLogging + 杀进程</h3>
+  <pre><code># 恢复 autoLogging: false(gateway / search 两个文件)
+# 改完保存后:
+
+kill $(cat /tmp/gateway.pid) 2&gt;/dev/null
+kill $(cat /tmp/search.pid) 2&gt;/dev/null
+lsof -ti :3000 -P | xargs kill -9 2&gt;/dev/null
+lsof -ti :3002 -P | xargs kill -9 2&gt;/dev/null
+
+# 验证:4 个服务都 autoLogging: false
+grep "autoLogging" apps/{gateway,sync,form}-service/src/app.module.ts \
+                    apps/search-service/src/app.module.ts</code></pre>
+  <p>期望输出:全部 <code>autoLogging: false</code>。</p>
+</div>
+
+<h2>3. nest-search 全景图(0018 后)</h2>
+
+<table style="width:100%; border-collapse: collapse; margin: 1rem 0;">
+<tr><th style="text-align:left; padding:0.4rem; border-bottom:1px solid var(--rule)">服务</th><th style="text-align:left; padding:0.4rem; border-bottom:1px solid var(--rule)">端口</th><th style="text-align:left; padding:0.4rem; border-bottom:1px solid var(--rule)">pino</th><th style="text-align:left; padding:0.4rem; border-bottom:1px solid var(--rule)">其他</th></tr>
+<tr><td style="padding:0.4rem;">gateway</td><td style="padding:0.4rem;">3000</td><td style="padding:0.4rem;">✅ 0005</td><td style="padding:0.4rem;">HttpClient + Swagger + Roles + Throttler + ProxyModule</td></tr>
+<tr><td style="padding:0.4rem;">auth-service</td><td style="padding:0.4rem;">3004</td><td style="padding:0.4rem;">✅ 主线</td><td style="padding:0.4rem;">Redis + Drizzle + CAS</td></tr>
+<tr><td style="padding:0.4rem;">search-service</td><td style="padding:0.4rem;">3002</td><td style="padding:0.4rem;">✅ 0016</td><td style="padding:0.4rem;">Elasticsearch</td></tr>
+<tr><td style="padding:0.4rem;">sync-service</td><td style="padding:0.4rem;">3001</td><td style="padding:0.4rem;">✅ 0017</td><td style="padding:0.4rem;">RabbitMQ consumer</td></tr>
+<tr><td style="padding:0.4rem;">form-service</td><td style="padding:0.4rem;">3003</td><td style="padding:0.4rem;">✅ 0017</td><td style="padding:0.4rem;">Drizzle</td></tr>
+</table>
+
+<h3>测试覆盖(0013-0014 副线 1 装的)</h3>
+<table style="width:100%; border-collapse: collapse; margin: 1rem 0;">
+<tr><th style="text-align:left; padding:0.4rem; border-bottom:1px solid var(--rule)">类型</th><th style="text-align:left; padding:0.4rem; border-bottom:1px solid var(--rule)">套件</th><th style="text-align:left; padding:0.4rem; border-bottom:1px solid var(--rule)">it 数</th></tr>
+<tr><td style="padding:0.4rem;">单测</td><td style="padding:0.4rem;">3(gateway RolesGuard / ProxyService / HttpClientService)</td><td style="padding:0.4rem;">11</td></tr>
+<tr><td style="padding:0.4rem;">e2e</td><td style="padding:0.4rem;">1(auth register/login/me)</td><td style="padding:0.4rem;">7</td></tr>
+<tr><td style="padding:0.4rem;"><strong>总计</strong></td><td style="padding:0.4rem;"><strong>4</strong></td><td style="padding:0.4rem;"><strong>18</strong></td></tr>
+</table>
+
+<p><code>pnpm test</code> 跑一次,~3 秒全过。</p>
+
+<h3>副线 2 收官 checklist</h3>
+<ul>
+  <li>✅ 5/5 服务有 pino</li>
+  <li>✅ 4/4 服务用同一份 pino 配置(零差异)</li>
+  <li>✅ 跨服务 requestId 实测通过(§2.3 真实输出)</li>
+  <li>✅ autoLogging 选择有 trade-off 解释(降噪 vs 可见)</li>
+</ul>
+
+<h2>4. 副线 2 总结 — 4 条 lesson 设计铁律</h2>
+
+<p>副线 2(0016-0018)撞了 0 个反模式(代码层面),但 lesson 设计层面撞了 2 个你抓出来的:</p>
+
+<ol>
+  <li><strong>quiz 不加粗答案</strong> — Ctrl+F 一秒破 quiz</li>
+  <li><strong>"迁移" 也要有实操步骤</strong> — 不能因为简单就跳过"动手"</li>
+</ol>
+
+<p>加上之前副线 1 撞的,4 条 lesson 设计铁律:</p>
+
+<div class="compare">
+  <div>
+    <h4>铁律 1 · lesson 代码先跑通再写</h4>
+    <p>改代码 → 本地跑 → 看输出 → 写 HTML → commit(0017 改进)</p>
+  </div>
+  <div>
+    <h4>铁律 2 · 基础设施改动单独成 §X.0</h4>
+    <p>每个 lesson 有"准备"章节讲依赖 / 配置 / 工具链(0013 改进)</p>
+  </div>
+  <div>
+    <h4>铁律 3 · 第三方 API 标版本号</h4>
+    <p>supertest 7.x / nestjs-pino 4.x — 避免 import 语义变化(0014 改进)</p>
+  </div>
+  <div>
+    <h4>铁律 4 · quiz 不加粗答案(0 加粗)</h4>
+    <p>data-correct 属性 + JS 反馈;视觉无提示(0018 强制)</p>
+  </div>
+</div>
+
+<h2>5. 自我检测(3 道题)</h2>
+
+<div class="quiz">
+  <div class="quiz-q" data-correct="c">
+    <p>1. 跨服务追踪的"一站式"本质是什么?</p>
+    <label class="quiz-opt"><input type="radio" name="q1" value="a"> 每个服务独立记录日志</label>
+    <label class="quiz-opt"><input type="radio" name="q1" value="b"> 用同一个数据库存所有 log</label>
+    <label class="quiz-opt"><input type="radio" name="q1" value="c"> 一次请求带同一个 trace id 横跨 N 个服务,事后 grep 一个 id 能拉出整个调用链</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz-q" data-correct="a">
+    <p>2. 为什么 gateway / search 都设 <code>autoLogging: false</code>?</p>
+    <label class="quiz-opt"><input type="radio" name="q2" value="a"> 降噪 — prod 每个 HTTP 请求都打 1 条 log 太吵,只在重要业务点显式 log</label>
+    <label class="quiz-opt"><input type="radio" name="q2" value="b"> 性能优化</label>
+    <label class="quiz-opt"><input type="radio" name="q2" value="c"> 因为 pino 不支持</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz-q" data-correct="b">
+    <p>3. 副线 2 撞了几个业务反模式(代码层面)?</p>
+    <label class="quiz-opt"><input type="radio" name="q3" value="a"> 5 个</label>
+    <label class="quiz-opt"><input type="radio" name="b"> 0 个 — 模式复制是低风险操作,反模式全在 lesson 设计层(quiz 加粗/缺实操)</label>
+    <label class="quiz-opt"><input type="radio" name="q3" value="c"> 10 个</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
+</div>
+
+<h2 id="what-next">下一节预告</h2>
+<p>0018 副线 2 收官。下一节按 LR-0019 的 3 个候选方向选:<strong>副线 3 = ?</strong></p>
+
+<table style="width:100%; border-collapse: collapse; margin: 1rem 0;">
+<tr><th style="text-align:left; padding:0.4rem; border-bottom:1px solid var(--rule)">候选</th><th style="text-align:left; padding:0.4rem; border-bottom:1px solid var(--rule)">内容</th><th style="text-align:left; padding:0.4rem; border-bottom:1px solid var(--rule)">预计节数</th></tr>
+<tr><td style="padding:0.4rem;">副线 3 · Docker 化部署</td><td style="padding:0.4rem;">写 Dockerfile + docker-compose.prod.yml + 真部署一次</td><td style="padding:0.4rem;">2-3 节</td></tr>
+<tr><td style="padding:0.4rem;">副线 4 · 配置中心 / Env 管理</td><td style="padding:0.4rem;">把 .env 散落各处 → 集中管理(Joi schema + dotenv-expand)</td><td style="padding:0.4rem;">1-2 节</td></tr>
+<tr><td style="padding:0.4rem;">副线 5 · 监控 / 健康检查</td><td style="padding:0.4rem;">每个服务加 healthcheck + Prometheus 指标 + 告警</td><td style="padding:0.4rem;">2-3 节</td></tr>
+</table>
+
+<p>你来选。也可以选"暂停学习,先消化已学的"。</p>
+
+<h2>收口 · 这一节你 commit 什么</h2>
+<p>2 个文件改动:</p>
+<ul>
+  <li><code>docs/teaching/lessons/0018-track2-finale.html</code> — 本课 lesson(含真实 trace 实测输出)</li>
+  <li><code>docs/teaching/learning-records/0022-track2-finale.md</code> — 副线 2 收官反思</li>
+</ul>
+
+<p><strong>本节没有代码改动</strong> — 0018 纯反思 + 实操验证。代码已经在 0016 + 0017 commit 了。</p>
+
+<p>LR-0022 内部会写:</p>
+<ul>
+  <li>实测过程中的 3 个发现(autoLogging 阻塞可见性 / HttpClientService 加 header / lsof 兜底)</li>
+  <li>4 条 lesson 设计铁律的演化过程</li>
+  <li>副线 2 跟副线 1 / principles 轨道的差异</li>
+</ul>
+
+<h2>延伸阅读</h2>
+<ul>
+  <li><a href="https://www.w3.org/TR/trace-context/">W3C Trace Context</a>(requestId 标准化方向)</li>
+  <li><a href="https://opentelemetry.io/docs/concepts/signals/traces/">OpenTelemetry — Distributed Tracing</a>(更重的方案,可作未来副线 5 参考)</li>
+  <li>0016/0017 lesson — 前置</li>
+</ul>
+
+<p style="margin-top: 1.6rem; color: var(--accent); font-weight: 600;">📌 2.3 那个 <code>"requestId":"trace-abc-002"</code> 在 2 个服务 log 都出现 — 是 0018 的金样本。nest-search 第一次有"跨服务可追踪"。</p>
+
+<hr>
+<footer>
+  nest-search · teach workspace · 课时 0018 · 副线 2 收官<br>
+  有问题直接问 Claude
+</footer>
+
+<script>
+function check(btn) {
+  const q = btn.closest('.quiz-q');
+  const correct = q.dataset.correct;
+  const picked = q.querySelector('input[type=radio]:checked');
+  const fb = q.querySelector('.quiz-feedback');
+  if (!picked) {
+    fb.textContent = '⚠️ 选一个再提交。';
+    fb.className = 'quiz-feedback show bad';
+  } else if (picked.value === correct) {
+    fb.textContent = '✅ 对了。';
+    fb.className = 'quiz-feedback show good';
+  } else {
+    fb.textContent = '❌ 不对,回到 §1 / §2 重读一遍,再试一次。';
+    fb.className = 'quiz-feedback show bad';
+  }
+}
+
+// 一键复制
+document.querySelectorAll('pre').forEach(function(pre) {
+  if (pre.classList.contains('json-block')) return;
+  if (pre.querySelector('.copy-btn')) return;
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.textContent = 'Copy';
+  btn.setAttribute('aria-label', '复制代码');
+  pre.appendChild(btn);
+  btn.addEventListener('click', async function() {
+    var codeEl = pre.querySelector('code');
+    if (!codeEl) return;
+    var text = codeEl.textContent;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+    } catch (err) {
+      btn.textContent = 'Failed';
+      btn.classList.add('failed');
+    }
+    setTimeout(function() {
+      btn.textContent = 'Copy';
+      btn.classList.remove('copied', 'failed');
+    }, 1500);
+  });
+});
+</script>
+
+</body>
+</html>
