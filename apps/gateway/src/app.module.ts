@@ -1,5 +1,5 @@
 import { Module } from "@nestjs/common";
-import { ConfigModule } from "@nestjs/config";
+import { ConfigModule, ConfigService } from "@nestjs/config";
 import { APP_GUARD, APP_FILTER } from "@nestjs/core";
 import { AppController } from "./app.controller";
 import { ApiKeyGuard } from "./guards/api-key.guard";
@@ -23,13 +23,16 @@ import { validateEnv } from "./config/validate-env";
   imports: [
     ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
     HttpClientModule, // ← 新加,放最前(其他 module 都依赖)
-    LoggerModule.forRoot({
-      pinoHttp: {
-        level: process.env.LOG_LEVEL || "info",
-        genReqId: (req) => req.headers["x-request-id"] || randomUUID(),
-        customProps: (req) => ({ requestId: req.id }),
-        autoLogging: false,
-      },
+    LoggerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        pinoHttp: {
+          level: config.getOrThrow<string>("LOG_LEVEL"),
+          genReqId: (req) => req.headers["x-request-id"] || randomUUID(),
+          customProps: (req) => ({ requestId: req.id }),
+          autoLogging: false,
+        },
+      }),
     }),
     HealthModule, // ← 新加
     ThrottlerModule.forRoot([

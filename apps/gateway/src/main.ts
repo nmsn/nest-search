@@ -2,6 +2,7 @@ import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { ValidationPipe } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 
 process.on("unhandledRejection", (reason) => {
   console.error("[unhandledRejection]", reason);
@@ -40,7 +41,7 @@ async function bootstrap() {
     }),
   );
 
-  const port = process.env.GATEWAY_PORT || 3000;
+  const port = app.get(ConfigService).getOrThrow<number>('GATEWAY_PORT');
   await app.listen(port);
   console.log(`Gateway running on port ${port}`);
 }

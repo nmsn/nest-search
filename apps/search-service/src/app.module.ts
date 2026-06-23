@@ -1,5 +1,5 @@
 import { Module, OnModuleInit } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { LoggerModule } from 'nestjs-pino';
 import { randomUUID } from 'node:crypto';
 import { ElasticsearchModule } from './elasticsearch/elasticsearch.module';
@@ -12,13 +12,16 @@ import { validateEnv } from './config/validate-env';
   imports: [
     ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
     // ← 0016: 对齐 gateway 0005 模式 — pino + 跨服务 requestId 透传
-    LoggerModule.forRoot({
-      pinoHttp: {
-        level: process.env.LOG_LEVEL || 'info',
-        genReqId: (req) => req.headers['x-request-id'] || randomUUID(),
-        customProps: (req) => ({ requestId: req.id }),
-        autoLogging: false,
-      },
+    LoggerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        pinoHttp: {
+          level: config.getOrThrow<string>('LOG_LEVEL'),
+          genReqId: (req) => req.headers['x-request-id'] || randomUUID(),
+          customProps: (req) => ({ requestId: req.id }),
+          autoLogging: false,
+        },
+      }),
     }),
     ElasticsearchModule,
     SearchModule,

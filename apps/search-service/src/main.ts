@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -11,7 +12,7 @@ async function bootstrap() {
     transform: true,
   }));
 
-  const port = process.env.SEARCH_SERVICE_PORT || 3002;
+  const port = app.get(ConfigService).getOrThrow<number>('SEARCH_SERVICE_PORT');
   await app.listen(port);
   console.log(`Search Service running on port ${port}`);
 }

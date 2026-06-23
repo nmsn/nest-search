@@ -1,4 +1,5 @@
 import { Injectable, UnauthorizedException, ForbiddenException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 import * as jwt from 'jsonwebtoken';
 import { CAS_CONFIG } from '../libs/shared/constants/cas';
@@ -9,11 +10,18 @@ import { RedisService } from '../redis/redis.service';
 
 @Injectable()
 export class AuthService {
+  // CAS_CONFIG 来自常量(后续 lesson 转 @Injectable,TODO)
+  // REFRESH_TOKEN_EXPIRES_IN 走 ConfigService
+  private readonly refreshTtl: number;
+
   constructor(
     private readonly userService: UserService,
     private readonly casService: CasService,
     private readonly redisService: RedisService,
-  ) {}
+    config: ConfigService,
+  ) {
+    this.refreshTtl = config.getOrThrow<number>('REFRESH_TOKEN_EXPIRES_IN');
+  }
 
   async login(username: string, password: string) {
     const user = await this.userService.validatePassword(username, password);
@@ -72,9 +80,8 @@ export class AuthService {
   }
 
   async logout(refreshToken: string) {
-    // Blacklist the refresh token
-    const ttl = parseInt(process.env.REFRESH_TOKEN_EXPIRES_IN || '604800');
-    await this.redisService.set(`refresh_token_blacklist:${refreshToken}`, '1', ttl);
+    // Blacklist the refresh token(用 constructor 注入的 refreshTtl,不再读 process.env)
+    await this.redisService.set(`refresh_token_blacklist:${refreshToken}`, '1', this.refreshTtl);
 
     // Remove token data
     await this.redisService.del(`refresh_token:${refreshToken}`);
@@ -94,13 +101,12 @@ export class AuthService {
 
   private async createRefreshToken(userId: number): Promise<string> {
     const tokenId = randomUUID();
-    const ttl = parseInt(process.env.REFRESH_TOKEN_EXPIRES_IN || '604800');
 
-    // Store token -> userId mapping
+    // Store token -> userId mapping(用 constructor 注入的 refreshTtl)
     await this.redisService.set(
       `refresh_token:${tokenId}`,
       JSON.stringify({ userId }),
-      ttl,
+      this.refreshTtl,
     );
 
     return tokenId;

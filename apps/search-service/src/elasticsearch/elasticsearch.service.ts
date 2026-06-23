@@ -1,14 +1,16 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Client } from '@elastic/elasticsearch';
 
 @Injectable()
 export class ElasticsearchService implements OnModuleInit {
   public client!: Client;
 
+  constructor(private readonly config: ConfigService) {}
+
   onModuleInit() {
-    this.client = new Client({
-      node: process.env.ELASTICSEARCH_NODE || 'http://localhost:9200',
-    });
+    const esNode = this.config.getOrThrow<string>('ELASTICSEARCH_NODE');
+    this.client = new Client({ node: esNode });
   }
 
   async createIndexIfNotExists(indexName: string, mappings: any) {

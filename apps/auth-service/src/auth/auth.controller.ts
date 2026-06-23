@@ -1,4 +1,5 @@
 import { Controller, Post, Get, Body, Headers, Res, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from '../user/dto/login.dto';
@@ -9,10 +10,20 @@ import { CAS_CONFIG, JwtPayload } from '../libs/shared';
 
 @Controller('api/auth')
 export class AuthController {
+  // 从 ConfigService 读 env,CAS_* 留 constants(后续 lesson 转 @Injectable)
+  private readonly isProduction: boolean;
+  private readonly cookieDomain: string;
+  private readonly refreshTtl: number;
+
   constructor(
     private readonly authService: AuthService,
     private readonly userService: UserService,
-  ) {}
+    config: ConfigService,
+  ) {
+    this.isProduction = config.getOrThrow<string>('NODE_ENV') === 'production';
+    this.cookieDomain = config.getOrThrow<string>('CAS_COOKIE_DOMAIN');
+    this.refreshTtl = config.getOrThrow<number>('REFRESH_TOKEN_EXPIRES_IN');
+  }
 
   @Post('register')
   async register(@Body() dto: CreateUserDto) {
@@ -80,29 +91,23 @@ export class AuthController {
   }
 
   private setRefreshTokenCookie(res: Response, refreshToken: string) {
-    const isProduction = process.env.NODE_ENV === 'production';
-    const domain = process.env.CAS_COOKIE_DOMAIN || '.localhost';
-
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
       sameSite: 'lax',
-      maxAge: parseInt(process.env.REFRESH_TOKEN_EXPIRES_IN || '604800') * 1000,
-      domain,
+      maxAge: this.refreshTtl * 1000,
+      domain: this.cookieDomain,
       path: '/',
-      secure: isProduction,
+      secure: this.isProduction,
     });
   }
 
   private clearRefreshTokenCookie(res: Response) {
-    const isProduction = process.env.NODE_ENV === 'production';
-    const domain = process.env.CAS_COOKIE_DOMAIN || '.localhost';
-
     res.clearCookie('refreshToken', {
       httpOnly: true,
       sameSite: 'lax',
-      domain,
+      domain: this.cookieDomain,
       path: '/',
-      secure: isProduction,
+      secure: this.isProduction,
     });
   }
 

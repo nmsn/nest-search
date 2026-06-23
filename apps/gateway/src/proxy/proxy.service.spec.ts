@@ -1,16 +1,30 @@
 import { ProxyService } from './proxy.service';
 import { HttpClientService } from '../common/http-client/http-client.service';
+import { ConfigService } from '@nestjs/config';
 import { HttpException } from '@nestjs/common';
 
 describe('ProxyService', () => {
   let service: ProxyService;
   let mockHttpClient: jest.Mocked<HttpClientService>;
   let mockLogger: any;
+  let mockConfig: jest.Mocked<ConfigService>;
 
   beforeEach(() => {
     mockHttpClient = { request: jest.fn() } as any;
     mockLogger = { info: jest.fn(), error: jest.fn() };
-    service = new ProxyService(mockLogger, mockHttpClient);
+    // ConfigService 注入:模拟下游 URL(0021 Tier 3 改造后多了一个参数)
+    mockConfig = {
+      getOrThrow: jest.fn((key: string) => {
+        const map: Record<string, string> = {
+          SYNC_SERVICE_URL: 'http://localhost:3001',
+          SEARCH_SERVICE_URL: 'http://localhost:3002',
+          FORM_SERVICE_URL: 'http://localhost:3003',
+          AUTH_SERVICE_URL: 'http://localhost:3004',
+        };
+        return map[key];
+      }),
+    } as any;
+    service = new ProxyService(mockLogger, mockHttpClient, mockConfig);
   });
 
   it('forwards to correct downstream URL', async () => {

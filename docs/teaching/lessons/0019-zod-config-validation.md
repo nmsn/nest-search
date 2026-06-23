@@ -2,6 +2,18 @@
 
 > 副线 3(配置校验)第 1 课。env 拼错一个字母 = 跑到线上才崩。Zod 让它在启动时直接挂,告诉你哪儿错了。
 
+## 导航
+
+- **上一课** · [0018 副线 2 收官 · 跨服务追踪实测](./0018-track2-finale.html) — nest-search 5 service pino 对齐
+- **当前课** · 0019(本文件)— Zod 在 auth-service 装上 + fail-fast 实测
+- **下一课** · [0020 Zod 推广到 5 个服务 + 抽公共 schema](./0020-zod-promote-shared-schema.md)
+- **相关 LR** · [LR-0023 副线 3 第 1 课反思](../learning-records/0023-track3-zod-validation.md)
+- **相关参考** · [CURRICULUM.md 总体设计](../CURRICULUM.md) · [MISSION.md 项目使命](../MISSION.md) · [LR-0002 nest-search 缺位盘点](../learning-records/0002-nest-search-inventory.md)
+- **本课产物**:
+  - `apps/auth-service/src/config/env.schema.ts`(新建)
+  - `apps/auth-service/src/config/validate-env.ts`(新建)
+  - `apps/auth-service/src/app.module.ts`(改:加 `validate: validateEnv`)
+
 ## 你今天会拿到什么
 
 1. 理解**为什么配置校验是企业级底线**(不是 nice-to-have)

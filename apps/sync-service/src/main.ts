@@ -1,8 +1,8 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Transport, MicroserviceOptions } from '@nestjs/microservices';
 import { AppModule } from './app.module';
-import { RABBITMQ_CONFIG } from './libs/shared/index';
 
 async function bootstrap() {
   // Start as hybrid: HTTP + Microservice
@@ -13,11 +13,14 @@ async function bootstrap() {
     transform: true,
   }));
 
+  // 从 ConfigService 读 RabbitMQ URL(Zod 已校验必填 + URL 格式)
+  const rabbitUrl = app.get(ConfigService).getOrThrow<string>('RABBITMQ_URL');
+
   // Connect to RabbitMQ as microservice
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.RMQ,
     options: {
-      urls: [RABBITMQ_CONFIG.url],
+      urls: [rabbitUrl],
       queue: 'sync-service-consumer',
       queueOptions: { durable: false },
     },
@@ -25,7 +28,7 @@ async function bootstrap() {
 
   await app.startAllMicroservices();
 
-  const port = process.env.SYNC_SERVICE_PORT || 3001;
+  const port = app.get(ConfigService).getOrThrow<number>('SYNC_SERVICE_PORT');
   await app.listen(port);
   console.log(`Sync Service running on port ${port} (HTTP + RabbitMQ)`);
 }

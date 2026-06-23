@@ -1,21 +1,26 @@
 import { Injectable, HttpException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Method } from 'axios';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { HttpClientService } from '../common/http-client/http-client.service';
 
-const SERVICE_MAP: Record<string, string> = {
-  sync: process.env.SYNC_SERVICE_URL || 'http://localhost:3001',
-  search: process.env.SEARCH_SERVICE_URL || 'http://localhost:3002',
-  form: process.env.FORM_SERVICE_URL || 'http://localhost:3003',
-  auth: process.env.AUTH_SERVICE_URL || 'http://localhost:3004',
-};
-
 @Injectable()
 export class ProxyService {
+  // 从 ConfigService 读下游 URL(替代 module-level SERVICE_MAP)
+  private readonly serviceMap: Record<string, string>;
+
   constructor(
     @InjectPinoLogger(ProxyService.name) private readonly logger: PinoLogger,
-    private readonly httpClient: HttpClientService, // ← 用 HttpClientService
-  ) {}
+    private readonly httpClient: HttpClientService,
+    config: ConfigService,
+  ) {
+    this.serviceMap = {
+      sync: config.getOrThrow<string>('SYNC_SERVICE_URL'),
+      search: config.getOrThrow<string>('SEARCH_SERVICE_URL'),
+      form: config.getOrThrow<string>('FORM_SERVICE_URL'),
+      auth: config.getOrThrow<string>('AUTH_SERVICE_URL'),
+    };
+  }
 
   async forward(
     service: string,
@@ -24,7 +29,7 @@ export class ProxyService {
     body?: any,
     headers?: Record<string, string>,
   ) {
-    const baseUrl = SERVICE_MAP[service];
+    const baseUrl = this.serviceMap[service];
     if (!baseUrl) {
       throw new Error(`Unknown service: ${service}`);
     }

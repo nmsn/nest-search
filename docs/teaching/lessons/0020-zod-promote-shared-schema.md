@@ -2,6 +2,18 @@
 
 > 副线 3(配置校验)第 2 课。0019 给 auth-service 装上 Zod,0020 把模式推广到剩下 4 个服务 + 抽公共 schema 避免重复。
 
+## 导航
+
+- **上一课** · [0019 Zod 配置校验:让服务在启动时 fail-fast](./0019-zod-config-validation.md)
+- **当前课** · 0020(本文件)— 5 service 都装 Zod,撞了 monorepo 跨包问题回退 inline
+- **下一课** · [0021 env.example + 配置文档化](./0021-env-example-and-config-docs.md)
+- **相关 LR** · [LR-0024 副线 3 monorepo 跨包踩坑反思](../learning-records/0024-track3-zod-monorepo-friction.md) · [LR-0023 副线 3 第 1 课反思](../learning-records/0023-track3-zod-validation.md)
+- **相关参考** · [CURRICULUM.md 总体设计](../CURRICULUM.md) · [MISSION.md 项目使命](../MISSION.md)
+- **本课产物**:
+  - 5 个 service × 2 文件(env.schema + validate-env)共 10 个新文件
+  - 5 个 service `app.module.ts` 改
+  - 最终决定:inline 公共字段(不抽 libs/shared)
+
 ## 你今天会拿到什么
 
 1. 把 **5 个公共 env 字段**抽到 `libs/shared/config/base-env.ts`

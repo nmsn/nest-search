@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 
@@ -13,7 +14,8 @@ async function bootstrap() {
     transform: true,
   }));
 
-  const port = process.env.AUTH_SERVICE_PORT || 3004;
+  // 从 ConfigService 取 port(Zod 已经校验必填 + 类型)
+  const port = app.get(ConfigService).getOrThrow<number>('AUTH_SERVICE_PORT');
   await app.listen(port);
   console.log(`Auth Service running on port ${port}`);
 }

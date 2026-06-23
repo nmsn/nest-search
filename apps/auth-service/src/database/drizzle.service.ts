@@ -1,4 +1,5 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { drizzle } from 'drizzle-orm/mysql2';
 import { createPool } from 'mysql2';
 import { users } from './schema/users';
@@ -9,10 +10,12 @@ import { casServices } from './schema/cas-services';
 export class DrizzleService implements OnModuleInit {
   public db!: ReturnType<typeof drizzle>;
 
+  constructor(private readonly config: ConfigService) {}
+
   async onModuleInit() {
-    const pool = createPool({
-      uri: process.env.DATABASE_URL || 'mysql://root:root123@localhost:3306/nest_search',
-    });
+    // Zod 已校验 DATABASE_URL 必填 + 是 URL,getOrThrow 保证 runtime 拿到 string
+    const databaseUrl = this.config.getOrThrow<string>('DATABASE_URL');
+    const pool = createPool({ uri: databaseUrl });
 
     this.db = drizzle(pool, {
       schema: { users, casTickets, casServices },

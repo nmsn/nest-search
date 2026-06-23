@@ -1,14 +1,20 @@
 import { Controller, Get, Post, Body, Query, Res, Req, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Request, Response } from 'express';
 import { CasService } from './cas.service';
 import { UserService } from '../user/user.service';
 
 @Controller('cas')
 export class CasController {
+  private readonly cookieDomain: string;
+
   constructor(
     private readonly casService: CasService,
     private readonly userService: UserService,
-  ) {}
+    config: ConfigService,
+  ) {
+    this.cookieDomain = config.getOrThrow<string>('CAS_COOKIE_DOMAIN');
+  }
 
   @Get('login')
   async loginPage(
@@ -66,7 +72,7 @@ export class CasController {
       httpOnly: true,
       secure: true,
       sameSite: 'lax',
-      domain: process.env.CAS_COOKIE_DOMAIN || '.example.local',
+      domain: this.cookieDomain,
       maxAge: 8 * 60 * 60 * 1000, // 8 hours
     });
 
@@ -102,7 +108,7 @@ export class CasController {
       await this.casService.destroyTgt(tgc);
     }
     res.clearCookie('TGC', {
-      domain: process.env.CAS_COOKIE_DOMAIN || '.example.local',
+      domain: this.cookieDomain,
       secure: true,
       sameSite: 'lax',
     });

@@ -7,3 +7,11 @@ apps/**/src/libs/**/*.js
 apps/**/src/libs/**/*.d.ts
 template/
 coverage/
+
+# .env 文件(配置模板 .env.example 跟踪,真实 .env 不进 git)
+.env
+.env.local
+.env.*.local
+apps/*/.env
+apps/*/.env.local
+apps/*/.env.*.local

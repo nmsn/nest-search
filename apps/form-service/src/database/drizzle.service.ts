@@ -1,4 +1,5 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { drizzle } from 'drizzle-orm/mysql2';
 import { createPool } from 'mysql2';
 import * as schema from './schema/schema-factory';
@@ -9,10 +10,11 @@ import { syncRecords } from '../libs/shared/index';
 export class DrizzleService implements OnModuleInit {
   public db!: ReturnType<typeof drizzle>;
 
+  constructor(private readonly config: ConfigService) {}
+
   async onModuleInit() {
-    const pool = createPool({
-      uri: process.env.DATABASE_URL || 'mysql://root:root123@localhost:3306/nest_search',
-    });
+    const databaseUrl = this.config.getOrThrow<string>('DATABASE_URL');
+    const pool = createPool({ uri: databaseUrl });
 
     this.db = drizzle(pool, {
       schema: { ...schema, businessLines, syncRecords },

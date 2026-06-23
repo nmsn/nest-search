@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Ctx, EventPattern, Payload, RmqContext } from '@nestjs/microservices';
 import { Client } from '@elastic/elasticsearch';
 import { RABBITMQ_CONFIG, BUSINESS_LINES, BusinessLineCode } from '../libs/shared/index';
@@ -10,10 +11,12 @@ export class SyncConsumer {
   private esClient: Client;
   private retryCount = new Map<string, number>();
 
-  constructor(private readonly syncService: SyncService) {
-    this.esClient = new Client({
-      node: process.env.ELASTICSEARCH_NODE || 'http://localhost:9200',
-    });
+  constructor(
+    private readonly syncService: SyncService,
+    config: ConfigService,
+  ) {
+    const esNode = config.getOrThrow<string>('ELASTICSEARCH_NODE');
+    this.esClient = new Client({ node: esNode });
   }
 
   @EventPattern('sync.full.ds')
