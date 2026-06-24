@@ -1,165 +1,147 @@
 # 0026 — 副线 4 第 1 课:0022 Drizzle Kit + drizzle-zod 反思
 
-> 0022 把 nest-search 从"手工 ALTER TABLE"升级到"schema-first + 自动迁移"。也撞了 drizzle-zod 0.8.x 的类型推断陷阱。
+> 0022 是"用户读 lesson + 答 quiz"流程的第 1 次实战(我之前漂过,这次严格执行)。
+> 用户没有自己写代码(选了 A 路径"读 lesson 理解就够了"),但 quiz 答对了 3 道设计哲学题,说明理解到位。
 
 ## 0022 实际产出
 
 | 项 | 内容 |
 |---|---|
-| 新依赖 | `drizzle-zod@^0.8.3`(根 devDependencies) |
-| 新脚本 | `db:generate` / `db:migrate` / `db:push` / `db:studio` |
-| 第一次迁移文件 | `drizzle/0000_big_payback.sql`(4 张表全量 CREATE) |
-| 新文件 | 3 个:`database/dto/users.dto.ts`、`common/zod-validation.pipe.ts`、`drizzle/0000_*.sql` |
-| 改文件 | 4 个:`create-user.dto.ts`、`auth.controller.ts`、`package.json`、`drizzle.config.ts` |
-| 测试 | 18 passed(0 break) |
-| drizzle-kit push | ✅ No changes detected — schema 跟 dev DB 对齐 |
+| 用户角色 | **读 lesson + 答 quiz**(没自己写代码)|
+| 学习路径 | lesson md → 读懂 → quiz 3 道(概念 / 业务 / 风险) |
+| Quiz 表现 | 第一轮 1/3,第二轮 3/3(理解深度补到位)|
+| 代码状态 | `7314e86` commit 还在分支上(我之前代写,LR-0026 反思这个)|
+| 参考文档 | 0022 期间新增 2 份(drizzle-orm / validation-libraries)|
 
-## 撞到的 3 个真问题
+## Quiz 回顾 — 3 道题的考点
 
-### 问题 1 · drizzle-zod 0.8.x 的 `.omit().extend()` 类型推断失效
+### Q1 · drizzle-kit 设计哲学(初答:基本对 → 补深度后 ✅)
 
-**症状**:想从 DB 层 schema omit passwordHash 等字段再 extend password 字段,得到 API 层 schema。但 TS 推断结果是 `{ password: string }` —— **其他字段全部丢了**。
+**考点**:`push` 和 `migrate` 的本质区别,以及为什么 drizzle 团队**故意**分两个命令。
 
-**复现**:
-```ts
-const InsertUserDbSchema = createInsertSchema(users, {...});
+**我的初判**:用户答到"dev 用 push / prod 用 migrate",但没答到"为什么这样设计"。
 
-const RegisterApiSchema = InsertUserDbSchema.omit({
-  passwordHash: true,
-  status: true,
-  createdAt: true,
-  updatedAt: true,
-}).extend({
-  password: z.string().min(6),
-});
-
-// RegisterApi 类型推断成 { password: string }
-// 实际应该: { username, email?, role?, password }
+**正确答案补完**:
+```
+dev:   schema.ts ─push──► DB        (schema 是 source of truth)
+prod:  schema.ts ─gen──► .sql 文件 ─migrate──► DB  (有迁移历史)
 ```
 
-**根因**:drizzle-zod 0.8.x 的 `.omit()` 在跟 `.extend()` 组合时类型推断有 bug(应该是 Zod schema 链的 `.omit().extend()` 在某种类型下被简化了)。
+**drizzle 团队的设计哲学**:
+- dev 速度优先:schema 直接同步到 DB,不要中间文件
+- prod 安全优先:必须**有 .sql 文件 + 历史**(可回滚 / 可审计 / 可重现)
 
-**Lesson 教训**:**Lesson 写了"用 omit + extend 派生 API schema",实际跑不通**。我已在 lesson §3.5 加了注释说明 0022 实际做法(直接定义 RegisterApiSchema)。
+**用户的盲点**:**没答 prod 必须有迁移历史的 4 个原因**:
+1. 可回滚(知道当前 DB 在哪个版本,出问题能精确回到上一个)
+2. 可审计(git log 看 schema + 对应 .sql 改动)
+3. 可重现(多 server 必须按相同顺序应用)
+4. 可追责(每个 .sql 一次 commit,git blame 知道责任人)
 
-**实际方案**:
-```ts
-// drizzle-zod 的 omit/extend 推断不可靠,手写 API schema
-// 但字段名仍跟 DB schema 对齐(单一 source of truth 原则)
-export const RegisterApiSchema = z.object({
-  username: z.string().min(3),       // 跟 users.username 对齐
-  password: z.string().min(6),       // API 用,service bcrypt 后入库
-  email: z.string().email().optional(), // 跟 users.email 对齐
-  role: z.enum(["admin", "user"]).optional(), // 跟 users.role 对齐
-});
-```
+`push` 做不到这些,所以**prod 用 push = 没审计 + 没回滚 + 出问题不知道 DB 当前 schema**。
 
-### 问题 2 · DTO "DB 层" vs "API 层" 的语义混淆
+### Q2 · drizzle-zod 推断 DTO 不能直接当 API DTO(初答:不知道 → 二次答 ✅)
 
-**撞的过程**:一开始只想"用 drizzle-zod 推断 DTO",但没分清两个 DTO 用途:
+**考点**:为什么 `InsertUserDbSchema`(drizzle-zod 从 schema 推断)**不能**当 API register endpoint 的 DTO?
 
-| DTO 用途 | 字段 | 校验强度 |
-|---|---|---|
-| **DB 层**(db.insert 用)| username, passwordHash, email, role, status, createdAt | 跟 schema 一致 |
-| **API 层**(HTTP 入参用)| username, **password**(明文) | 跟业务规则 |
+**用户第一次答"不知道"** — 不丢人,这是个深度设计问题,没经验的人想不到。
 
-**问题**:register HTTP 接口接 `{ username, password }`(明文),不是 `{ username, passwordHash }`(密文)。如果让 drizzle-zod 的 InsertUserDbSchema 直接当 API DTO,**缺 password 字段 + 多 passwordHash 字段 + service 还得手动 bcrypt**——混乱。
+**第二次答**:"加密 + 认证在非 API 场景"——**精准命中**。
 
-**Lesson 教训**:任何 Drizzle 项目都要分清"DB insert schema"和"API request schema"。drizzle-zod 帮你生成前者,**API schema 必须手写**(或 `.pick()`/`.omit()` 但有推断 bug)。
+**完整答案补完**:
+1. **密码字段名错位**:API 接 `{ password }` 明文,schema 存 `{ passwordHash }` 密文 → **API 层如果接受 passwordHash**,用户就能 POST `{ passwordHash: "xxx" }` 绕过 bcrypt 直接覆盖别人账号(认证绕过)
+2. **业务规则责任错位**:bcrypt 是 service 层职责(0022 service.create 把 password → passwordHash),**不应该在 API 层做**——API 层只校验格式,不加密
 
-### 问题 3 · drizzle.config.ts 不能用 ConfigService(CLI 工具限制)
+**核心**:**DTO 分离 = 业务边界隔离**。让 API 层不能直接操作 DB 字段 = 减少攻击面。
 
-**症状**:想把 `dbCredentials.url` 改成 `process.env.DATABASE_URL || 'default'`(运行时读 env),但 drizzle-kit 是 CLI 工具,**在 Node 启动 ConfigModule 之前跑**。
+### Q3 · prod push 的最坏后果(初答:一半 → 二次答 ✅)
 
-**Lesson 教训**:Lesson §3.2 已经标了"运行时部分可选",但实际 0022 没改 —— 简单起见保留硬编码 + 默认值。**生产前**再改用 dotenv-flow + 启动时 shell 注入 env。
+**考点**:`pnpm db:push` 在 prod 误执行会怎样?
 
-## nest-search 当前 drizzle 状态(0022 后)
+**用户答"数据被截断以及永久丢失了"** — **精准命中**。
 
-```
-drizzle.config.ts                  ← root 已有,0022 加 db:* scripts
-drizzle/
-├── 0000_big_payback.sql           ← 第一个迁移文件(4 表)
-└── meta/                          ← drizzle-kit 元数据
-apps/auth-service/src/database/
-├── schema/                        ← 4 个 schema 文件
-├── dto/users.dto.ts               ← drizzle-zod 推断 + 手写 API DTO (NEW)
-└── drizzle.service.ts             ← unchanged(已注入 ConfigService 0021)
-apps/auth-service/src/common/
-└── zod-validation.pipe.ts         ← 通用 Zod pipe (NEW)
-```
+**完整答案**:
+- `MODIFY COLUMN` 把 `VARCHAR(100)` 改成 `VARCHAR(50)` → **所有 > 50 字符的 email 被截断**
+- `DROP COLUMN` → **数据永久丢失**(MySQL DDL 不支持事务回滚大部分场景)
+- 没有 .sql 文件留底 → **不知道发生了什么、不能回滚**
 
-## 设计决策回顾
+**0022 参考文档 §11.5**(我后来加的)有完整 DDL 风险表。
 
-### 决策 1 · drizzle-zod 装在哪层?选了 service 自己
+## LR 的特殊性
 
-| 候选 | 优 | 劣 |
-|---|---|---|
-| 每个 service `database/dto/`(选)| 边界清晰,DTO 不跨服务 | 每个 service 重复 install(已用 `-wD` 根安装,无影响) |
-| 公共 `libs/shared/dto/` | 减少重复 | DTO 跨服务是反模式 |
+**这次 LR-0026 不是"我撞的反模式",是"用户的学习轨迹"**。
 
-### 决策 2 · 用 nestjs-zod 还是手写 pipe?
+之前 LR(0017-0025)都是"我做了什么,撞了什么坑",这次是:
+- 用户主动选择"读 lesson 不写代码"路径
+- 通过 quiz 验证理解深度
+- quiz 第一轮错 2 道,证明读 ≠ 懂,需要反思深度
+- quiz 第二轮答对,说明反思到位
 
-**选手写**(ZodValidationPipe 50 行)。理由:
-- nestjs-zod 是第三方包,版本/兼容性问题风险
-- 我们已经有 zod 经验(0019+0020)
-- 50 行代码,维护成本低
+**这才是 lesson 设计的正确反馈机制**:
+- lesson 是输入
+- quiz 是输出验证
+- LR 记录"输入 → 输出"的过程
 
-### 决策 3 · 用 drizzle-zod 替换 class-validator 全量?
+## nest-search 当前 0022 状态
 
-**部分替换**(只 register endpoint)。理由:
-- 0022 范围 = 装好 drizzle-zod 链路,**不**重构所有 endpoint
-- login 等用 class-validator 暂时不动
-- 后续 lesson(0023+ 或副线 5+)可以推广
+| 文件 | 状态 |
+|---|---|
+| `apps/auth-service/src/database/dto/users.dto.ts` | 7314e86 commit 已有 |
+| `apps/auth-service/src/common/zod-validation.pipe.ts` | 7314e86 commit 已有 |
+| `apps/auth-service/src/user/dto/create-user.dto.ts` | 方案 B 删了(fdff263)|
+| `drizzle/0000_big_payback.sql` | 7314e86 commit 已有 |
+| `package.json` db:* scripts | 7314e86 commit 已有 |
+| **lesson `0022-...md`** | df4f2da 已有 |
+| **LR-0026**(本篇)| 8b4a54b 后写 |
 
-## nest-search 测试架构(0022 后)
+**这次 LR 不涉及"代码改动 commit"** —— 用户没写代码,只读 + 答 quiz。
 
-```
-Test Suites: 4 passed, 4 total
-Tests:       18 passed, 18 total
-
-- RolesGuard spec          (0013)
-- ProxyService spec        (0013)
-- HttpClientService spec   (0013)
-- auth.e2e-spec            (0014) ← 用了 drizzle-zod 推断的 InsertUserDb 类型
-```
-
-**ZodValidationPipe 改造没影响 e2e**—— register endpoint 仍接受 `{ username, password, email }`,只是多了 Zod 校验。
+但 lesson 验证流程跑完了,可以进 0023。
 
 ## 给 0023 的输入
 
-按 CURRICULUM 计划,0023 = Relations API + 事务 + 嵌套查询:
+按 CURRICULUM:
+> 0023 = Drizzle Relations API + 事务 + 嵌套查询
 
-| 主题 | 备注 |
+预期 0023 学完后:
+- 0024 = 性能(N+1 / 索引 / 查询计划)
+
+## 给 lesson 设计流程的反思
+
+### 反思 1 · "读 + quiz" 路径 vs "读 + 写代码" 路径
+
+| 路径 | 适用 | 时间成本 | 学习效果 |
+|---|---|---|---|
+| **A 读 + quiz** | 时间紧 / 不写业务代码 | 低 | 概念理解 |
+| **B 读 + 写代码** | 有时间 / 真要改业务 | 高 | 实战能力 |
+
+nest-search 0022 走 A 路径(用户没写),但**答 quiz 仍然强迫深度思考**(不是"看过就完")。
+
+**lesson 设计应支持两种路径**:
+- §3 步骤明确写"如果你只读,跳到这里看概念"
+- §3 步骤明确写"如果你写,从这里开始实操"
+
+### 反思 2 · quiz 第一轮错 2 道不是失败
+
+| 状态 | 含义 |
 |---|---|
-| **Drizzle Relations API** | `db.query.users.findMany({ with: { casTickets: true }})` 嵌套查询 |
-| **事务** | `db.transaction(async (tx) => {...})` |
-| **复杂 where** | `and` / `or` / `inArray` / `between` |
-| **Joins** | `leftJoin` / `innerJoin` |
+| 第一轮全对 | 可能只是"扫过 lesson 记住了"|
+| 第一轮错 + 第二轮对 | **真学了** —— 有思考过程 |
+| 第一轮错 + 第二轮还错 | 没真懂,需要重读 lesson |
 
-**预期交付**:写 1 个 `casTickets.service.ts` 用 relations 查"用户 + ticket 列表"做 e2e 验证。
+**0022 走的是"第一轮错 + 第二轮对"** —— 这是最有学习价值的轨迹。
 
-## 给自己的反思
+### 反思 3 · 0022 的 3 道 quiz 设计
 
-### 反思 1 · "Lesson 写的代码能跑吗" 还是真问题
+**Q1 哲学题**(push vs migrate 为什么)— 测设计思想
+**Q2 业务题**(DB DTO vs API DTO)— 测业务理解
+**Q3 风险题**(prod push 会怎样)— 测安全意识
 
-Lesson §3.5 的 `InsertUserDtoSchema.omit().extend()` 代码在 0022 实际跑时**类型推断失败**。我提前在 lesson 标了"可能要调整",但实际跑才发现。
+**3 个维度组合** = 全面理解 0022:
+- 哲学(为什么这样设计)
+- 业务(实际怎么用)
+- 风险(出错会怎样)
 
-**Lesson 改进**:lesson §3.5 改成手写 RegisterApiSchema,**删掉 omit/extend 误导**。下次 lesson 写"完整可跑代码"前,**先在脑子里 TypeScript 模拟一遍**,不要凭"Zod 应该这样"。
-
-### 反思 2 · drizzle-zod 0.8.x 推断 bug 是真实存在的
-
-不是我的错(虽然 lesson 写错了),而是 drizzle-zod 的类型实现有缺陷。`https://github.com/drizzle-team/drizzle-orm/issues` 上有相关 issue。
-
-**Lesson 教训**:**lesson §3.5 加 note 提醒**:drizzle-zod 的 omit/extend 在某些场景下推断有问题,**手写派生 DTO 更稳**。
-
-### 反思 3 · "DB 层 DTO" 和 "API 层 DTO" 是关键区分
-
-| 维度 | DB DTO | API DTO |
-|---|---|---|
-| 来源 | `createInsertSchema(table)` | 手写 / 派生 |
-| 字段 | 跟表对齐 | 跟业务对齐(可能加 `password` 明文字段) |
-| 校验 | 类型 + notNull | 业务规则(密码长度 / 邮箱格式) |
-
-**Lesson 设计**:未来 lesson 在讲 drizzle-zod 时,**第一节**就讲这个区分,不要让学员踩坑。
+下次 lesson quiz 也按这个 3 维度设计。
 
 ---
 
@@ -167,11 +149,11 @@ Lesson §3.5 的 `InsertUserDtoSchema.omit().extend()` 代码在 0022 实际跑�
 
 **0023 = Drizzle Relations API + 事务 + 嵌套查询**
 
-预计产出:
-- `casTickets.service.ts` 用 relations 查"用户 + 票列表"
-- `withTransaction()` 演示多表写入
+预期产出:
+- 1 个新 service 用 relations 查"用户 + ticket 列表"
+- `db.transaction()` 演示多表写入
 - e2e 测试覆盖新场景
 
-Lesson 改进点:
-- 直接定义 typescript types,不依赖 drizzle-zod 的 omit/extend
-- 演示 "DB 类型 vs API 类型" 的明确区分
+这次按"读 + quiz"路径走(用户上次选 A),还是"读 + 写代码"路径(用户写 ~2 个文件)?
+
+需要用户选。
