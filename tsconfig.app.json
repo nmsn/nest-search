@@ -13,10 +13,19 @@
     "experimentalDecorators": true,
     "allowSyntheticDefaultImports": true,
     "incremental": true,
-    "ignoreDeprecations": "6.0",
-    "types": ["jest", "node"],
-    "esModuleInterop": true
+    "ignoreDeprecations": "6.0"
   },
-  "include": ["apps/**/*.ts", "libs/**/*.ts"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "apps/**/src/**/*",
+    "libs/shared/src/**/*",
+    "libs/frontend-shared/src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.spec.ts",
+    "**/*.test.ts",
+    "**/test/**",
+    "**/tests/**"
+  ]
 }
