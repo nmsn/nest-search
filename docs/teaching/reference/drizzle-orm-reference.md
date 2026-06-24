@@ -16,6 +16,7 @@
 - §8 [drizzle-zod 自动推断 DTO](#8-drizzle-zod-自动推断-dto)
 - §9 [drizzle-kit CLI 命令](#9-drizzle-kit-cli-命令)
 - §10 [nest-search 实战 checklist](#10-nest-search-实战-checklist)
+- §11 [安全实践(drizzle-kit 没内建防护)](#11-安全实践drizzle-kit-没内建防护)
 
 ---
 
@@ -581,6 +582,133 @@ git commit -m "feat(db): add users.phone column + migration"
 ```
 
 **schema 和 migration 一起 commit**,这样别人 clone 后 `pnpm db:migrate` 就能跟上。
+
+---
+
+## 11. 安全实践(drizzle-kit 没内建防护)
+
+> ⚠️ **drizzle-kit 默认不安全** —— 它假设你已经知道在干啥。
+>
+> 本节回答 2 个问题:
+> 1. drizzle-kit 在 prod 跑 `push` 会被拦截吗?
+> 2. 怎么防误操作?
+
+### 11.1 drizzle-kit 安全现状
+
+| 机制 | 有? | 说明 |
+|---|---|---|
+| **执行前显示 diff** | ✅ | `push` 打印"将执行这些 SQL,确定吗?(y/N)" |
+| **生产环境检测** | ❌ | **不**读 `NODE_ENV`,**不**阻止你 push 到 prod |
+| **DB user 权限检查** | ❌ | drizzle-kit 不管你用什么账号连 |
+| **dry-run 模式** | ⚠️ | `generate` 只产文件(安全);`push` 没 dry-run |
+| **事务回滚保护** | ⚠️ MySQL 有限 | MySQL DDL 大部分**不**支持事务回滚,drizzle-kit 也没法 |
+| **审计日志** | ❌ | 不内置,你要自己 audit |
+
+### 11.2 最容易出事的场景
+
+```bash
+# 你在 dev 改完 schema,顺手 push
+# 但 shell 当前 env 误设成 production
+NODE_ENV=production pnpm db:push
+# ↑ push 不管 NODE_ENV,直接连 DATABASE_URL 指向的库
+#   如果 DATABASE_URL 指向 prod DB → 完蛋(直接 ALTER TABLE)
+```
+
+### 11.3 推荐 4 层防护
+
+#### 层 1 · shell 别名 — 别直接 `pnpm db:push`
+
+```bash
+# .zshrc / .bashrc
+alias db-push-dev='DATABASE_URL=mysql://dev pnpm db:push'
+alias db-migrate-prod='DATABASE_URL=mysql://prod pnpm db:migrate'
+
+# 永远不直接 pnpm db:push
+```
+
+#### 层 2 · package.json 拆 dev/prod 命令
+
+```json
+{
+  "scripts": {
+    "db:generate": "drizzle-kit generate",      // 任何环境安全
+    "db:migrate": "drizzle-kit migrate",        // prod 用
+    "db:push": "drizzle-kit push",              // dev 默认,prod 别用
+    "db:push:safe": "node scripts/db-push-safe.js"  // 自定义包装(见下)
+  }
+}
+```
+
+#### 层 3 · drizzle.config.ts 读 env(不硬编码)
+
+```ts
+import type { Config } from 'drizzle-kit';
+
+export default {
+  schema: ['./apps/auth-service/src/database/schema/**/*.ts'],
+  out: './drizzle',
+  dialect: 'mysql',
+  dbCredentials: {
+    url: process.env.DATABASE_URL!,  // ← 读 env,不硬编码
+  },
+  // verbose: true,  // 调试时可开,打印每个 SQL
+} satisfies Config;
+```
+
+#### 层 4 · scripts/db-push-safe.js — 自定义 push 包装
+
+```js
+#!/usr/bin/env node
+// scripts/db-push-safe.js
+// 0023+ 推荐加:拒绝 push 到疑似 prod 的 DB
+
+const dbUrl = process.env.DATABASE_URL || '';
+
+// 判定"像 prod"的 URL 模式(根据项目实际调整)
+const PROD_PATTERNS = [
+  /\.prod\./i,                  // db.prod.example.com
+  /prod-/i,                       // prod-db-1.cluster
+  /\.rds\.amazonaws\.com/i,       // AWS RDS 通常是 prod
+  /:3306$/,                      // prod 默认端口(假设)
+];
+
+const isProd = PROD_PATTERNS.some(re => re.test(dbUrl));
+
+if (isProd) {
+  console.error('❌ db:push 拒绝执行 — 检测到疑似 prod DB URL');
+  console.error(`URL: ${dbUrl.replace(/:[^:@]+@/, ':***@')}`);  // mask password
+  console.error('prod 应该用 db:migrate,不是 db:push');
+  console.error('如确认要在 prod 直接改 schema(高风险),注释这段检查');
+  process.exit(1);
+}
+
+// 不是疑似 prod,正常 push
+const { execSync } = require('child_process');
+execSync('drizzle-kit push', { stdio: 'inherit' });
+```
+
+### 11.4 实战 checklist
+
+- [ ] `.zshrc` / `.bashrc` 加 `db-push-dev` / `db-migrate-prod` 别名
+- [ ] `package.json` 拆 `db:push`(dev)和 `db:migrate`(prod)
+- [ ] `drizzle.config.ts` 的 `dbCredentials.url` 读 `process.env.DATABASE_URL`(不硬编码)
+- [ ] 加 `scripts/db-push-safe.js` 拦截疑似 prod URL
+- [ ] CI 流水线只跑 `db:migrate`,**不**跑 `db:push`
+- [ ] 每次 migrate 前 **手动 backup** prod DB
+- [ ] 重要 schema 改(column drop / type change)单独 PR,**不**跟业务代码混
+
+### 11.5 MySQL DDL 注意事项
+
+| 操作 | 可回滚? | 备注 |
+|---|---|---|
+| `ADD COLUMN` | ✅(MySQL 8.0+) | 大多数 DDL 现在支持 atomic DDL |
+| `DROP COLUMN` | ⚠️ 数据丢失 | **先 backup**,**先**确认业务无依赖 |
+| `MODIFY COLUMN` | ⚠️ 数据可能丢失 | 类型转换失败/截断 |
+| `RENAME TABLE` | ⚠️ | 破坏外键引用 |
+| `CREATE INDEX` | ✅ | 安全 |
+| `DROP INDEX` | ⚠️ | 查询变慢 |
+
+**DDL 不可逆** → prod 改 schema 前**永远先 backup**。
 
 ---
 
