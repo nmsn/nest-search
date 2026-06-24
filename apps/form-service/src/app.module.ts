@@ -1,11 +1,13 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_FILTER } from '@nestjs/core';
 import { LoggerModule } from 'nestjs-pino';
 import { randomUUID } from 'node:crypto';
 import { DrizzleModule } from './database/drizzle.module';
 import { SchemeModule } from './scheme/scheme.module';
 import { FormModule } from './form/form.module';
 import { validateEnv } from './config/validate-env';
+import { AllExceptionsFilter } from './filters/all-exceptions.filter';
 
 @Module({
   imports: [
@@ -25,6 +27,12 @@ import { validateEnv } from './config/validate-env';
     DrizzleModule,
     SchemeModule,
     FormModule,
+  ],
+  providers: [
+    {
+      provide: APP_FILTER,
+      useClass: AllExceptionsFilter,
+    },
   ],
 })
 export class AppModule {}

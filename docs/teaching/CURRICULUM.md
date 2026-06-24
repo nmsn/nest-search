@@ -299,7 +299,8 @@
 ## 下一个动作
 
 按 2026-06-24 校准:
-1. **继续 Phase A 0025**(原计划:优雅退出) 或 **直接进 Phase E 0051**(用户新加的企业级 DB 架构第 1 课:外键禁用 + 业务一致性)
-2. 0024(Drizzle 索引 + EXPLAIN + N+1)已交付 lesson,等用户跑完测试 + commit
+1. **Phase A 0025 lesson 已就绪** — AllExceptionsFilter + 业务异常分类
+2. 用户按顺序学 0025 → 0026 → ... → 0030 完成 Phase A
+3. 0024(Drizzle 索引 + EXPLAIN + N+1)已交付 lesson,等用户跑完测试 + commit
 
-**确认开哪条?** 推荐先开 Phase E 0051(用户明确要求 + nest-search 当前最缺业务一致性校验)。
+**下一步**:用户执行 0025 lesson。

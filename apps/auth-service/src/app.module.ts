@@ -8,6 +8,8 @@ import { CasModule } from "./cas/cas.module";
 import { AuthModule } from "./auth/auth.module";
 import { RedisModule } from "./redis/redis.module";
 import { validateEnv } from "./config/validate-env";
+import { AllExceptionsFilter } from "./filters/all-exceptions.filter";
+import { APP_FILTER } from "@nestjs/core";
 
 @Module({
   imports: [
@@ -30,6 +32,12 @@ import { validateEnv } from "./config/validate-env";
     UserModule,
     CasModule,
     AuthModule,
+  ],
+  providers: [
+    {
+      provide: APP_FILTER,
+      useClass: AllExceptionsFilter,
+    },
   ],
 })
 export class AppModule {}

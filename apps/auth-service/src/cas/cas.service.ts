@@ -1,9 +1,12 @@
-import {
-  Injectable,
-  UnauthorizedException,
-  BadRequestException,
-} from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { DrizzleService } from "../database/drizzle.service";
+import {
+  CasTgtInvalidException,
+  CasServiceNotRegisteredException,
+  CasTicketInvalidException,
+  CasTicketMismatchException,
+} from "../exceptions/cas.exception";
+import { UserNotFoundException, UserDisabledException } from "../exceptions/user.exceptions";
 import { casTickets } from "../database/schema/cas-tickets";
 import { casServices } from "../database/schema/cas-services";
 import { users } from "../database/schema/users";
@@ -36,7 +39,7 @@ export class CasService {
   ): Promise<{ ticket: string; serviceUrl: string }> {
     // Validate TGT
     const tgt = await this.validateTgt(tgtTicket);
-    if (!tgt) throw new UnauthorizedException("Invalid or expired TGT");
+    if (!tgt) throw new CasTgtInvalidException(tgtTicket);
 
     // Validate service is registered
     const [service] = await this.drizzle.db
@@ -50,7 +53,7 @@ export class CasService {
       )
       .limit(1);
 
-    if (!service) throw new BadRequestException("Service not registered");
+    if (!service) throw new CasServiceNotRegisteredException(serviceUrl);
 
     // Issue ST
     const ticket = `ST-${randomBytes(32).toString("hex")}`;
@@ -81,10 +84,8 @@ export class CasService {
       )
       .limit(1);
 
-    if (!st)
-      throw new UnauthorizedException("Invalid or expired service ticket");
-    if (st.service !== serviceUrl)
-      throw new UnauthorizedException("Service URL mismatch");
+    if (!st) throw new CasTicketInvalidException(ticket);
+    if (st.service !== serviceUrl) throw new CasTicketMismatchException(ticket, serviceUrl);
 
     // Mark as consumed
     await this.drizzle.db
@@ -99,9 +100,8 @@ export class CasService {
       .where(eq(users.id, st.userId))
       .limit(1);
 
-    if (!user) throw new UnauthorizedException("User not found");
-    if (user.status === "disabled")
-      throw new UnauthorizedException("User account is disabled");
+    if (!user) throw new UserNotFoundException(st.userId);
+    if (user.status === "disabled") throw new UserDisabledException(st.userId);
 
     return user;
   }

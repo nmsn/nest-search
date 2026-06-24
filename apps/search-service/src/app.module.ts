@@ -1,5 +1,6 @@
 import { Module, OnModuleInit } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_FILTER } from '@nestjs/core';
 import { LoggerModule } from 'nestjs-pino';
 import { randomUUID } from 'node:crypto';
 import { ElasticsearchModule } from './elasticsearch/elasticsearch.module';
@@ -7,6 +8,7 @@ import { ElasticsearchService } from './elasticsearch/elasticsearch.service';
 import { SearchModule } from './search/search.module';
 import { initIndices } from './elasticsearch/elasticsearch.init';
 import { validateEnv } from './config/validate-env';
+import { AllExceptionsFilter } from './filters/all-exceptions.filter';
 
 @Module({
   imports: [
@@ -25,6 +27,12 @@ import { validateEnv } from './config/validate-env';
     }),
     ElasticsearchModule,
     SearchModule,
+  ],
+  providers: [
+    {
+      provide: APP_FILTER,
+      useClass: AllExceptionsFilter,
+    },
   ],
 })
 export class AppModule implements OnModuleInit {

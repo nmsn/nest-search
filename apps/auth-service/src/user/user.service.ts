@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { DrizzleService } from '../database/drizzle.service';
+import { UserNotFoundException, UsernameConflictException } from '../exceptions/user.exceptions';
 import { users } from '../database/schema/users';
 import { eq } from 'drizzle-orm';
 import * as bcrypt from 'bcrypt';
@@ -12,7 +13,7 @@ export class UserService {
 
   async create(dto: CreateUserDto) {
     const existing = await this.findByUsername(dto.username);
-    if (existing) throw new ConflictException('Username already exists');
+    if (existing) throw new UsernameConflictException(dto.username);
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
     const [inserted] = await this.drizzle.db.insert(users).values({
@@ -30,7 +31,7 @@ export class UserService {
       .from(users)
       .where(eq(users.id, id))
       .limit(1);
-    if (!result) throw new NotFoundException(`User #${id} not found`);
+    if (!result) throw new UserNotFoundException(id);
     return result;
   }
 
