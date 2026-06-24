@@ -152,14 +152,14 @@ export class CasService {
       // 1. bcrypt 密码(事务内)
       const passwordHash = await bcrypt.hash(input.password, 10);
 
-      // 2. 创建用户
+      // 2. 创建用户(PostgreSQL 用 .returning({ id }),不是 mysql2 的 $returningId)
       const [userResult] = await tx
         .insert(users)
         .values({
           username: input.username,
           passwordHash,
         })
-        .$returningId();
+        .returning({ id: users.id });
       const userId = userResult.id;
 
       // 3. 创建 ticket

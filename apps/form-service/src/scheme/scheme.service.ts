@@ -10,16 +10,16 @@ export class SchemeService {
 
   async create(businessLine: string, dto: CreateSchemeDto) {
     const tables = getBusinessLineTables(businessLine);
-    const insertResult = await this.drizzle.db
+    const [inserted] = await this.drizzle.db
       .insert(tables.schemes)
       .values({
         name: dto.name,
         description: dto.description,
         status: dto.status as any,
         config: dto.config,
-      });
-    const insertedId = insertResult[0].insertId;
-    return this.findOne(businessLine, Number(insertedId));
+      })
+      .returning({ id: tables.schemes.id });
+    return this.findOne(businessLine, inserted.id);
   }
 
   async findAll(businessLine: string) {

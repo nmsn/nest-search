@@ -1,7 +1,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { drizzle } from 'drizzle-orm/mysql2';
-import { createPool } from 'mysql2';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
 import * as schema from './schema/schema-factory';
 import { businessLines } from './schema/business-lines';
 import { syncRecords } from '../libs/shared/index';
@@ -14,11 +14,10 @@ export class DrizzleService implements OnModuleInit {
 
   async onModuleInit() {
     const databaseUrl = this.config.getOrThrow<string>('DATABASE_URL');
-    const pool = createPool({ uri: databaseUrl });
+    const pool = new Pool({ connectionString: databaseUrl });
 
     this.db = drizzle(pool, {
       schema: { ...schema, businessLines, syncRecords },
-      mode: 'default',
     });
 
     await this.initBusinessLines();
@@ -32,9 +31,13 @@ export class DrizzleService implements OnModuleInit {
     ];
 
     for (const line of lines) {
+      // Postgres 等价:onConflictDoUpdate 替代 mysql2 的 onDuplicateKeyUpdate
       await this.db.insert(businessLines)
         .values(line)
-        .onDuplicateKeyUpdate({ set: { name: line.name } });
+        .onConflictDoUpdate({
+          target: businessLines.code,
+          set: { name: line.name },
+        });
     }
   }
 }

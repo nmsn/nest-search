@@ -1,12 +1,12 @@
 {
   "version": "7",
-  "dialect": "mysql",
+  "dialect": "postgresql",
   "entries": [
     {
       "idx": 0,
-      "version": "5",
-      "when": 1782222005507,
-      "tag": "0000_big_payback",
+      "version": "7",
+      "when": 1782311478848,
+      "tag": "0000_flashy_justice",
       "breakpoints": true
     }
   ]

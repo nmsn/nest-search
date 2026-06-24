@@ -18,7 +18,7 @@ export const SyncEnvSchema = z.object({
   DATABASE_URL: z
     .string()
     .url()
-    .default("mysql://root:root123@localhost:3306/nest_search"),
+    .default("postgresql://postgres:postgres123@localhost:5432/nest_search"),
   ELASTICSEARCH_NODE: z.string().url().default("http://localhost:9200"),
   RABBITMQ_URL: z.string().url().optional(),
 });

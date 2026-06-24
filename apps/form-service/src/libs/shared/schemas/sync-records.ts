@@ -1,10 +1,18 @@
-import { mysqlTable, int, text, timestamp, mysqlEnum } from 'drizzle-orm/mysql-core';
+import { pgTable, serial, text, timestamp, pgEnum, integer } from 'drizzle-orm/pg-core';
 
-export const syncRecords = mysqlTable('sync_records', {
-  id: int('id').primaryKey().autoincrement(),
-  type: mysqlEnum('type', ['incremental', 'full']).notNull(),
-  status: mysqlEnum('status', ['pending', 'running', 'success', 'failed']).default('pending'),
-  recordsCount: int('records_count').default(0),
+export const syncRecordTypeEnum = pgEnum('sync_record_type', ['incremental', 'full']);
+export const syncRecordStatusEnum = pgEnum('sync_record_status', [
+  'pending',
+  'running',
+  'success',
+  'failed',
+]);
+
+export const syncRecords = pgTable('sync_records', {
+  id: serial('id').primaryKey(),
+  type: syncRecordTypeEnum('type').notNull(),
+  status: syncRecordStatusEnum('status').default('pending'),
+  recordsCount: integer('records_count').default(0),
   errorMessage: text('error_message'),
   startedAt: timestamp('started_at'),
   completedAt: timestamp('completed_at'),

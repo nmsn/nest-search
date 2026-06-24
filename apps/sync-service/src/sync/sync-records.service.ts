@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { drizzle } from 'drizzle-orm/mysql2';
-import { createPool } from 'mysql2';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
 import { syncRecords } from '../libs/shared/index';
 import { desc } from 'drizzle-orm';
 
@@ -11,7 +11,7 @@ export class SyncRecordsService {
 
   constructor(config: ConfigService) {
     const databaseUrl = config.getOrThrow<string>('DATABASE_URL');
-    const pool = createPool({ uri: databaseUrl });
+    const pool = new Pool({ connectionString: databaseUrl });
     this.db = drizzle(pool);
   }
 

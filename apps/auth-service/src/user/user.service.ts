@@ -15,14 +15,13 @@ export class UserService {
     if (existing) throw new ConflictException('Username already exists');
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
-    const insertResult = await this.drizzle.db.insert(users).values({
+    const [inserted] = await this.drizzle.db.insert(users).values({
       username: dto.username,
       passwordHash,
       email: dto.email,
       role: dto.role || 'user',
-    });
-    const insertedId = insertResult[0].insertId;
-    return this.findById(Number(insertedId));
+    }).returning({ id: users.id });
+    return this.findById(inserted.id);
   }
 
   async findById(id: number) {

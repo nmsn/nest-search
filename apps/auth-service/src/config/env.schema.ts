@@ -24,7 +24,7 @@ export const AuthEnvSchema = z.object({
   DATABASE_URL: z
     .string()
     .url()
-    .default("mysql://root:root123@localhost:3306/nest_search"),
+    .default("postgresql://postgres:postgres123@localhost:5432/nest_search"),
   REDIS_HOST: z.string().default("localhost"),
   REDIS_PORT: z.coerce.number().int().positive().default(6379),
   REFRESH_TOKEN_EXPIRES_IN: z.string().default("604800"),

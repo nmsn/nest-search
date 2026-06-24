@@ -20,7 +20,7 @@ export class FormService {
       0,
     );
 
-    const insertResult = await this.drizzle.db
+    const [inserted] = await this.drizzle.db
       .insert(tables.forms)
       .values({
         schemeId: dto.schemeId,
@@ -28,9 +28,9 @@ export class FormService {
         totalAmount: totalAmount.toString(),
         totalQuantity,
         formData: dto.formData,
-      });
-    const insertedId = insertResult[0].insertId;
-    return this.findOne(businessLine, Number(insertedId));
+      })
+      .returning({ id: tables.forms.id });
+    return this.findOne(businessLine, inserted.id);
   }
 
   async findAll(businessLine: string) {
