@@ -2,11 +2,12 @@ import { Controller, Post, Get, Body, Headers, Res, UnauthorizedException, UsePi
 import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
 import { AuthService } from './auth.service';
-import { LoginDto } from '../user/dto/login.dto';
 // 方案 B:DTO 单一 source of truth 在 database/dto/,user 模块直接 import
 import {
   RegisterApi as CreateUserDto,
   RegisterApiSchema as CreateUserDtoSchema,
+  LoginApi,
+  LoginApiSchema,
 } from '../database/dto/users.dto';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { UserService } from '../user/user.service';
@@ -40,7 +41,8 @@ export class AuthController {
   }
 
   @Post('login')
-  async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
+  @UsePipes(new ZodValidationPipe(LoginApiSchema))
+  async login(@Body() dto: LoginApi, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.login(dto.username, dto.password);
     this.setRefreshTokenCookie(res, result.refreshToken);
     return { accessToken: result.accessToken, user: result.user };

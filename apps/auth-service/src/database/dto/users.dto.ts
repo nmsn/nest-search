@@ -28,3 +28,12 @@ export const RegisterApiSchema = z.object({
 export type InsertUserDb = z.infer<typeof InsertUserDbSchema>;
 export type RegisterApi = z.infer<typeof RegisterApiSchema>;
 export type SelectUserDto = z.infer<typeof SelectUserDtoSchema>;
+
+// Login API schema — 接受明文 username/password,跟 RegisterApi 同源
+// 注意:password 字段不会再回到 DB 层(由 service 层 bcrypt)
+export const LoginApiSchema = z.object({
+  username: z.string().min(3),
+  password: z.string().min(6),
+});
+
+export type LoginApi = z.infer<typeof LoginApiSchema>;

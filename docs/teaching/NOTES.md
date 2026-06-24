@@ -91,6 +91,14 @@
 4. **依赖深度**:Drizzle + Zod + Joi + Redis + RabbitMQ 都"用过但未深入",要专门课
 5. **全栈补充(Phase D)**:OAuth/WebSocket/文件上传/scope/版本控制 — 企业级必备
 
+### Lesson 交付约定(2026-06-24 用户偏好)
+
+- **每次写新 lesson 必须给用户文件路径**,方便用户直接 cat / 编辑器打开
+- 路径格式:`docs/teaching/lessons/XXXX-name.md`
+- 提供配套参考文档链接(drizzle-orm-reference / validation-libraries)
+- 给出章节结构概览(让用户知道先看哪节)
+- 提供打开命令(`cat` / `code`)
+
 ### 工作流约束(2026-06-22 起)
 
 - **lesson HTML 由 Claude 写**(纯指南)
