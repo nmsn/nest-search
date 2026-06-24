@@ -1,14 +1,26 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { drizzle } from 'drizzle-orm/mysql2';
+import { drizzle, type MySql2Database } from 'drizzle-orm/mysql2';
 import { createPool } from 'mysql2';
 import { users } from './schema/users';
 import { casTickets } from './schema/cas-tickets';
 import { casServices } from './schema/cas-services';
+import { casTicketsRelations, usersRelations } from './relations';
+
+// 显式 schema 类型 — 避免 ReturnType<typeof drizzle> 默认推成 Record<string, never>
+// 这样 db.query.users / db.query.casTickets 都有类型
+type Schema = {
+  users: typeof users;
+  casTickets: typeof casTickets;
+  casServices: typeof casServices;
+  usersRelations: typeof usersRelations;
+  casTicketsRelations: typeof casTicketsRelations;
+};
 
 @Injectable()
 export class DrizzleService implements OnModuleInit {
-  public db!: ReturnType<typeof drizzle>;
+  // 用显式 MySql2Database<Schema>,让 db.query.* / with:* 类型推断出来
+  public db!: MySql2Database<Schema>;
 
   constructor(private readonly config: ConfigService) {}
 
@@ -18,7 +30,7 @@ export class DrizzleService implements OnModuleInit {
     const pool = createPool({ uri: databaseUrl });
 
     this.db = drizzle(pool, {
-      schema: { users, casTickets, casServices },
+      schema: { users, casTickets, casServices, usersRelations, casTicketsRelations },
       mode: 'default',
     });
 
