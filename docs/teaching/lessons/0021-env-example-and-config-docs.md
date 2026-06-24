@@ -131,7 +131,7 @@ CAS_TGT_EXPIRES_IN=8h
 CAS_ST_EXPIRES_IN=30s
 
 # === auth-service 私有 ===
-DATABASE_URL=mysql://root:root123@localhost:3306/nest_search
+DATABASE_URL=postgresql://postgres:postgres123@localhost:5432/nest_search
 REDIS_HOST=localhost
 REDIS_PORT=6379
 REFRESH_TOKEN_EXPIRES_IN=604800
@@ -170,7 +170,7 @@ CAS_ST_EXPIRES_IN=30s
 
 # === sync-service 私有 ===
 SYNC_SERVICE_PORT=3001
-DATABASE_URL=mysql://root:root123@localhost:3306/nest_search
+DATABASE_URL=postgresql://postgres:postgres123@localhost:5432/nest_search
 ELASTICSEARCH_NODE=http://localhost:9200
 RABBITMQ_URL=amqp://guest:guest@localhost:5672
 ```
@@ -189,7 +189,7 @@ CAS_ST_EXPIRES_IN=30s
 
 # === form-service 私有 ===
 FORM_SERVICE_PORT=3003
-DATABASE_URL=mysql://root:root123@localhost:3306/nest_search
+DATABASE_URL=postgresql://postgres:postgres123@localhost:5432/nest_search
 RABBITMQ_URL=amqp://guest:guest@localhost:5672
 ```
 
@@ -262,7 +262,7 @@ const port = app.get(ConfigService).get('AUTH_SERVICE_PORT', 3004);
 ```ts
 async onModuleInit() {
   const pool = createPool({
-    uri: process.env.DATABASE_URL || 'mysql://...',
+    uri: process.env.DATABASE_URL || 'postgresql://...',
   });
   // ...
 }

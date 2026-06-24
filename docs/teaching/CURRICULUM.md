@@ -26,9 +26,9 @@
 主线(8) → principles(4) → 副线1 测试(3) → 副线2 迁移(3)
          [已用 18]
                                               ↓
-              Phase A 必修 12 → Phase B 深度 8 → Phase C 加分 5 → Phase D 全栈 7
-              [0019-0030]      [0031-0038]      [0039-0043]      [0044-0050]
-              [30 节总目标]     [38 节]          [43 节]          [50 节]
+              Phase A 必修 12 → Phase B 深度 8 → Phase C 加分 5 → Phase D 全栈 7 → Phase E DB 架构 6
+              [0019-0030]      [0031-0038]      [0039-0043]      [0044-0050]      [0051-0056]
+              [30 节总目标]     [38 节]          [43 节]          [50 节]          [56 节]
 ```
 
 ---
@@ -194,6 +194,57 @@
 
 ---
 
+## Phase E · 企业级数据库架构 6 节 — 50 → 56(2026-06-24 新增)
+
+> **来源**:用户要求"教企业级数据库高并发 / 分库分表 / 微服务 + 改造项目"。
+> **参考文档**:`docs/teaching/reference/enterprise-database-architecture.md`(必读前置)。
+> **目标**:把 nest-search 从"教学 demo"改造为"接近企业级生产"的样板,聚焦架构层(非 API 层)。
+
+### 0051 · 外键禁用 + 业务一致性
+
+- **缺口**:nest-search schema 已无 FK(0023 验证),但**应用层一致性检查缺失**;无软删除兜底
+- **覆盖**:禁用 FK 的 5 个理由(性能 / 锁 / 分库 / 微服务 / 恢复);5 种替代方案(应用层校验 / 软删除 / 定期对账 / Outbox / Saga)
+- **预期交付**:`cas_tickets.userId` 显式无 FK 注释 + service 层 `userService.exists(id)` 校验 + `users.deleted_at` 字段 + 1 个 e2e 测孤儿 ticket
+
+### 0052 · 高并发 + 连接池调优
+
+- **缺口**:pg pool 用默认值,无显式配置;没演示过 EXPLAIN ANALYZE 在高并发场景
+- **覆盖**:PostgreSQL server 端(`max_connections` / `shared_buffers` / `work_mem` / `statement_timeout`) + 应用层 pg.Pool 配置 + 实战 EXPLAIN ANALYZE
+- **预期交付**:`drizzle.service.ts` 显式 Pool config + k6 / autocannon 压测 register endpoint + 报告
+
+### 0053 · 缓存策略(Cache-Aside)
+
+- **缺口**:Redis (ioredis) 已装但只用于限流;DB cache 空白
+- **覆盖**:Cache-Aside / Write-Through / Write-Behind / Read-Through 4 模式 + 3 大坑(穿透 / 雪崩 / 击穿)
+- **预期交付**:`UserService.findById` 加 Cache-Aside(Redis, TTL 5min) + 处理 3 大坑
+
+### 0054 · 分库分表(水平 + snowflake)
+
+- **缺口**:5 service 已垂直分库,但无水平分表演示;auto_increment ID 在分表后不连续
+- **覆盖**:水平分表 3 策略(Hash / Range / Time) + sharding 中间件对比 + snowflake ID
+- **预期交付**:`cas_tickets` 模拟水平分表(`userId % 2` → 2 个 DB) + snowflake-like ID 生成器 + 应用层 router
+
+### 0055 · 分布式事务(Outbox 模式)
+
+- **缺口**:跨 service 副作用无事务保护(0023 LR 提的"非事务性副作用"问题)
+- **覆盖**:4 种方案对比(2PC / TCC / Saga / Outbox) + Outbox 实现 + worker 处理 + 幂等性
+- **预期交付**:`outbox` 表 + `createUserWithOutboxEvent` 事务方法 + Cron worker 推 RabbitMQ(已有 amqplib)
+
+### 0056 · 微服务 Database per Service
+
+- **缺口**:form-service / sync-service 跟 auth 共享 DB(反模式);sync-service 通过 schema-factory 动态生成表(共享 DB 池)
+- **覆盖**:Database per Service 原则 + 5 种跨服务数据访问模式 + nest-search 现状盘点
+- **预期交付**:form-service 拆独立 DB(`nest_search_form`) + sync-service 拆独立 DB(`nest_search_sync`) + 跨 service 数据走 API Composition
+
+### Phase E 共性
+
+- **每次都有"现状 → 改造 → 验证"3 段式**
+- **不引入新中间件**(ShardingSphere / Vitess 都是 Java 生态;nest-search 是 Node,演示用应用层手写)
+- **每个改动跑 `pnpm test` 验证不破窗**
+- **如果 nest-search 改不动**(比如 form/sync 拆 DB 影响太大),**降级为 lesson 内的 design exercise**(不动代码,只产出迁移方案文档)
+
+---
+
 ## 跨课共性
 
 ### 每节课交付物(强制)
@@ -235,17 +286,20 @@
 
 | 阶段 | 节数 | 状态 | 完成日期 |
 |---|---|---|---|
-| 已完成 | 18 | ✅ | 2026-06-22 |
-| Phase A | 12 | ⏳ 待开 | — |
-| Phase B | 8 | ⏳ 待开 | — |
-| Phase C | 5 | ⏳ 待开 | — |
-| Phase D | 7 | ⏳ 待开 | — |
-| **总计** | **50** | **18/50 = 36%** | — |
+| 已完成(主线+副线+Phase A 0022-0024) | 24 | ✅ | 2026-06-24 |
+| Phase A 余下 | 9 | ⏳ | — |
+| Phase B | 8 | ⏳ | — |
+| Phase C | 5 | ⏳ | — |
+| Phase D | 7 | ⏳ | — |
+| **Phase E(企业级 DB 架构,2026-06-24 新增)** | **6** | **⏳** | — |
+| **总计** | **56** | **24/56 = 43%** | — |
 
 ---
 
 ## 下一个动作
 
-按上述顺序,**0019-0021 Zod 配置校验** 是 Phase A 第 1 个 + 用户强调主题 + MISSION 缺口,**立刻可开**。
+按 2026-06-24 校准:
+1. **继续 Phase A 0025**(原计划:优雅退出) 或 **直接进 Phase E 0051**(用户新加的企业级 DB 架构第 1 课:外键禁用 + 业务一致性)
+2. 0024(Drizzle 索引 + EXPLAIN + N+1)已交付 lesson,等用户跑完测试 + commit
 
-确认开 0019?或对大纲有调整?
+**确认开哪条?** 推荐先开 Phase E 0051(用户明确要求 + nest-search 当前最缺业务一致性校验)。

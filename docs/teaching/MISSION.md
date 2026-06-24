@@ -12,7 +12,7 @@
 
 ## Constraints
 - 工作目录: `/Users/nmsn/Studio/nest-search`(已是 NestJS 11 monorepo,基础设施齐全)
-- 工具栈已固定: TypeScript 6 / pnpm / Drizzle / MySQL / ioredis / amqplib / @elastic/elasticsearch / Jest(已装但未用)
+- 工具栈已固定: TypeScript 6 / pnpm / Drizzle / PostgreSQL(2026-06-24 从 MySQL 迁) / ioredis / amqplib / @elastic/elasticsearch / Jest(已装但未用)
 - 学习方式: 边做边学 — 每一课要么产出一个 lesson,要么产出一次实际代码改动
 - 假设你已经会的: TypeScript、ES 语法、HTTP/REST、Promise/async-await、React 生态;Node.js 本身需要"补底"
 - 节奏: 1 课 ≈ 1 个可独立交付的小事,不要试图一次学完整个 NestJS

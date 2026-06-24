@@ -126,7 +126,7 @@ export type BaseEnv = z.infer<typeof BaseEnvSchema>;
 ### sync-service(10 字段,公共 + 4 私有)
 
 **私有**:
-- `DATABASE_URL` — MySQL 连接
+- `DATABASE_URL` — PostgreSQL 连接
 - `ELASTICSEARCH_NODE`
 - `SYNC_SERVICE_PORT`
 - `RABBITMQ_URL`

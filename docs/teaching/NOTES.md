@@ -108,3 +108,12 @@
 - **不再有"我替你写完"的伪动手**
 
 
+### Phase E · 企业级 DB 架构(2026-06-24 用户偏好)
+
+- **课程编号**:0051-0056(6 节,接 Phase D 0050 之后)
+- **参考文档(必读前置)**:`reference/enterprise-database-architecture.md`
+- **每次课结构**:现状盘点 → 改造 → 验证(3 段式)
+- **降级约定**:如果 nest-search 改不动(比如 form/sync 拆 DB 影响太大),**降级为 design exercise**(不动代码,只产出迁移方案文档)
+- **不引入新中间件**:ShardingSphere / Vitess 都是 Java 生态,nest-search 是 Node,**应用层手写**
+- **撞到的 TS 错 / 选型决策** → LR-0051/0052/...
+

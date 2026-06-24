@@ -473,12 +473,16 @@ create(@Body() dto: CreateUserDto) { ... }
 ### 9.1 class-validator + Drizzle(零联动)
 
 ```ts
-// Drizzle schema
-export const users = mysqlTable('users', {
-  id: int('id').primaryKey().autoincrement(),
+// Drizzle schema(2026-06-24 PG 适配版)
+import { pgTable, serial, varchar, pgEnum } from 'drizzle-orm/pg-core';
+
+export const userRoleEnum = pgEnum('user_role', ['admin', 'user']);
+
+export const users = pgTable('users', {
+  id: serial('id').primaryKey(),
   username: varchar('username', { length: 50 }).unique().notNull(),
   email: varchar('email', { length: 100 }),
-  role: mysqlEnum('role', ['admin', 'user']).default('user'),
+  role: userRoleEnum('role').default('user'),
 });
 
 // 手写 DTO(跟 schema 重复定义字段)

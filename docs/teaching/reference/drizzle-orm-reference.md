@@ -2,7 +2,9 @@
 
 > 涵盖 **drizzle-orm** + **drizzle-kit** + **drizzle-zod** 的常用 API + nest-search 实战模式。
 >
-> 版本:nest-search 当前装 `drizzle-orm@^0.45.2` / `drizzle-kit@^0.31.10` / `drizzle-zod@^0.8.3`。
+> **2026-06-24 更新**:数据库从 MySQL 迁到 PostgreSQL,本文档示例全部用 pg-core / node-postgres。
+>
+> 版本:nest-search 当前装 `drizzle-orm@^0.45.2` / `drizzle-kit@^0.31.10` / `drizzle-zod@^0.8.3` / `pg@^8.13.1`。
 
 ## 导航
 
@@ -26,8 +28,8 @@
 
 ```
 ┌─────────────────────────────────────┐
-│ Schema 层(表结构定义)               │ ← mysqlTable(...)
-│ e.g. users = mysqlTable('users', {...}) │
+│ Schema 层(表结构定义)               │ ← pgTable(...)
+│ e.g. users = pgTable('users', {...}) │
 └─────────────────────────────────────┘
               ↓ 类型 + 数据
 ┌─────────────────────────────────────┐
@@ -40,52 +42,61 @@
 └─────────────────────────────────────┘
 ```
 
-### 1.2 MySQL Driver 初始化
+### 1.2 PostgreSQL Driver 初始化
 
 ```ts
 // apps/*/src/database/drizzle.service.ts
-import { drizzle } from 'drizzle-orm/mysql2';
-import { createPool } from 'mysql2';
+import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
 import * as schema from './schema/users';
+
+type Schema = { users: typeof users; /* ... */ };
 
 @Injectable()
 export class DrizzleService implements OnModuleInit {
-  public db!: ReturnType<typeof drizzle>;
+  public db!: NodePgDatabase<Schema>;
 
   async onModuleInit() {
-    const pool = createPool({ uri: process.env.DATABASE_URL! });
-    this.db = drizzle(pool, { schema, mode: 'default' });
+    const databaseUrl = this.config.getOrThrow<string>('DATABASE_URL');
+    const pool = new Pool({ connectionString: databaseUrl });
+    this.db = drizzle(pool, { schema });
   }
 }
 ```
 
 **关键点**:
-- `mode: 'default'` — 用 mysql2 默认驱动
+- `node-postgres` driver(原 `pg` 包)
 - `schema` — 传所有表用于 relations 推断
-- `pool` — mysql2 连接池,**不**在每个 query 创建新连接
+- `pool` — `pg.Pool` 连接池,**不**在每个 query 创建新连接
+- 显式 `NodePgDatabase<Schema>` 类型 — 避免 `ReturnType<typeof drizzle>` 推成 `Record<string, never>`
 
 ---
 
 ## 2. Schema 定义
 
-### 2.1 mysqlTable + 列类型
+### 2.1 pgTable + 列类型
 
 ```ts
 import {
-  mysqlTable,
-  int,
+  pgTable,
+  serial,
   varchar,
   text,
   boolean,
   timestamp,
   json,
-  decimal,
-  mysqlEnum,
-} from 'drizzle-orm/mysql-core';
+  numeric,
+  pgEnum,
+  integer,
+} from 'drizzle-orm/pg-core';
 
-export const users = mysqlTable('users', {
-  // 整数,主键,自增
-  id: int('id').primaryKey().autoincrement(),
+// pgEnum 必须独立常量(mysqlEnum 可以内联)
+export const userRoleEnum = pgEnum('user_role', ['admin', 'user']);
+export const userStatusEnum = pgEnum('user_status', ['active', 'disabled']);
+
+export const users = pgTable('users', {
+  // 整数,主键,自增(serial = auto-increment in PG)
+  id: serial('id').primaryKey(),
 
   // 字符串,必填,唯一,长度 50
   username: varchar('username', { length: 50 }).unique().notNull(),
@@ -96,19 +107,20 @@ export const users = mysqlTable('users', {
   // 可选字符串
   email: varchar('email', { length: 100 }),
 
-  // 枚举
-  role: mysqlEnum('role', ['admin', 'user']).default('user'),
-  status: mysqlEnum('status', ['active', 'disabled']).default('active'),
+  // 枚举(必须用独立常量)
+  role: userRoleEnum('role').default('user'),
+  status: userStatusEnum('status').default('active'),
 
   // 时间戳
   createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow().onUpdateNow(),
+  // pg-core 没有 .onUpdateNow(),用 $onUpdate 回调
+  updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 
   // JSON 字段(带 TS 类型推断)
   metadata: json('metadata').$type<{ theme: string }>(),
 
   // 小数(precision 总位数, scale 小数位)
-  balance: decimal('balance', { precision: 12, scale: 2 }).notNull(),
+  balance: numeric('balance', { precision: 12, scale: 2 }).notNull(),
 });
 ```
 
@@ -116,30 +128,33 @@ export const users = mysqlTable('users', {
 
 | 修饰符 | 作用 | 例 |
 |---|---|---|
-| `.primaryKey()` | 主键 | `int('id').primaryKey()` |
-| `.autoincrement()` | 自增 | `int('id').autoincrement()` |
+| `serial('id').primaryKey()` | 主键 + 自增 | `serial('id').primaryKey()` |
+| `integer().generatedAlwaysAsIdentity()` | identity 列(PG 10+) | `integer('id').generatedAlwaysAsIdentity()` |
 | `.notNull()` | NOT NULL | `varchar('name', { length: 100 }).notNull()` |
 | `.unique()` | UNIQUE | `varchar('email', { length: 100 }).unique()` |
-| `.default(value)` | 默认值 | `mysqlEnum('role', [...]).default('user')` |
+| `.default(value)` | 默认值 | `userRoleEnum('role').default('user')` |
 | `.defaultNow()` | 当前时间 | `timestamp('created_at').defaultNow()` |
-| `.onUpdateNow()` | 每次 UPDATE 更新 | `timestamp('updated_at').onUpdateNow()` |
-| `.references(() => other.col)` | 外键 | `int('user_id').references(() => users.id)` |
+| `.$onUpdate(() => new Date())` | UPDATE 时自动更新 | `timestamp('updated_at').defaultNow().$onUpdate(() => new Date())` |
+| `.references(() => other.col)` | 外键 | `integer('user_id').references(() => users.id)` |
 | `.$type<T>()` | TS 类型推断 | `json('meta').$type<MyType>()` |
+| `jsonb()` | JSONB(PG 二进制 JSON,推荐) | `jsonb('meta').$type<MyType>()` |
 
 ### 2.3 表名 vs 列名
 
 ```ts
-mysqlTable('users', {        // ← 数据库表名(实际 SQL 用的)
-  id: int('id'),           // ← 数据库列名
+pgTable('users', {              // ← 数据库表名(实际 SQL 用的)
+  id: serial('id'),           // ← 数据库列名
   username: varchar('username', { length: 50 }),
-  //    ^^^^^^^^^^^            ← TS 字段名
+  //    ^^^^^^^^^^^              ← TS 字段名
 });
 
-// SQL: CREATE TABLE users (id INT, username VARCHAR(50))
+// SQL: CREATE TABLE "users" ("id" serial, "username" varchar(50))
 // TS:  db.select().from(users)  → users.username
 ```
 
 **TS 名跟 DB 名可以不一致**,但通常保持一致(可读性)。
+
+**PostgreSQL 标识符自动小写**:`pgTable('Users')` 实际建表是 `users`(除非用双引号强制)。Drizzle 不会自动加引号。
 
 ---
 
@@ -470,7 +485,7 @@ import type { Config } from 'drizzle-kit';
 export default {
   schema: ['./apps/auth-service/src/database/schema/**/*.ts'],
   out: './drizzle',
-  dialect: 'mysql',
+  dialect: 'postgresql',  // ← PG
   dbCredentials: {
     url: process.env.DATABASE_URL!,  // 注意:drizzle-kit 是 CLI,无法用 ConfigService
   },
@@ -538,19 +553,24 @@ apps/<service>/src/database/
 
 **当前方案**:**inline 公共字段** + 注释提示同步。公共字段 < 10 个时足够。
 
-### 10.3 DrizzleService 标准模式(已注入 ConfigService)
+### 10.3 DrizzleService 标准模式(已注入 ConfigService,PostgreSQL)
 
 ```ts
+import { Pool } from 'pg';
+import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
+
+type Schema = { users: typeof users; casTickets: typeof casTickets; /* ... */ };
+
 @Injectable()
 export class DrizzleService implements OnModuleInit {
-  public db!: ReturnType<typeof drizzle>;
+  public db!: NodePgDatabase<Schema>;  // 显式类型,避免 ReturnType 推成 {}
 
   constructor(private readonly config: ConfigService) {}
 
   async onModuleInit() {
     const uri = this.config.getOrThrow<string>('DATABASE_URL');
-    const pool = createPool({ uri });
-    this.db = drizzle(pool, { schema: { users, casTickets, ... } });
+    const pool = new Pool({ connectionString: uri });
+    this.db = drizzle(pool, { schema: { users, casTickets, /* ... */ } });
   }
 }
 ```
@@ -601,7 +621,7 @@ git commit -m "feat(db): add users.phone column + migration"
 | **生产环境检测** | ❌ | **不**读 `NODE_ENV`,**不**阻止你 push 到 prod |
 | **DB user 权限检查** | ❌ | drizzle-kit 不管你用什么账号连 |
 | **dry-run 模式** | ⚠️ | `generate` 只产文件(安全);`push` 没 dry-run |
-| **事务回滚保护** | ⚠️ MySQL 有限 | MySQL DDL 大部分**不**支持事务回滚,drizzle-kit 也没法 |
+| **事务回滚保护** | ✅ PG 完整 | PostgreSQL 大部分 DDL 支持事务回滚(更安全) |
 | **审计日志** | ❌ | 不内置,你要自己 audit |
 
 ### 11.2 最容易出事的场景
@@ -620,8 +640,8 @@ NODE_ENV=production pnpm db:push
 
 ```bash
 # .zshrc / .bashrc
-alias db-push-dev='DATABASE_URL=mysql://dev pnpm db:push'
-alias db-migrate-prod='DATABASE_URL=mysql://prod pnpm db:migrate'
+alias db-push-dev='DATABASE_URL=postgresql://dev pnpm db:push'
+alias db-migrate-prod='DATABASE_URL=postgresql://prod pnpm db:migrate'
 
 # 永远不直接 pnpm db:push
 ```
@@ -647,7 +667,7 @@ import type { Config } from 'drizzle-kit';
 export default {
   schema: ['./apps/auth-service/src/database/schema/**/*.ts'],
   out: './drizzle',
-  dialect: 'mysql',
+  dialect: 'postgresql',
   dbCredentials: {
     url: process.env.DATABASE_URL!,  // ← 读 env,不硬编码
   },
@@ -669,7 +689,7 @@ const PROD_PATTERNS = [
   /\.prod\./i,                  // db.prod.example.com
   /prod-/i,                       // prod-db-1.cluster
   /\.rds\.amazonaws\.com/i,       // AWS RDS 通常是 prod
-  /:3306$/,                      // prod 默认端口(假设)
+  /:5432$/,                      // prod 默认端口(假设)
 ];
 
 const isProd = PROD_PATTERNS.some(re => re.test(dbUrl));
@@ -697,15 +717,15 @@ execSync('drizzle-kit push', { stdio: 'inherit' });
 - [ ] 每次 migrate 前 **手动 backup** prod DB
 - [ ] 重要 schema 改(column drop / type change)单独 PR,**不**跟业务代码混
 
-### 11.5 MySQL DDL 注意事项
+### 11.5 PostgreSQL DDL 注意事项
 
 | 操作 | 可回滚? | 备注 |
 |---|---|---|
-| `ADD COLUMN` | ✅(MySQL 8.0+) | 大多数 DDL 现在支持 atomic DDL |
+| `ADD COLUMN` | ✅ | PostgreSQL 大部分 DDL 支持事务回滚 |
 | `DROP COLUMN` | ⚠️ 数据丢失 | **先 backup**,**先**确认业务无依赖 |
-| `MODIFY COLUMN` | ⚠️ 数据可能丢失 | 类型转换失败/截断 |
+| `ALTER COLUMN TYPE` | ⚠️ 数据可能丢失 | 类型转换失败/截断 |
 | `RENAME TABLE` | ⚠️ | 破坏外键引用 |
-| `CREATE INDEX` | ✅ | 安全 |
+| `CREATE INDEX` | ✅(可用 `CONCURRENTLY` 不锁表) | 推荐 `CREATE INDEX CONCURRENTLY` |
 | `DROP INDEX` | ⚠️ | 查询变慢 |
 
 **DDL 不可逆** → prod 改 schema 前**永远先 backup**。
@@ -727,7 +747,8 @@ execSync('drizzle-kit push', { stdio: 'inherit' });
 | drizzle-orm | 0.45.2 | 0.46+ 改 types 导出路径 |
 | drizzle-kit | 0.31.10 | 跟 orm 主版本对齐 |
 | drizzle-zod | 0.8.3 | omit/extend 推断有 bug,等 0.9 |
-| mysql2 | 3.x | major 升级需重测连接池 |
+| mysql2(已废弃) | 3.x | major 升级需重测连接池 |
+| pg | 8.x | major 升级注意 pool 行为变化 |
 
 ---
 

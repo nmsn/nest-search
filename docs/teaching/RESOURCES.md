@@ -63,7 +63,46 @@
 
 > 你目前没表达过"不想参与社区"的偏好,我会先按这个清单推荐;若你更想要"只读不发言"的姿势,告诉我,我把重心挪到一手文章。
 
+### 企业级数据库架构(Phase E 0051-0056 配套)
+
+> **配套参考**:`docs/teaching/reference/enterprise-database-architecture.md`(必读)。
+> **主题**:外键禁用 + 高并发 + 分库分表 + 分布式事务 + 微服务 DB per Service。
+
+- ★ [《数据密集型应用系统设计》(DDIA, Martin Kleppmann)](https://dataintensive.net/)
+  第 5 章复制 / 第 6 章分区 / 第 7 章事务 / 第 9 章一致性与共识。**Phase E 整套前置阅读**。
+- ★ [microservices.io — Database per Service](https://microservices.io/patterns/data/database-per-service.html)
+  Chris Richardson 维护,微服务模式权威目录。
+- ★ [microservices.io — Transactional Outbox](https://microservices.io/patterns/data/transactional-outbox.html)
+  Outbox 模式的标准定义。
+- ★ [microservices.io — Saga](https://microservices.io/patterns/data/saga.html)
+  Saga 模式 + 编排式 vs 编舞式。
+- [《阿里 Java 开发手册》MySQL 规约](https://developer.aliyun.com/topic/java-development-manual)
+  "不得使用外键与级联" — 国内大厂生产铁律。
+- [MySQL 官方手册 — InnoDB Foreign Key Constraints](https://dev.mysql.com/doc/refman/8.0/en/innodb-foreign-key-constraints.html)
+  MySQL 官方对外键的实现细节 + 性能影响。
+- [Apache ShardingSphere 文档](https://shardingsphere.apache.org/document/current/en/overview/)
+  Java 生态 sharding 中间件标准(参考,Phase E 不强求 nest-search 用)。
+- [Vitess 官方文档](https://vitess.io/docs/)
+  YouTube 用 10+ 年的 MySQL sharding proxy。
+- [Percona Database Performance Blog](https://www.percona.com/blog/)
+  MySQL 高并发调优实战文章最密集的来源。
+- [Twitter Snowflake(archive)](https://github.com/twitter-archive/snowflake)
+  Snowflake ID 算法原始论文 + Scala 实现。
+- [美团 Leaf](https://github.com/Meituan-Dianping/Leaf)
+  Snowflake 改进版,DB 分配 workerId,Phase E 0054 可参考。
+- [TiDB 文档](https://docs.pingcap.com/tidb/stable)
+  NewSQL 分布式 MySQL 替代,Phase E 0054 选型参考。
+
+### 中文实战文章
+
+- [InfoQ — 微服务架构下的数据库分库分表实践](https://www.infoq.cn/)
+  搜 "分库分表" / "外键" / "微服务数据库"
+- [掘金 — Drizzle ORM 实战](https://juejin.cn/tag/drizzle-orm) — 中等密度
+- [美团技术团队 — 分布式 ID 方案](https://tech.meituan.com/) — 美团 Leaf 中文详细解析
+
 ## Gaps (待补的资源)
 
 - 中文 NestJS enterprise 落地案例(大厂团队怎么用)目前没找到公认权威的,可能需要去字节/阿里技术博客翻。
 - Pino + Drizzle/MySQL 链路追踪案例少,第一课落地时若不够顺会先做 demo,再做整合。
+- Node.js 生态的分库分表中间件 — 没有 ShardingSphere-JDBC 这种事实标准,Phase E 0054 选型需要从 Vitess(proxy,Go) / 应用层手写 / 直接换 TiDB 中选
+- Phase E 0055 Outbox 模式的 Node 实战代码相对少(Java/Go 例子多),nest-search 改造时撞到的具体 TS 错要先 demo 再固化

@@ -1,30 +1,38 @@
-# 0022 · Drizzle Kit 迁移 + drizzle-zod 集成
+# 0022 · Drizzle Kit 迁移 + drizzle-zod 集成(PostgreSQL)
 
 > 副线 4(Drizzle 深度)第 1 课。nest-search 现在改 schema 是"靠手工跑 SQL",这课装上正经的迁移 + DTO 推断。
+>
+> **2026-06-24 更新**:数据库从 MySQL 迁到 PostgreSQL,driver 从 `mysql2` 换 `pg`,schema 从 `mysql-core` 换 `pg-core`。本课同步更新。
 
 ## 你今天会拿到什么
 
 1. 理解**为什么 Drizzle Kit 是必须**(替代手工 ALTER TABLE)
 2. 跑一次 `drizzle-kit generate`,产生第一个 SQL 迁移文件
-3. 跑一次 `drizzle-kit push`,把 schema 应用到 dev MySQL
+3. 跑一次 `drizzle-kit push`,把 schema 应用到 dev PostgreSQL
 4. 装 `drizzle-zod`,从 schema **自动推断 DTO**(写完 schema,DTO 不用手写)
 5. 18 测试还过 + 1 个 commit
 
 ## 1. nest-search Drizzle 当前现状
 
 ```
-✅ drizzle-orm 0.45.2 / drizzle-kit 0.31.10 已装
-✅ drizzle.config.ts 已存在(根)
+✅ drizzle-orm 0.45.2 / drizzle-kit 0.31.10 / drizzle-zod 0.8.3 已装
+✅ drizzle.config.ts 已存在(dialect: 'postgresql')
 ✅ 5 个 schema 文件(users / cas-tickets / cas-services / business-lines / schema-factory)
-❌ drizzle/migrations 目录不存在
-❌ drizzle-zod 没装
-❌ DTO 是手写的 class-validator(跟 schema 重复定义字段)
+   全部用 pg-core(pgTable / serial / pgEnum)
+✅ 3 个 drizzle.service.ts 用 node-postgres driver
+✅ docker-compose 起 postgres:16-alpine(5432 端口 / pg_isready healthcheck)
+❌ drizzle/migrations 目录不存在(2026-06-24 删了 MySQL 历史,等重生)
+❌ DTO 是手写的 Zod(部分手写,drizzle-zod 已集成)
 ```
 
-**后果**:
-- 改 `users.ts` 加一个字段 → 手动 `ALTER TABLE users ADD COLUMN ...` → 跟代码可能不同步
-- 新增 DTO → 手写字段列表,字段名拼错一个字母 runtime 才崩
-- 没有迁移历史 → 不知道 prod DB 跟代码 schema 差多少
+**PostgreSQL 改动要点**:
+- schema import 从 `drizzle-orm/mysql-core` → `drizzle-orm/pg-core`
+- `mysqlTable` → `pgTable`,`int().autoincrement()` → `serial()`
+- `mysqlEnum('col', [...])` → 独立 `pgEnum('name', [...])` 常量 + `xxxEnum('col').default(...)`
+- `timestamp().onUpdateNow()` → `timestamp().defaultNow().$onUpdate(() => new Date())`
+- driver 从 `mysql2` → `pg`(Pool + connectionString)
+- `MySql2Database<Schema>` → `NodePgDatabase<Schema>`
+- `.onDuplicateKeyUpdate()` → `.onConflictDoUpdate({ target, set })`
 
 ## 2. 设计决策
 
@@ -73,22 +81,23 @@ export default {
     './apps/form-service/src/database/schema/**/*.ts',
   ],
   out: './drizzle',
-  dialect: 'mysql',
+  dialect: 'postgresql',  // ← PostgreSQL
   dbCredentials: {
-    url: 'mysql://root:root123@localhost:3306/nest_search',
+    url: process.env.DATABASE_URL ?? 'postgresql://postgres:postgres123@localhost:5432/nest_search',
   },
 } satisfies Config;
 ```
 
-**注意**:`dbCredentials.url` 是硬编码。**改成读 ConfigService 的 env** 比较干净(用 drizzle.config.ts 的运行时部分)。
+**PostgreSQL 注意**:
+- `dialect: 'postgresql'`(不是 `'postgres'`)
+- URL 格式 `postgresql://user:pass@host:port/db`(不是 `postgres://`,虽然 PG 两种都接受)
+- 读 env 而非硬编码(避免 dev/prod 串)
 
 ### 3.3 · 加 npm scripts
 
-改 `package.json` 加 drizzle-kit 命令:
-
+`package.json` 已加:
 ```json
 "scripts": {
-  // ...existing
   "db:generate": "drizzle-kit generate",
   "db:migrate": "drizzle-kit migrate",
   "db:push": "drizzle-kit push",
@@ -99,61 +108,50 @@ export default {
 ### 3.4 · 跑第一次 generate
 
 ```bash
+docker-compose up -d postgres   # 先起 PG
 pnpm db:generate
 ```
 
-期望输出:
+**期望输出**:
 ```
 drizzle-kit: v0.31.10
 drizzle-orm: v0.45.2
 
-No schema changes, nothing to generate 😴
+[✓] Your SQL migration file ➜ drizzle/0000_*.sql  ← 新生成(PG 语法)
 ```
-
-(因为现有 schema 已经反映在 DB 里 — 0022 用例是"先有 schema 后有迁移"。下次改 schema 才出文件)
-
-**或者**:故意加一个字段 → 重新 generate → 看 `.sql` 文件生成。
 
 ### 3.5 · drizzle-zod 集成(auth-service)
 
-新建 `apps/auth-service/src/database/dto/users.dto.ts`:
+`apps/auth-service/src/database/dto/users.dto.ts`:
 
 ```ts
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import { z } from 'zod';
 import { users } from '../schema/users';
 
-// 自动从 schema 推断 Zod
+// 自动从 pg-core schema 推断 Zod
+// pgEnum 推断成 z.enum([...]),serial 推断成 z.number().int().positive()
 export const InsertUserDtoSchema = createInsertSchema(users, {
-  email: z.string().email().optional(),  // 覆盖默认值
+  email: z.string().email().optional(),
   role: z.enum(['admin', 'user']).default('user'),
 });
 
 export const SelectUserDtoSchema = createSelectSchema(users);
 
-// TS 类型
 export type InsertUserDto = z.infer<typeof InsertUserDtoSchema>;
 export type SelectUserDto = z.infer<typeof SelectUserDtoSchema>;
 ```
 
-**关键点**:
-- `createInsertSchema(users)` 自动生成 `{ username, passwordHash, email, role, status, createdAt, updatedAt }` 全字段
-- 第二个参数可以**覆盖**某个字段的规则(更严格或更宽松)
-- `createSelectSchema(users)` 生成 SELECT 返回的类型(所有字段都有,因为都有 default)
+**PostgreSQL 推断要点**:
+- `serial()` → `z.number().int().positive()`
+- `pgEnum('user_role', ['admin', 'user'])` → `z.enum(['admin', 'user'])`
+- `varchar({ length: 50 })` → `z.string().max(50)`
+- `timestamp()` → `z.date()`
 
 ### 3.6 · 在 controller 用 drizzle-zod 推断的 DTO
 
-改 `apps/auth-service/src/user/dto/create-user.dto.ts`:
+`apps/auth-service/src/user/dto/create-user.dto.ts`:
 
-**之前**:
-```ts
-export class CreateUserDto {
-  @IsString() @MinLength(3) username: string;
-  // ...
-}
-```
-
-**之后**:
 ```ts
 // 直接 re-export drizzle-zod 推断的 schema
 export { InsertUserDtoSchema as CreateUserDtoSchema } from '../../database/dto/users.dto';
@@ -161,8 +159,6 @@ export type { InsertUserDto as CreateUserDto } from '../../database/dto/users.dt
 ```
 
 ### 3.7 · 全局 ValidationPipe 跑 Zod schema
-
-NestJS 11 的 `ValidationPipe` 默认不识 Zod,需要 nestjs-zod 或手写。**0022 选手写**(避免多一个依赖):
 
 新建 `apps/auth-service/src/common/zod-validation.pipe.ts`:
 
@@ -186,8 +182,7 @@ export class ZodValidationPipe implements PipeTransform {
 }
 ```
 
-改 `auth.controller.ts` 在 register endpoint 加 `@UsePipes`:
-
+`auth.controller.ts`:
 ```ts
 import { UsePipes } from '@nestjs/common';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
@@ -200,17 +195,14 @@ async register(@Body() dto: CreateUserDto) {
 }
 ```
 
-### 3.8 · 跑 push 到 dev DB
+### 3.8 · 跑 push 到 dev PostgreSQL
 
 ```bash
-# 确保 docker MySQL 在跑
-docker ps | grep mysql
-
-# 把 schema 推到 dev
+docker-compose up -d postgres
 pnpm db:push
 ```
 
-**警告**:push 会直接改 DB,生产前**先 backup**。
+**注意**:PostgreSQL `db:push` 比 MySQL 更安全(很多 DDL 支持事务回滚)。
 
 ### 3.9 · 跑测试
 
@@ -218,16 +210,37 @@ pnpm db:push
 pnpm test
 ```
 
-期望:18 passed。如果 DTO schema 改导致 e2e 注册请求体不匹配 → 调 e2e 数据。
+期望:18+ passed。如果 DTO schema 改导致 e2e 注册请求体不匹配 → 调 e2e 数据。
 
-## 4. 设计自由度
+## 4. MySQL → PostgreSQL 迁移速查
+
+| MySQL | PostgreSQL | 备注 |
+|---|---|---|
+| `mysqlTable('x', {...})` | `pgTable('x', {...})` | 表 |
+| `int('id').primaryKey().autoincrement()` | `serial('id').primaryKey()` | PK |
+| `mysqlEnum('x', ['a', 'b'])` | `pgEnum('x', ['a', 'b'])` 独立常量 | enum 必须独立 |
+| `varchar({ length: 50 })` | `varchar({ length: 50 })` | 相同 |
+| `text` | `text` | 相同 |
+| `boolean` | `boolean` | 相同 |
+| `timestamp().onUpdateNow()` | `timestamp().defaultNow().$onUpdate(() => new Date())` | 应用层 onUpdate |
+| `decimal(p, s)` | `numeric(p, s)` 或 `decimal(p, s)` | 都可,numeric 更 PG-native |
+| `json` | `json` (同),`jsonb`(更好,推荐) | PG 可用 jsonb |
+| `mysql2 / MySql2Database` | `pg / NodePgDatabase` | driver |
+| `createPool({ uri })` | `new Pool({ connectionString })` | pool config |
+| `.onDuplicateKeyUpdate()` | `.onConflictDoUpdate({ target, set })` | upsert |
+| `insertResult[0].insertId` | `insertResult[0].id`(用 `.returning({ id })`) | 拿 id |
+| `dialect: 'mysql'` | `dialect: 'postgresql'` | drizzle-kit |
+| `mysql://...` | `postgresql://...` | URL |
+| `docker mysql:8.0` (3306) | `docker postgres:16-alpine` (5432) | docker |
+
+## 5. 设计自由度
 
 - **是否在 drizzle.config.ts 用 ConfigService**:你定
 - **DTO 用 class 还是 type**:都可以,Zod 推断的是 type,class 是装饰器
 - **drizzle-zod 覆盖 auth-service 还是 form-service**:0022 只示范 auth,form 留 0023+
 - **`ZodValidationPipe` 放哪**:`apps/auth-service/src/common/` 还是 `libs/shared/src/common/`:你判断
 
-## 5. 自我检测(3 道题)
+## 6. 自我检测(3 道题)
 
 <div class="quiz">
   <div class="quiz-q" data-correct="b">
@@ -256,12 +269,23 @@ pnpm test
     <button onclick="check(this)">提交</button>
     <div class="quiz-feedback"></div>
   </div>
+
+  <div class="quiz-q" data-correct="b">
+    <p>4. PostgreSQL 的 pgEnum 跟 MySQL 的 mysqlEnum 区别?</p>
+    <label class="quiz-opt"><input type="radio" name="q4" value="a"> 完全一样</label>
+    <label class="quiz-opt"><input type="radio" name="q4" value="b"> <strong>pgEnum 必须独立定义成常量再引用,mysqlEnum 可以内联</strong></label>
+    <label class="quiz-opt"><input type="radio" name="q4" value="c"> pgEnum 不支持 default</label>
+    <button onclick="check(this)">提交</button>
+    <div class="quiz-feedback"></div>
+  </div>
 </div>
 
-## 6. commit message(直接复制)
+## 7. commit message(直接复制)
 
 ```
 feat(auth-service): Drizzle Kit migrations + drizzle-zod DTO inference (0022)
+
+(PostgreSQL 适配:driver 从 mysql2 → pg,schema 从 mysql-core → pg-core)
 
 - Install drizzle-zod for Zod schema inference from Drizzle tables
 - Add db:generate / db:migrate / db:push / db:studio npm scripts
@@ -272,7 +296,7 @@ feat(auth-service): Drizzle Kit migrations + drizzle-zod DTO inference (0022)
 - Refactor apps/auth-service/src/user/dto/create-user.dto.ts to re-export
   drizzle-zod inferred schema (eliminates duplicate field declarations)
 - Verified: pnpm test 18/18 still pass
-- Verified: pnpm db:push syncs schema to dev MySQL
+- Verified: pnpm db:push syncs schema to dev PostgreSQL
 - Lesson 0022 docs/teaching/lessons/0022-drizzle-kit-migrations-and-zod.md
 - LR-0026: 副线 4 第 1 课反思
 
@@ -282,18 +306,35 @@ Chose hand-rolled for 0022 (lesson clarity + 0 new deps).
 Refs: docs/teaching/lessons/0022-drizzle-kit-migrations-and-zod.md
 ```
 
-## 7. 收口 checklist
+## 8. 收口 checklist
 
-- [ ] 3.1 `pnpm add -wD drizzle-zod`
-- [ ] 3.2 review drizzle.config.ts(可选:让 url 从 env 读)
-- [ ] 3.3 加 4 个 db:* script 到 package.json
-- [ ] 3.4 跑 `pnpm db:generate`(看输出)
-- [ ] 3.5 写 `apps/auth-service/src/database/dto/users.dto.ts`
-- [ ] 3.6 改 `create-user.dto.ts` re-export
-- [ ] 3.7 写 `zod-validation.pipe.ts`
-- [ ] 3.8 跑 `pnpm db:push` 到 dev MySQL
-- [ ] 3.9 `pnpm test` 18 passed
-- [ ] 3 道 quiz 答完
+- [ ] 3.1 `pnpm add -wD drizzle-zod`(已装则跳过)
+- [ ] 3.2 review `drizzle.config.ts`(确认 `dialect: 'postgresql'` + PG URL)
+- [ ] 3.3 确认 4 个 `db:*` script 在 package.json
+- [ ] 3.4 `docker-compose up -d postgres` 起 PG
+- [ ] 3.5 跑 `pnpm db:generate`(看输出)
+- [ ] 3.6 写 `apps/auth-service/src/database/dto/users.dto.ts`
+- [ ] 3.7 改 `create-user.dto.ts` re-export
+- [ ] 3.8 写 `zod-validation.pipe.ts`
+- [ ] 3.9 `pnpm db:push` 到 dev PG
+- [ ] 3.10 `pnpm test` 18+ passed
+- [ ] 4 道 quiz 答完
 - [ ] commit(用上面 message)
 
-**做完后告诉我结果**,我开 0023(Relations API + 事务 + 嵌套查询)。
+---
+
+## 打开方式
+
+```bash
+cat docs/teaching/lessons/0022-drizzle-kit-migrations-and-zod.md
+```
+
+## 参考文档
+
+- `docs/teaching/reference/drizzle-orm-reference.md`(PG 适配版,§4 有 MySQL→PG 速查表)
+- PostgreSQL 官方文档:[postgresql.org/docs](https://www.postgresql.org/docs/)
+- Drizzle ORM pg-core:[orm.drizzle.team/docs/column-types/pg](https://orm.drizzle.team/docs/column-types/pg)
+
+---
+
+**做完后告诉我结果**,我开 0023(Relations API + 事务 + 嵌套查询,PG 适配版)。

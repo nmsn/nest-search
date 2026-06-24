@@ -1,6 +1,8 @@
-# 0023 · Drizzle Relations API + 事务 + 嵌套查询
+# 0023 · Drizzle Relations API + 事务 + 嵌套查询(PostgreSQL)
 
 > 副线 4(Drizzle 深度)第 2 课。0022 装了 Drizzle Kit + drizzle-zod,0023 把"跨表查询"和"原子写入"做对。
+>
+> **2026-06-24 更新**:数据库迁到 PostgreSQL 后,`drizzle.service.ts` 的 driver 从 `drizzle-orm/mysql2` 改为 `drizzle-orm/node-postgres`,`MySql2Database<Schema>` → `NodePgDatabase<Schema>`。Relations API + 事务语义跨方言一致,本课核心内容不变。
 
 ## 你今天会拿到什么
 
@@ -161,12 +163,12 @@ export class CasService {
       // 1. bcrypt 密码(事务内)
       const passwordHash = await bcrypt.hash(input.password, 10);
 
-      // 2. 创建用户
+      // 2. 创建用户(Postgres 用 .returning({ id }),不是 mysql2 的 insertId)
       const [userResult] = await tx.insert(users).values({
         username: input.username,
         passwordHash,
-      }).$returningId();
-      const userId = userResult.insertId;
+      }).returning({ id: users.id });
+      const userId = userResult.id;
 
       // 3. 创建 ticket
       await tx.insert(casTickets).values({

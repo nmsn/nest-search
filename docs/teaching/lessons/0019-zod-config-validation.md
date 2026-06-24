@@ -28,7 +28,7 @@
 
 ```ts
 // apps/auth-service/src/database/drizzle.service.ts
-uri: process.env.DATABASE_URL || 'mysql://root:root123@localhost:3306/nest_search'
+uri: process.env.DATABASE_URL || 'postgresql://postgres:postgres123@localhost:5432/nest_search'
 
 // apps/auth-service/src/redis/redis.service.ts
 host: process.env.REDIS_HOST || 'localhost',
