@@ -16,6 +16,7 @@
 - §10 [性能基准](#10-性能基准)
 - §11 [迁移路径(class-validator → Zod)](#11-迁移路径class-validator--zod)
 - §12 [nest-search 实战状态](#12-nest-search-实战状态)
+- §13 [Entity vs Input DTO vs Output DTO](#13-entity-vs-input-dto-vs-output-dto)
 
 ---
 
@@ -639,6 +640,250 @@ pnpm remove class-validator class-transformer
 > **class-validator = NestJS "默认",Zod = TypeScript "默认"**。
 >
 > nest-search 走 Zod 路线(0022 决策),原因:**drizzle-zod 联动 + TS 类型推断 + 跨 framework**。
+
+---
+
+## 13. Entity vs Input DTO vs Output DTO
+
+> NestJS / Drizzle 项目最常混淆的 3 个名词。本节讲透三者的区别 + nest-search 现状。
+
+### 13.1 一句话区分
+
+| 词 | 本质 | 何时用 |
+|---|---|---|
+| **Entity** | 数据库行(DB row) | service 层 / repo 层 |
+| **Input DTO** | API 入参(请求体)| controller 层 `@Body()` |
+| **Output DTO** | API 出参(响应体)| controller 层返回值 |
+
+**核心**:**三者经常长得不一样**(password 字段就是经典例子)。
+
+### 13.2 详细对比
+
+#### Entity(数据库实体)
+
+```ts
+import type { InferSelectModel } from 'drizzle-orm';
+import { users } from './schema/users';
+
+// SELECT 返回类型 = 数据库行
+export type UserEntity = InferSelectModel<typeof users>;
+// {
+//   id: number;
+//   username: string;
+//   passwordHash: string;   ← 包含密码哈希(敏感!)
+//   email: string | null;
+//   role: 'admin' | 'user';
+//   status: 'active' | 'disabled';
+//   createdAt: Date;
+//   updatedAt: Date;
+// }
+```
+
+**特点**:
+- 直接对应 DB schema,**严格 1:1**
+- 包含**所有字段**(包括敏感字段)
+- service 层 / repo 层用
+- 通常**不**跨网络传输
+
+#### Input DTO(API 入参)
+
+```ts
+import { z } from 'zod';
+
+export const CreateUserInputSchema = z.object({
+  username: z.string().min(3),
+  password: z.string().min(6),     // ← API 收 password(明文)
+  email: z.string().email().optional(),
+  role: z.enum(['admin', 'user']).optional(),
+});
+export type CreateUserInput = z.infer<typeof CreateUserInputSchema>;
+```
+
+**特点**:
+- **业务规则**(密码长度、邮箱格式)
+- 字段名 ≠ Entity(`password` vs `passwordHash`)
+- controller `@Body()` 用
+- 含 API-only 字段(`confirmPassword`、`inviteCode` 等)
+
+#### Output DTO(API 出参)
+
+```ts
+import { z } from 'zod';
+
+export const UserResponseSchema = z.object({
+  id: z.number(),
+  username: z.string(),
+  email: z.string().nullable(),
+  role: z.enum(['admin', 'user']),
+  createdAt: z.date(),
+});
+export type UserResponse = z.infer<typeof UserResponseSchema>;
+```
+
+**特点**:
+- **永远不**返回敏感字段(`passwordHash` / `token` / `secret`)
+- 可能省略内部字段(`status`、`updatedAt`)
+- controller `@Body()` 返回值用
+- **API 契约**——前端依赖这个 shape
+
+### 13.3 完整数据流(nest-search auth-service)
+
+```
+┌────────────────────────────────────────────────────────┐
+│ HTTP POST /api/auth/register                           │
+│ Body: { username, password, email }                   │
+└────────────────────────────────────────────────────────┘
+                       ↓
+       ZodValidationPipe(CreateUserInputSchema)
+                       ↓
+┌────────────────────────────────────────────────────────┐
+│ CreateUserInput type: { username, password, email? }  │
+│   ↑ Input DTO — API 收到的形状,明文 password          │
+└────────────────────────────────────────────────────────┘
+                       ↓
+         userService.create(dto)
+                       ↓
+   bcrypt.hash(dto.password, 10) → passwordHash
+                       ↓
+┌────────────────────────────────────────────────────────┐
+│ CreateUserPayload type:                               │
+│   { username, passwordHash, email?, role? }           │
+│   ↑ DB 入参 DTO — 哈希后入库                          │
+└────────────────────────────────────────────────────────┘
+                       ↓
+       drizzle.db.insert(users).values(...)
+                       ↓
+┌────────────────────────────────────────────────────────┐
+│ UserEntity (SELECT 返回):                             │
+│   { id, username, passwordHash, email,                │
+│     role, status, createdAt, updatedAt }              │
+│   ↑ Entity — DB 完整行                                │
+└────────────────────────────────────────────────────────┘
+                       ↓
+       service 层 strip 敏感字段
+                       ↓
+┌────────────────────────────────────────────────────────┐
+│ UserResponse type: { id, username, email, role }      │
+│   ↑ Output DTO — 不暴露 passwordHash                  │
+└────────────────────────────────────────────────────────┘
+                       ↓
+       HTTP response body
+```
+
+### 13.4 命名约定(nest-search 现状 + 推荐)
+
+| 层 | 当前命名 | 推荐命名 | 说明 |
+|---|---|---|---|
+| **DB 行** | `User`(service 返回)| `UserEntity` / `UserRow` | 加后缀避免混 |
+| **DB 入参** | `InsertUserDb`(0022) | 保留 | 跟 schema 对齐 |
+| **API 入参** | `RegisterApi` / `CreateUserDto`(旧名)| `CreateUserInput` | 更明确 |
+| **API 出参** | (暂无)| `UserResponse` / `UserOutput` | 0023+ 加 |
+| **业务内部** | `User`(模糊) | 加后缀 | 别裸用 `User` |
+
+**当前混乱**:
+```ts
+// apps/auth-service/src/user/user.service.ts
+async create(dto: CreateUserDto) {  // ← dto 名字误导
+  // dto 实际是 API 输入(RegisterApi)
+  // service 内部又要做 bcrypt
+}
+```
+
+**推荐改造**(0023+):
+```ts
+// 清晰的 4 层命名
+async create(input: CreateUserInput) {
+  const payload: CreateUserPayload = {
+    ...input,
+    passwordHash: await bcrypt.hash(input.password, 10),
+  };
+  return drizzle.db.insert(users).values(payload).$returningId();
+}
+
+async findById(id: number): Promise<UserEntity | null> {
+  // ...
+}
+
+async getResponse(id: number): Promise<UserResponse | null> {
+  const user = await this.findById(id);
+  if (!user) return null;
+  // strip passwordHash
+  const { passwordHash, status, updatedAt, ...rest } = user;
+  return rest;
+}
+```
+
+### 13.5 何时用什么?
+
+| 场景 | 用什么类型 |
+|---|---|
+| `@Body()` 接收 HTTP 入参 | **Input DTO** |
+| `@Body()` 返回 HTTP 出参 | **Output DTO** |
+| `service.method(arg)` 参数(已校验过的) | 业务类型(Input/Payload 之一)|
+| `service.method()` 返回 DB 查询结果 | **Entity** |
+| 内部业务逻辑传值 | 业务类型(可等于 Input / Output / Entity)|
+| 测试 mock 数据 | **Entity**(最完整)|
+
+### 13.6 常见反模式
+
+#### 反模式 1 · service 返回 Entity 给 controller
+
+```ts
+// ❌ 错:返回 Entity(passwordHash 会泄漏到 response)
+@Get(':id')
+async getOne(@Param('id') id: number) {
+  return this.userService.findById(id);  // 类型 UserEntity 含 passwordHash
+}
+
+// ✅ 对:service 返回 Entity,但 controller 转换成 Output DTO
+@Get(':id')
+async getOne(@Param('id') id: string) {
+  const user = await this.userService.findById(+id);
+  if (!user) throw new NotFoundException();
+  // 显式 strip
+  const { passwordHash, ...rest } = user;
+  return rest;
+}
+```
+
+#### 反模式 2 · controller 直接接 Entity 当 @Body()
+
+```ts
+// ❌ 错:用户可以 POST { passwordHash: "anything" } 覆盖
+@Post()
+create(@Body() dto: UserEntity) {
+  // drizzle 直接 insert(dto) → 用户控制 passwordHash
+}
+
+// ✅ 对:Input DTO 严格定义 API 形状
+@Post()
+@UsePipes(new ZodValidationPipe(CreateUserInputSchema))
+create(@Body() dto: CreateUserInput) {
+  // dto.passwordHash 类型上不存在,TS 阻止
+}
+```
+
+#### 反模式 3 · Entity 和 DTO 用同一个名字 `User`
+
+```ts
+// ❌ 错:User 是 Entity?DTO?Input?Output?混用
+async findOne(id: number): Promise<User> { ... }
+async create(data: User): Promise<User> { ... }
+async getResponse(id: number): Promise<User> { ... }
+
+// ✅ 对:每个角色一个明确名字
+async findOne(id: number): Promise<UserEntity | null> { ... }
+async create(input: CreateUserInput): Promise<UserEntity> { ... }
+async getResponse(id: number): Promise<UserResponse | null> { ... }
+```
+
+### 13.7 nest-search 改造时间表
+
+| 课 | 改造内容 |
+|---|---|
+| 0023 | `UserService.create(input)` 改 `CreateUserInput` 入参;返回 `UserEntity` |
+| 0024 | 加 `UserResponse` Output DTO;controller 显式 strip |
+| 0025+ | 推广到 form-service / sync-service / search-service |
 
 ---
 
