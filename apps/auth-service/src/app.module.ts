@@ -9,6 +9,7 @@ import { AuthModule } from "./auth/auth.module";
 import { RedisModule } from "./redis/redis.module";
 import { validateEnv } from "./config/validate-env";
 import { AllExceptionsFilter } from "./filters/all-exceptions.filter";
+import { HealthModule } from "./health/health.module";
 import { APP_FILTER } from "@nestjs/core";
 
 @Module({
@@ -32,6 +33,7 @@ import { APP_FILTER } from "@nestjs/core";
     UserModule,
     CasModule,
     AuthModule,
+    HealthModule,
   ],
   providers: [
     {
