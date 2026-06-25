@@ -304,9 +304,9 @@
 
 ## 下一个动作
 
-按 2026-06-24 校准:
-1. **Phase A 0026 已就绪** — 优雅退出 + enableShutdownHooks
-2. 用户按顺序学 0026 → 0027 → ... → 0030 完成 Phase A
-3. **Phase B 新增 Elasticsearch 3 节**(0037-0039),大纲已更新
+按 2026-06-25 校准:
+1. **0027 lesson 已就绪** — JWT 深入:AT 黑名单 + ConfigService 改造
+2. **0028 lesson 已就绪** — 健康检查:liveness vs readiness + 自定义 indicator
+3. Phase A 还剩 0027-0030,完成后进入 Phase B
 
-**下一步**:用户执行 0026 lesson。
+**下一步**:用户执行 0027 lesson。
