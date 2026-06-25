@@ -1,37 +1,47 @@
-import { Controller, Post, Get, Body, Headers, Res, UnauthorizedException, UsePipes } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Response } from 'express';
-import { AuthService } from './auth.service';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Headers,
+  Res,
+  UnauthorizedException,
+  UsePipes,
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { Response } from "express";
+import { AuthService } from "./auth.service";
 // 方案 B:DTO 单一 source of truth 在 database/dto/,user 模块直接 import
 import {
   RegisterApi as CreateUserDto,
   RegisterApiSchema as CreateUserDtoSchema,
   LoginApi,
   LoginApiSchema,
-} from '../database/dto/users.dto';
-import { ZodValidationPipe } from '../common/zod-validation.pipe';
-import { UserService } from '../user/user.service';
-import * as jwt from 'jsonwebtoken';
-import { CAS_CONFIG, JwtPayload } from '../libs/shared';
+} from "../database/dto/users.dto";
+import { ZodValidationPipe } from "../common/zod-validation.pipe";
+import { UserService } from "../user/user.service";
+import * as jwt from "jsonwebtoken";
+import { JwtPayload } from "../libs/shared";
 
-@Controller('api/auth')
+@Controller("api/auth")
 export class AuthController {
-  // 从 ConfigService 读 env,CAS_* 留 constants(后续 lesson 转 @Injectable)
   private readonly isProduction: boolean;
   private readonly cookieDomain: string;
   private readonly refreshTtl: number;
+  private readonly jwtSecret: string;
 
   constructor(
     private readonly authService: AuthService,
     private readonly userService: UserService,
     config: ConfigService,
   ) {
-    this.isProduction = config.getOrThrow<string>('NODE_ENV') === 'production';
-    this.cookieDomain = config.getOrThrow<string>('CAS_COOKIE_DOMAIN');
-    this.refreshTtl = config.getOrThrow<number>('REFRESH_TOKEN_EXPIRES_IN');
+    this.isProduction = config.getOrThrow<string>("NODE_ENV") === "production";
+    this.cookieDomain = config.getOrThrow<string>("CAS_COOKIE_DOMAIN");
+    this.refreshTtl = config.getOrThrow<number>("REFRESH_TOKEN_EXPIRES_IN");
+    this.jwtSecret = config.getOrThrow<string>("JWT_SECRET");
   }
 
-  @Post('register')
+  @Post("register")
   // 0022: 用 drizzle-zod 推断的 Zod schema + 手写 pipe 校验
   @UsePipes(new ZodValidationPipe(CreateUserDtoSchema))
   async register(@Body() dto: CreateUserDto) {
@@ -40,28 +50,32 @@ export class AuthController {
     return result;
   }
 
-  @Post('login')
+  @Post("login")
   @UsePipes(new ZodValidationPipe(LoginApiSchema))
-  async login(@Body() dto: LoginApi, @Res({ passthrough: true }) res: Response) {
+  async login(
+    @Body() dto: LoginApi,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const result = await this.authService.login(dto.username, dto.password);
     this.setRefreshTokenCookie(res, result.refreshToken);
     return { accessToken: result.accessToken, user: result.user };
   }
 
-  @Post('validate')
+  @Post("validate")
   async validate(@Body() body: { ticket: string; service: string }) {
     return this.authService.validateTicket(body.ticket, body.service);
   }
 
-  @Post('refresh')
+  @Post("refresh")
   async refresh(
     @Body() body: { refreshToken?: string },
-    @Headers('cookie') cookie: string,
+    @Headers("cookie") cookie: string,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const refreshToken = body.refreshToken || this.extractRefreshTokenFromCookie(cookie);
+    const refreshToken =
+      body.refreshToken || this.extractRefreshTokenFromCookie(cookie);
     if (!refreshToken) {
-      throw new UnauthorizedException('Refresh token not provided');
+      throw new UnauthorizedException("Refresh token not provided");
     }
 
     const result = await this.authService.refresh(refreshToken);
@@ -69,28 +83,37 @@ export class AuthController {
     return { accessToken: result.accessToken };
   }
 
-  @Post('logout')
+  @Post("logout")
   async logout(
     @Body() body: { refreshToken?: string },
-    @Headers('cookie') cookie: string,
+    @Headers("cookie") cookie: string,
+    @Headers("authorization") auth: string,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const refreshToken = body.refreshToken || this.extractRefreshTokenFromCookie(cookie);
+    const refreshToken =
+      body.refreshToken || this.extractRefreshTokenFromCookie(cookie);
+
+    // 从 Authorization header 取 AT
+    const accessToken = auth?.replace("Bearer ", "");
+
     if (refreshToken) {
-      await this.authService.logout(refreshToken);
+      await this.authService.logout(refreshToken, accessToken);
     }
     this.clearRefreshTokenCookie(res);
-    return { message: 'Logged out' };
+    return { message: "Logged out" };
   }
 
-  @Get('me')
-  async me(@Headers('authorization') auth: string) {
-    if (!auth?.startsWith('Bearer ')) {
+  @Get("me")
+  async me(@Headers("authorization") auth: string) {
+    if (!auth?.startsWith("Bearer ")) {
       return { user: null };
     }
     try {
       const token = auth.slice(7);
-      const payload = jwt.verify(token, CAS_CONFIG.jwtSecret) as unknown as JwtPayload;
+      const payload = jwt.verify(
+        token,
+        this.jwtSecret,
+      ) as unknown as JwtPayload;
       const user = await this.userService.findById(payload.sub);
       const { passwordHash, ...result } = user as any;
       return { user: result };
@@ -100,27 +123,29 @@ export class AuthController {
   }
 
   private setRefreshTokenCookie(res: Response, refreshToken: string) {
-    res.cookie('refreshToken', refreshToken, {
+    res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
-      sameSite: 'lax',
+      sameSite: "lax",
       maxAge: this.refreshTtl * 1000,
       domain: this.cookieDomain,
-      path: '/',
+      path: "/",
       secure: this.isProduction,
     });
   }
 
   private clearRefreshTokenCookie(res: Response) {
-    res.clearCookie('refreshToken', {
+    res.clearCookie("refreshToken", {
       httpOnly: true,
-      sameSite: 'lax',
+      sameSite: "lax",
       domain: this.cookieDomain,
-      path: '/',
+      path: "/",
       secure: this.isProduction,
     });
   }
 
-  private extractRefreshTokenFromCookie(cookie: string | undefined): string | undefined {
+  private extractRefreshTokenFromCookie(
+    cookie: string | undefined,
+  ): string | undefined {
     if (!cookie) return undefined;
     const match = cookie.match(/refreshToken=([^;]+)/);
     return match ? match[1] : undefined;
