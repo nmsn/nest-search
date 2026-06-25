@@ -5,11 +5,11 @@
 ## 已有(green)
 - NestJS 11 monorepo,5 个后端 app(gateway / auth / search / form / sync)+ `libs/shared` 库
 - pnpm workspace,`nest-cli.json` 已配好 monorepo
-- 基础设施: Docker Compose 起 MySQL 8 / Elasticsearch 8.12 / RabbitMQ 3-management / Redis 7
+- 基础设施: Docker Compose 起 MySQL 8 / Elasticsearch 8.12 / BullMQ 3-management / Redis 7
 - Gateway: API Key Guard + CAS Guard + AllExceptionsFilter + ProxyService(已落到 `apps/gateway/src/`)
 - auth-service: ConfigModule(global) / DrizzleModule(global) / RedisModule(global) / ValidationPipe(whitelist + transform) / cookie-parser / CORS
 - 数据层: Drizzle ORM + mysql2 + drizzle-kit 已装
-- 消息: amqp-connection-manager + amqplib(用于 sync-service)
+- 消息: amqp-connection-manager + bull(用于 sync-service)
 - 缓存: ioredis 已装并抽象为 RedisService
 - 搜索: `@elastic/elasticsearch` 8.19 + `SearchModule` 用 `onModuleInit` 初始化索引
 - 测试: jest + ts-jest + @nestjs/testing 已装,**但 `apps/*/src/**/__tests__` 几乎为空**
@@ -23,7 +23,7 @@
 6. **统一配置校验**: ConfigModule 没接 Joi/Zod,`process.env` 直接读,启动时不会爆但运行时会
 7. **JWT 策略**: 看到 `CasGuard` 但没看到 `@nestjs/jwt` 接入,登录后怎么续签 / 怎么校验没串起来
 8. **测试**: 一行测试都没有,改任何东西都是裸奔
-9. **优雅退出**: 没有 `enableShutdownHooks`,SIGTERM 来时 RabbitMQ 连接会半挂
+9. **优雅退出**: 没有 `enableShutdownHooks`,SIGTERM 来时 BullMQ 连接会半挂
 10. **链路追踪**: 没有 OpenTelemetry,跨服务调用定位困难
 
 **Implications**:

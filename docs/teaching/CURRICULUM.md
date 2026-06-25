@@ -14,7 +14,7 @@
 |---|---|
 | LR-0002 列的 10 个 nest-search 缺位,**4 个 MISSING** | 全部进 Phase A 必修 |
 | 数据库只"用过"未"深入"(Drizzle 没专门课) | 进 Phase A 第 2 个 |
-| Redis/RabbitMQ/Zod/Drizzle 全是"用过但未深入" | 进 Phase A / B 必修 |
+| Redis/BullMQ/Zod/Drizzle 全是"用过但未深入" | 进 Phase A / B 必修 |
 | Docker 0 课时(MISSION out-of-scope 边缘) | 进 Phase C 加分,非必修 |
 | 测试 / 健康检查 / 错误处理"浅做" | 全部进 Phase A 必修 |
 
@@ -115,7 +115,7 @@
 
 ## Phase B · 全栈深度 11 节 — 30 → 41
 
-**目标**:用户强调的 Redis + RabbitMQ 深入 + Elasticsearch + 错误处理模式。
+**目标**:用户强调的 Redis + BullMQ 深入 + Elasticsearch + 错误处理模式。
 
 ### 0031-0033 · Redis 深度(3 节)
 
@@ -234,7 +234,7 @@
 
 - **缺口**:跨 service 副作用无事务保护(0023 LR 提的"非事务性副作用"问题)
 - **覆盖**:4 种方案对比(2PC / TCC / Saga / Outbox) + Outbox 实现 + worker 处理 + 幂等性
-- **预期交付**:`outbox` 表 + `createUserWithOutboxEvent` 事务方法 + Cron worker 推 RabbitMQ(已有 amqplib)
+- **预期交付**:`outbox` 表 + `createUserWithOutboxEvent` 事务方法 + Cron worker 推 BullMQ(已有 bull)
 
 ### 0059 · 微服务 Database per Service
 

@@ -2,7 +2,7 @@
 
 ## 核心心智模型
 
-K8s 给 Pod 30 秒软死时间窗(SIGTERM → SIGKILL),你必须显式装 `app.enableShutdownHooks()` 才能在窗口期内跑 cleanup 钩子。**没装它 = 收到 SIGTERM 立即死** = in-flight 请求被打断, RabbitMQ/Redis/MySQL 连接硬切,等 30 秒后 K8s 兜底 SIGKILL 二次伤害。
+K8s 给 Pod 30 秒软死时间窗(SIGTERM → SIGKILL),你必须显式装 `app.enableShutdownHooks()` 才能在窗口期内跑 cleanup 钩子。**没装它 = 收到 SIGTERM 立即死** = in-flight 请求被打断, BullMQ/Redis/MySQL 连接硬切,等 30 秒后 K8s 兜底 SIGKILL 二次伤害。
 
 ## 4 阶段有序退出顺序(在 §4 跟 §5.4 跑通过)
 

@@ -31,7 +31,7 @@
 
 **症状**:第一次跑 `pnpm start:sync &`,然后 `kill $PID`,但**端口 3001 还被占**。
 
-**根因**:sync-service <code>main.ts</code> 同时起 HTTP + RabbitMQ consumer。`nest start` 是父进程,`kill $PID` 只杀父进程,nest CLI 起的子进程(node + amqp 连接)没被波及。
+**根因**:sync-service <code>main.ts</code> 同时起 HTTP + BullMQ consumer。`nest start` 是父进程,`kill $PID` 只杀父进程,nest CLI 起的子进程(node + amqp 连接)没被波及。
 
 **修复模式**:
 ```bash

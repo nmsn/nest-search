@@ -422,7 +422,7 @@ async checkout() {
 }
 ```
 
-**用 NestJS Microservices transport**(TCP / Redis / RabbitMQ / Kafka)。0026 课讲。
+**用 NestJS Microservices transport**(TCP / Redis / BullMQ / Kafka)。0026 课讲。
 
 ---
 

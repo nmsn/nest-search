@@ -180,13 +180,13 @@ await this.db.transaction(async (tx) => {
   });
 });
 
-// Worker 异步读 outbox,推送 RabbitMQ → 多个消费者
+// Worker 异步读 outbox,推送 BullMQ → 多个消费者
 // 消费者消费后,UPDATE outbox SET status = 'processed'
 ```
 
 **好处**:
 - 写 user 和"通知外部"在同一个 DB 事务里原子
-- 即使 RabbitMQ 挂了,outbox 表里事件还在(持久)
+- 即使 BullMQ 挂了,outbox 表里事件还在(持久)
 - Worker 重试,最终一致
 
 ### 2.5 Saga 模式
@@ -532,8 +532,8 @@ async processOutbox() {
 
   for (const evt of events) {
     try {
-      // 2. 推到 RabbitMQ(或其他下游)
-      await this.rabbitmq.publish(evt.eventType, evt.payload);
+      // 2. 推到 BullMQ(或其他下游)
+      await this.bullmq.publish(evt.eventType, evt.payload);
 
       // 3. 标记 processed
       await this.db.update(outbox)
@@ -555,7 +555,7 @@ async processOutbox() {
 
 - 加 outbox 表到 auth-service
 - createUserWithTicket(已有事务)加 outbox 写入
-- 加 worker(Cron)推到 RabbitMQ(已装 amqplib)
+- 加 worker(Cron)推到 BullMQ(已装 bull)
 
 ---
 
@@ -651,7 +651,7 @@ apps/gateway            → DB: 无                       ✅ 无 DB
 | **0052** | 高并发 + 连接池 | pg pool 显式配置(max / idleTimeout / statement_timeout);演示 EXPLAIN 在高并发场景 |
 | **0053** | 缓存策略 | auth-service 的 `findUserById` 加 Cache-Aside(Redis);处理穿透/雪崩/击穿 |
 | **0054** | 分库分表 | casTickets 模拟水平分表(2 个 DB,userId % 2 路由);加 snowflake-like ID |
-| **0055** | 分布式事务 + Outbox | createUserWithTicket 加 outbox 写入;Cron worker 推到 RabbitMQ(已有 amqplib) |
+| **0055** | 分布式事务 + Outbox | createUserWithTicket 加 outbox 写入;Cron worker 推到 BullMQ(已有 bull) |
 | **0056** | 微服务 DB per Service | form-service / sync-service 拆独立 DB;跨 service 数据走 API |
 
 **总耗时估计**:6 节 × ~1 小时 = ~6 小时(分散在多 session)
