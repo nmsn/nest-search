@@ -99,17 +99,29 @@
 - **覆盖**:SIGTERM 处理 + 连接清理 + 业务异常分类 + Sentry 集成预留
 - **预期交付**:每个 service 装 enableShutdownHooks + 业务异常基类 + 测试
 
-### 0027-0028 · JWT 深入(2 节)
+### 0027 · JWT 深入(1 节)
 
 - **缺口**:LR-0002 #7(CasGuard 浅做,JWT 流程不完整)
-- **覆盖**:refresh token rotation + 黑名单 + 自动续签 + 边界(过期/吊销)
-- **预期交付**:auth-service 完整 token 生命周期 + 18 测试覆盖
+- **覆盖**:AT 黑名单(jti + Redis)+ CAS_CONFIG → ConfigService + 双令牌架构 + 签名验证原理
+- **交付**:auth.service.ts AT 即时吊销 + auth.controller.ts ConfigService 改造 ✅
 
-### 0029-0030 · 健康检查深度(2 节)
+### 0028 · 健康检查深度(1 节)
 
 - **缺口**:LR-0002 #3(terminus 浅做)
-- **覆盖**:liveness vs readiness + 自定义 indicator(数据库/Redis/MQ 连接检查)
-- **预期交付**:每个 service 加 readiness probe + 业务级 health check
+- **覆盖**:liveness vs readiness + 自定义 indicator(数据库/Redis 连接检查)+ Docker Compose / k3s 配置
+- **交付**:auth-service health module + /health/live + /health/ready ✅
+
+### 0029 · Swagger API 文档(1 节)
+
+- **缺口**:nest-search 5 个 service 无 API 文档,前端对接靠口头沟通
+- **覆盖**:OpenAPI 3.0 规范 + @nestjs/swagger + 装饰器(@ApiProperty/@ApiResponse/@ApiTags)
+- **预期交付**:auth-service 装 Swagger + /api/docs 可访问
+
+### 0030 · CORS + 安全头 + 请求限制(1 节,Phase A 收官)
+
+- **缺口**:auth-service CORS 全开,无 Helmet,无 body 大小限制
+- **覆盖**:CORS 精确配置(按环境区分)+ Helmet 安全头 + 请求体大小限制
+- **预期交付**:auth-service 安全配置完善
 
 ---
 
@@ -292,21 +304,21 @@
 
 | 阶段 | 节数 | 状态 | 完成日期 |
 |---|---|---|---|
-| 已完成(主线+副线+Phase A 0022-0026) | 26 | ✅ | 2026-06-24 |
-| Phase A 余下 | 4 | ⏳ | — |
+| 已完成(主线+副线+Phase A 0019-0028) | 28 | ✅ | 2026-06-25 |
+| Phase A 余下 (0029-0030) | 2 | ⏳ | — |
 | Phase B | 11 | ⏳ | — |
 | Phase C | 5 | ⏳ | — |
 | Phase D | 7 | ⏳ | — |
 | **Phase E(企业级 DB 架构,2026-06-24 新增)** | **6** | **⏳** | — |
-| **总计** | **59** | **26/59 = 44%** | — |
+| **总计** | **59** | **28/59 = 47%** | — |
 
 ---
 
 ## 下一个动作
 
 按 2026-06-25 校准:
-1. **0027 lesson 已就绪** — JWT 深入:AT 黑名单 + ConfigService 改造
-2. **0028 lesson 已就绪** — 健康检查:liveness vs readiness + 自定义 indicator
-3. Phase A 还剩 0027-0030,完成后进入 Phase B
+1. **0029 lesson 已就绪** — Swagger API 文档
+2. **0030 lesson 已就绪** — CORS + 安全头 + 请求限制
+3. Phase A 还剩 0029-0030,完成后进入 Phase B (0031 Redis 深度)
 
-**下一步**:用户执行 0027 lesson。
+**下一步**:用户执行 0029 lesson。
