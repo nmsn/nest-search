@@ -473,7 +473,7 @@ this.logger.debug({ status: 500, err: exception }, "something broke");
 **Q1: 为什么每个 service 都需要自己的 AllExceptionsFilter，而不是只在 gateway 有？**
 
 A) 因为 gateway 的 filter 不能捕获下游 service 的异常
-B) 因为 gateway 只代理 HTTP 请求，service 内部的非 HTTP 异常（如 RabbitMQ consumer）不会经过 gateway
+B) 因为 gateway 只代理 HTTP 请求，service 内部的非 HTTP 异常（如 BullMQ worker）不会经过 gateway
 C) 因为 NestJS 不支持跨 module 的 filter
 
 **Q2: BusinessException 继承 HttpException 的好处是什么？**

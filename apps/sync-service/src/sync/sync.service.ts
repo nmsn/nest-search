@@ -1,53 +1,63 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { ClientProxy, Client, Transport } from '@nestjs/microservices';
-import { RABBITMQ_CONFIG, BUSINESS_LINES, BusinessLineCode } from '../libs/shared/index';
+import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bull';
+import { Queue } from 'bull';
+import { BUSINESS_LINES, BusinessLineCode } from '../libs/shared/index';
 import * as fs from 'fs';
 import * as path from 'path';
 
 @Injectable()
-export class SyncService implements OnModuleInit {
+export class SyncService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(SyncService.name);
 
-  @Client({
-    transport: Transport.RMQ,
-    options: {
-      urls: [RABBITMQ_CONFIG.url],
-      queue: 'sync-service-producer',
-      queueOptions: { durable: false },
-    },
-  })
-  private client!: ClientProxy;
+  constructor(
+    @InjectQueue('sync-full') private fullQueue: Queue,
+    @InjectQueue('sync-incremental') private incrementalQueue: Queue,
+  ) {}
 
   async onModuleInit() {
-    await this.client.connect();
-    this.logger.log('Connected to RabbitMQ');
+    this.logger.log('BullMQ queues ready');
+  }
+
+  async onModuleDestroy() {
+    await this.fullQueue.close();
+    await this.incrementalQueue.close();
   }
 
   async triggerFullSync(businessLine: BusinessLineCode) {
     this.logger.log(`Triggering full sync for ${businessLine}`);
-    const message = {
-      businessLine,
-      type: 'full' as const,
-      triggeredBy: 'manual' as const,
-      timestamp: new Date(),
-    };
-
-    this.client.emit(RABBITMQ_CONFIG.routingKeys.syncFull(businessLine), message);
-    return { status: 'queued', type: 'full', businessLine };
+    const job = await this.fullQueue.add(
+      'sync',
+      {
+        businessLine,
+        type: 'full' as const,
+        triggeredBy: 'manual' as const,
+        timestamp: new Date(),
+      },
+      {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 1000 },
+      },
+    );
+    return { status: 'queued', type: 'full', businessLine, jobId: job.id };
   }
 
   async triggerIncrementalSync(businessLine: BusinessLineCode) {
     this.logger.log(`Triggering incremental sync for ${businessLine}`);
-    const message = {
-      businessLine,
-      type: 'incremental' as const,
-      triggeredBy: 'manual' as const,
-      lastSyncTime: new Date(Date.now() - 24 * 60 * 60 * 1000),
-      timestamp: new Date(),
-    };
-
-    this.client.emit(RABBITMQ_CONFIG.routingKeys.syncIncremental(businessLine), message);
-    return { status: 'queued', type: 'incremental', businessLine };
+    const job = await this.incrementalQueue.add(
+      'sync',
+      {
+        businessLine,
+        type: 'incremental' as const,
+        triggeredBy: 'manual' as const,
+        lastSyncTime: new Date(Date.now() - 24 * 60 * 60 * 1000),
+        timestamp: new Date(),
+      },
+      {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 1000 },
+      },
+    );
+    return { status: 'queued', type: 'incremental', businessLine, jobId: job.id };
   }
 
   loadMockData(type: 'full' | 'incremental') {

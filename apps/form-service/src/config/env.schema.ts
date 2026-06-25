@@ -19,7 +19,6 @@ export const FormEnvSchema = z.object({
     .string()
     .url()
     .default("postgresql://postgres:postgres123@localhost:5432/nest_search"),
-  RABBITMQ_URL: z.string().url().optional(),
 });
 
 export type FormEnv = z.infer<typeof FormEnvSchema>;

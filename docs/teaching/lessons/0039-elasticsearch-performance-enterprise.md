@@ -201,7 +201,7 @@ PUT /products-ds/_settings
 ```
 ┌─────────────┐     ┌──────────────┐     ┌─────────────────┐
 │ sync-service │────▶│  PostgreSQL  │────▶│ search-service  │
-│ (RabbitMQ)   │     │  (主存储)     │     │ (Elasticsearch) │
+│ (BullMQ)     │     │  (主存储)     │     │ (Elasticsearch) │
 └─────────────┘     └──────────────┘     └─────────────────┘
         │                                         ▲
         │           定时同步                       │
@@ -209,7 +209,7 @@ PUT /products-ds/_settings
 ```
 
 **数据流**：
-1. sync-service 从 RabbitMQ 消费消息
+1. sync-service 通过 BullMQ (Redis) 触发同步任务
 2. 写入 PostgreSQL（主存储）
 3. 定时同步到 Elasticsearch（搜索层）
 4. search-service 查询 ES 返回结果

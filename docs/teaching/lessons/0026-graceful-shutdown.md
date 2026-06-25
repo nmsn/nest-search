@@ -1,8 +1,8 @@
 # 0026 · 优雅退出 + enableShutdownHooks(NestJS)
 
-> Phase A 第 8 课。0025 建了 AllExceptionsFilter + BusinessException,0026 解决另一个缺口：**服务退出时连接泄漏**。Docker 发 SIGTERM 时，DB pool / Redis / ES / RabbitMQ 连接没有被正确关闭。
+> Phase A 第 8 课。0025 建了 AllExceptionsFilter + BusinessException,0026 解决另一个缺口：**服务退出时连接泄漏**。Docker 发 SIGTERM 时，DB pool / Redis / ES / BullMQ 连接没有被正确关闭。
 >
-> **2026-06-24**:所有 service 都用 PostgreSQL (pg.Pool) + Pino 日志。auth-service 额外有 Redis (ioredis)。
+> **2026-06-24**:所有 service 都用 PostgreSQL (pg.Pool) + Pino 日志。auth-service 额外有 Redis (ioredis)。sync-service 用 BullMQ (基于 Redis)。
 
 ## 你今天会拿到什么
 
@@ -29,7 +29,7 @@ enableShutdownHooks:
    ⚠️ 但是死代码！因为没调 enableShutdownHooks
 ❌ form-service/drizzle.service.ts → pool 没存为属性,无法 close
 ❌ search-service/elasticsearch.service.ts → 无 close
-❌ sync-service/elasticsearch + rabbitmq → 无 close
+❌ sync-service/elasticsearch + bullmq → 无 close
 ```
 
 **后果**：

@@ -1,130 +1,92 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Ctx, EventPattern, Payload, RmqContext } from '@nestjs/microservices';
+import { Processor, Process, WorkerHost } from '@nestjs/bull';
+import { Job } from 'bull';
 import { Client } from '@elastic/elasticsearch';
-import { RABBITMQ_CONFIG, BUSINESS_LINES, BusinessLineCode } from '../libs/shared/index';
+import { BUSINESS_LINES, BusinessLineCode } from '../libs/shared/index';
 import { SyncService } from './sync.service';
 
 @Injectable()
-export class SyncConsumer {
-  private readonly logger = new Logger(SyncConsumer.name);
+@Processor('sync-full')
+export class SyncFullConsumer extends WorkerHost {
+  private readonly logger = new Logger(SyncFullConsumer.name);
   private esClient: Client;
-  private retryCount = new Map<string, number>();
 
   constructor(
     private readonly syncService: SyncService,
     config: ConfigService,
   ) {
+    super();
     const esNode = config.getOrThrow<string>('ELASTICSEARCH_NODE');
     this.esClient = new Client({ node: esNode });
   }
 
-  @EventPattern('sync.full.ds')
-  async handleFullSyncDs(@Payload() data: any, @Ctx() context: RmqContext) {
-    await this.processFullSync('ds', data, context);
-  }
+  @Process('sync')
+  async handleFullSync(job: Job) {
+    const businessLine = job.data.businessLine as BusinessLineCode;
+    this.logger.log(`Processing full sync for ${businessLine} (attempt ${job.attemptsMade + 1})`);
 
-  @EventPattern('sync.full.zk')
-  async handleFullSyncZk(@Payload() data: any, @Ctx() context: RmqContext) {
-    await this.processFullSync('zk', data, context);
-  }
+    const products = this.syncService.loadMockData('full');
+    const filtered = products.filter((p: any) => p.businessLine === businessLine);
 
-  @EventPattern('sync.full.meeting')
-  async handleFullSyncMeeting(@Payload() data: any, @Ctx() context: RmqContext) {
-    await this.processFullSync('meeting', data, context);
-  }
-
-  @EventPattern('sync.incremental.ds')
-  async handleIncrementalSyncDs(@Payload() data: any, @Ctx() context: RmqContext) {
-    await this.processIncrementalSync('ds', data, context);
-  }
-
-  @EventPattern('sync.incremental.zk')
-  async handleIncrementalSyncZk(@Payload() data: any, @Ctx() context: RmqContext) {
-    await this.processIncrementalSync('zk', data, context);
-  }
-
-  @EventPattern('sync.incremental.meeting')
-  async handleIncrementalSyncMeeting(@Payload() data: any, @Ctx() context: RmqContext) {
-    await this.processIncrementalSync('meeting', data, context);
-  }
-
-  private async processFullSync(businessLine: BusinessLineCode, data: any, context: RmqContext) {
-    this.logger.log(`Processing full sync for ${businessLine}`);
-    const pattern = `sync.full.${businessLine}`;
-
-    try {
-      const products = this.syncService.loadMockData('full');
-      const filtered = products.filter((p: any) => p.businessLine === businessLine);
-
-      if (filtered.length === 0) {
-        this.logger.warn(`No products found for business line: ${businessLine}`);
-        return;
-      }
-
-      const index = BUSINESS_LINES[businessLine].esIndex;
-
-      await this.esClient.deleteByQuery({
-        index,
-        query: { match_all: {} } as any,
-      });
-
-      const operations = filtered.flatMap((doc: any) => [
-        { index: { _index: index, _id: doc.productId } },
-        doc,
-      ]);
-
-      await this.esClient.bulk({ operations });
-      this.logger.log(`Full sync complete for ${businessLine}: ${filtered.length} products indexed`);
-
-      this.retryCount.delete(pattern);
-    } catch (error: any) {
-      this.logger.error(`Full sync failed for ${businessLine}: ${error.message}`);
-      this.handleRetry(context, pattern);
+    if (filtered.length === 0) {
+      this.logger.warn(`No products found for business line: ${businessLine}`);
+      return;
     }
+
+    const index = BUSINESS_LINES[businessLine].esIndex;
+
+    await this.esClient.deleteByQuery({
+      index,
+      query: { match_all: {} } as any,
+    });
+
+    const operations = filtered.flatMap((doc: any) => [
+      { index: { _index: index, _id: doc.productId } },
+      doc,
+    ]);
+
+    await this.esClient.bulk({ operations });
+    this.logger.log(`Full sync complete for ${businessLine}: ${filtered.length} products indexed`);
+  }
+}
+
+@Injectable()
+@Processor('sync-incremental')
+export class SyncIncrementalConsumer extends WorkerHost {
+  private readonly logger = new Logger(SyncIncrementalConsumer.name);
+  private esClient: Client;
+
+  constructor(
+    private readonly syncService: SyncService,
+    config: ConfigService,
+  ) {
+    super();
+    const esNode = config.getOrThrow<string>('ELASTICSEARCH_NODE');
+    this.esClient = new Client({ node: esNode });
   }
 
-  private async processIncrementalSync(businessLine: BusinessLineCode, data: any, context: RmqContext) {
-    this.logger.log(`Processing incremental sync for ${businessLine}`);
-    const pattern = `sync.incremental.${businessLine}`;
+  @Process('sync')
+  async handleIncrementalSync(job: Job) {
+    const businessLine = job.data.businessLine as BusinessLineCode;
+    this.logger.log(`Processing incremental sync for ${businessLine} (attempt ${job.attemptsMade + 1})`);
 
-    try {
-      const products = this.syncService.loadMockData('incremental');
-      const filtered = products.filter((p: any) => p.businessLine === businessLine);
+    const products = this.syncService.loadMockData('incremental');
+    const filtered = products.filter((p: any) => p.businessLine === businessLine);
 
-      if (filtered.length === 0) {
-        this.logger.log(`No incremental data for ${businessLine}`);
-        return;
-      }
-
-      const index = BUSINESS_LINES[businessLine].esIndex;
-
-      const operations = filtered.flatMap((doc: any) => [
-        { index: { _index: index, _id: doc.productId } },
-        doc,
-      ]);
-
-      await this.esClient.bulk({ operations });
-      this.logger.log(`Incremental sync complete for ${businessLine}: ${filtered.length} products`);
-
-      this.retryCount.delete(pattern);
-    } catch (error: any) {
-      this.logger.error(`Incremental sync failed for ${businessLine}: ${error.message}`);
-      this.handleRetry(context, pattern);
+    if (filtered.length === 0) {
+      this.logger.log(`No incremental data for ${businessLine}`);
+      return;
     }
-  }
 
-  private handleRetry(context: RmqContext, pattern: string) {
-    const currentRetries = this.retryCount.get(pattern) || 0;
-    if (currentRetries < 3) {
-      this.retryCount.set(pattern, currentRetries + 1);
-      const channel = context.getChannelRef();
-      const originalMsg = context.getMessage();
-      channel.nack(originalMsg, false, true);
-      this.logger.warn(`Retrying ${pattern} (attempt ${currentRetries + 1}/3)`);
-    } else {
-      this.logger.error(`Max retries reached for ${pattern}`);
-      this.retryCount.delete(pattern);
-    }
+    const index = BUSINESS_LINES[businessLine].esIndex;
+
+    const operations = filtered.flatMap((doc: any) => [
+      { index: { _index: index, _id: doc.productId } },
+      doc,
+    ]);
+
+    await this.esClient.bulk({ operations });
+    this.logger.log(`Incremental sync complete for ${businessLine}: ${filtered.length} products`);
   }
 }

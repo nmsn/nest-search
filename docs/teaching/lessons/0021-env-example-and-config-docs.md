@@ -115,7 +115,7 @@ SEARCH_SERVICE_URL=http://localhost:3002
 SYNC_SERVICE_URL=http://localhost:3001
 FORM_SERVICE_URL=http://localhost:3003
 REFRESH_TOKEN_EXPIRES_IN=604800
-RABBITMQ_URL=amqp://guest:guest@localhost:5672
+REDIS_URL=amqp://guest:guest@localhost:5672
 ```
 
 #### `apps/auth-service/.env.example`
@@ -153,7 +153,7 @@ CAS_ST_EXPIRES_IN=30s
 # === search-service 私有 ===
 SEARCH_SERVICE_PORT=3002
 ELASTICSEARCH_NODE=http://localhost:9200
-RABBITMQ_URL=amqp://guest:guest@localhost:5672
+REDIS_URL=amqp://guest:guest@localhost:5672
 ```
 
 #### `apps/sync-service/.env.example`
@@ -172,7 +172,7 @@ CAS_ST_EXPIRES_IN=30s
 SYNC_SERVICE_PORT=3001
 DATABASE_URL=postgresql://postgres:postgres123@localhost:5432/nest_search
 ELASTICSEARCH_NODE=http://localhost:9200
-RABBITMQ_URL=amqp://guest:guest@localhost:5672
+REDIS_URL=amqp://guest:guest@localhost:5672
 ```
 
 #### `apps/form-service/.env.example`
@@ -190,7 +190,7 @@ CAS_ST_EXPIRES_IN=30s
 # === form-service 私有 ===
 FORM_SERVICE_PORT=3003
 DATABASE_URL=postgresql://postgres:postgres123@localhost:5432/nest_search
-RABBITMQ_URL=amqp://guest:guest@localhost:5672
+REDIS_URL=amqp://guest:guest@localhost:5672
 ```
 
 ### 3.2 · 创建 `docs/CONFIG.md`
@@ -227,7 +227,7 @@ CAS_COOKIE_DOMAIN / CAS_TGT_EXPIRES_IN / CAS_ST_EXPIRES_IN
 
 - JWT_SECRET 生产必须用 `openssl rand -hex 32` 生成,**绝对不能**用默认占位符
 - DATABASE_URL 含密码,生产用 secret manager(vault / k8s secret / etc.)
-- RABBITMQ_URL 含密码,同上
+- REDIS_URL 含密码,同上
 
 ## 新成员 onboarding 步骤
 

@@ -20,7 +20,8 @@ export const SyncEnvSchema = z.object({
     .url()
     .default("postgresql://postgres:postgres123@localhost:5432/nest_search"),
   ELASTICSEARCH_NODE: z.string().url().default("http://localhost:9200"),
-  RABBITMQ_URL: z.string().url().optional(),
+  REDIS_HOST: z.string().default("localhost"),
+  REDIS_PORT: z.coerce.number().int().positive().default(6379),
 });
 
 export type SyncEnv = z.infer<typeof SyncEnvSchema>;

@@ -16,7 +16,6 @@ export const SearchEnvSchema = z.object({
 
   SEARCH_SERVICE_PORT: z.coerce.number().int().positive().default(3002),
   ELASTICSEARCH_NODE: z.string().url().default("http://localhost:9200"),
-  RABBITMQ_URL: z.string().url().optional(),
 });
 
 export type SearchEnv = z.infer<typeof SearchEnvSchema>;

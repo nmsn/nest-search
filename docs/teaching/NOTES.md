@@ -62,7 +62,7 @@
 | 课 | 主题 | 备注 |
 |---|---|---|
 | 0031-0033 | Redis 深度(数据结构 + 分布式锁 + Cache-Aside) | user 强调 |
-| 0034-0036 | RabbitMQ 深度(Exchange + 死信 + 幂等) | user 强调 |
+| 0034-0036 | BullMQ 深度(Queue/Worker + 重试 + 延迟任务) | user 强调(替代 RabbitMQ) |
 | 0037-0038 | 错误处理模式(retry + circuit breaker + bulkhead) | MISSION 缺 |
 
 ### Phase C · 加分项 5 节 — 38 → 43
@@ -87,8 +87,8 @@
 
 1. **MISSION 优先**:任何 MISSION 写的"3-5 企业级补丁"必修
 2. **LR-0002 缺口**:10 个缺位中未完成的 4 个必修
-3. **用户强调主题**:redis/rabbitmq/zod/drizzle 必修
-4. **依赖深度**:Drizzle + Zod + Joi + Redis + RabbitMQ 都"用过但未深入",要专门课
+3. **用户强调主题**:redis/bullmq/zod/drizzle 必修
+4. **依赖深度**:Drizzle + Zod + Joi + Redis + BullMQ 都"用过但未深入",要专门课
 5. **全栈补充(Phase D)**:OAuth/WebSocket/文件上传/scope/版本控制 — 企业级必备
 
 ### Lesson 交付约定(2026-06-24 用户偏好)

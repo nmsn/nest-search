@@ -1,6 +1,6 @@
 # 0037 · Elasticsearch 基础：核心概念 + 倒排索引
 
-> Phase B 第 8 课。0036 做完 RabbitMQ,0037 进入 **Elasticsearch**——search-service 已经在用,但没有教学。本节讲 ES 的核心概念和底层原理。
+> Phase B 第 8 课。0036 做完 BullMQ,0037 进入 **Elasticsearch**——search-service 已经在用,但没有教学。本节讲 ES 的核心概念和底层原理。
 
 ## 你今天会拿到什么
 
@@ -230,6 +230,6 @@ docs(teaching): 0037 Elasticsearch 基础 lesson
 
 ## §7. 跨节链接
 
-- [0036 · RabbitMQ 深度](./0036-rabbitmq-deep-dive.md) — 上一课
+- [0036 · BullMQ 深度](./0036-bullmq-deep-dive.md) — 上一课
 - [0038 · Query DSL 语法](./0038-elasticsearch-query-dsl.md) — 下一课
 - [search-service 代码](../../apps/search-service/src/) — nest-search 的 ES 实现

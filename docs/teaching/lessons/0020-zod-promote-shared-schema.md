@@ -114,14 +114,14 @@ export type BaseEnv = z.infer<typeof BaseEnvSchema>;
 - `API_KEY_DS`, `API_KEY_ZK`, `API_KEY_MEETING` — 3 个 business line API key
 - `AUTH_SERVICE_URL`, `SEARCH_SERVICE_URL`, `SYNC_SERVICE_URL`, `FORM_SERVICE_URL` — 4 个下游 URL
 - `GATEWAY_PORT` — port
-- `RABBITMQ_URL` — MQ 连接
+- `REDIS_URL` — MQ 连接
 
 ### search-service(9 字段,公共 + 3 私有)
 
 **私有**:
 - `ELASTICSEARCH_NODE` — ES URL
 - `SEARCH_SERVICE_PORT`
-- `RABBITMQ_URL`
+- `REDIS_URL`
 
 ### sync-service(10 字段,公共 + 4 私有)
 
@@ -129,14 +129,14 @@ export type BaseEnv = z.infer<typeof BaseEnvSchema>;
 - `DATABASE_URL` — PostgreSQL 连接
 - `ELASTICSEARCH_NODE`
 - `SYNC_SERVICE_PORT`
-- `RABBITMQ_URL`
+- `REDIS_URL`
 
 ### form-service(9 字段,公共 + 3 私有)
 
 **私有**:
 - `DATABASE_URL`
 - `FORM_SERVICE_PORT`
-- `RABBITMQ_URL`
+- `REDIS_URL`
 
 ### auth-service(11 字段,0019 已装)
 
@@ -285,7 +285,7 @@ feat(services): promote Zod validation to all 5 services + shared schema (0020)
 - gateway / search-service / sync-service / form-service:
   - New apps/<service>/src/config/env.schema.ts: extends
     BaseEnvSchema with service-specific fields (PORT / *URL /
-    API_KEY / RABBITMQ_URL / etc.)
+    API_KEY / REDIS_URL / etc.)
   - New apps/<service>/src/config/validate-env.ts: safeParse +
     structured error logging + throw
   - app.module.ts: ConfigModule.forRoot({ validate })

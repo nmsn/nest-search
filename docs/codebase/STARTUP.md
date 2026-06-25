@@ -21,14 +21,14 @@ docker-compose up -d
 |------|------|------|
 | MySQL | 3306 | 主数据库 |
 | Elasticsearch | 9200 | 搜索服务 |
-| RabbitMQ | 5672, 15672 | 消息队列 |
+| BullMQ | 6379, 16379 | 消息队列 |
 | Redis | 6379 | 缓存/Session |
 
 ## 后端服务 (5个)
 
 ```bash
 pnpm run start:gateway      # 端口 3000 - API网关
-pnpm run start:sync         # 端口 3001 - 同步服务 (HTTP + RabbitMQ)
+pnpm run start:sync         # 端口 3001 - 同步服务 (HTTP + BullMQ)
 pnpm run start:search       # 端口 3002 - 搜索服务
 pnpm run start:form         # 端口 3003 - 表单服务
 pnpm run start:auth         # 端口 3004 - 认证服务
@@ -44,7 +44,7 @@ Gateway (3000)
   ├── Auth Service (3004) - 用户认证/CAS
   ├── Search Service (3002) - Elasticsearch查询
   ├── Form Service (3003) - 表单管理
-  └── Sync Service (3001) ← RabbitMQ
+  └── Sync Service (3001) ← BullMQ
 ```
 
 ## 前端服务 (4个)
@@ -80,8 +80,8 @@ DATABASE_URL=mysql://root:root123@localhost:3306/nest_search
 # Elasticsearch
 ELASTICSEARCH_NODE=http://localhost:9200
 
-# RabbitMQ
-RABBITMQ_URL=amqp://guest:guest@localhost:5672
+# BullMQ
+REDIS_URL=amqp://guest:guest@localhost:6379
 
 # Redis
 REDIS_HOST=localhost
@@ -124,7 +124,7 @@ cd apps/meeting-frontend && pnpm dev
 | Auth Service | 3004 |
 | MySQL | 3306 |
 | Elasticsearch | 9200 |
-| RabbitMQ | 5672 / 15672 |
+| BullMQ | 6379 / 16379 |
 | Redis | 6379 |
 | auth-frontend | 3100 |
 | ds-frontend | 3101 |

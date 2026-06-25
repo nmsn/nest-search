@@ -123,11 +123,11 @@
 - **覆盖**:Redis 数据结构(String/Hash/List/Sorted Set/Stream)+ 分布式锁(Redlock)+ Cache-Aside / Write-Through 模式
 - **预期交付**:Cache-Aside 通用 module + 分布式锁 utility + 性能基准
 
-### 0034-0036 · RabbitMQ 深度(3 节)
+### 0034-0036 · BullMQ 深度(3 节)
 
-- **用户强调**:`rabbitmq` 必修
-- **覆盖**:AMQP 模型 + 4 种 Exchange(direct/fanout/topic/headers)+ 死信队列 + 消息幂等性 + Consumer prefetch
-- **预期交付**:通用 publisher / consumer module + DLQ 配置 + 重试策略
+- **用户强调**:`bullmq` 必修(替代 RabbitMQ,BullMQ 基于 Redis,项目已有 Redis)
+- **覆盖**:BullMQ 核心概念(Queue/Worker/Job)+ 重试策略(attempts + backoff)+ 延迟任务 + 优先级队列 + 限流 + 事件监听
+- **预期交付**:通用 Queue/Worker module + 重试配置 + 任务状态监控
 
 ### 0037-0039 · Elasticsearch 深度(3 节)
 

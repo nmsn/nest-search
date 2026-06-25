@@ -1,6 +1,6 @@
 export * from './constants/business-lines';
 export * from './constants/cas';
-export * from './constants/rabbitmq';
+export * from './constants/bullmq';
 export * from './interfaces/sync-message.interface';
 export * from './interfaces/product.interface';
 export * from './interfaces/user.interface';

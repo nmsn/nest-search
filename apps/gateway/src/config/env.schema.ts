@@ -23,7 +23,6 @@ export const GatewayEnvSchema = z.object({
   SYNC_SERVICE_URL: z.string().url().default("http://localhost:3001"),
   FORM_SERVICE_URL: z.string().url().default("http://localhost:3003"),
   REFRESH_TOKEN_EXPIRES_IN: z.string().default("604800"),
-  RABBITMQ_URL: z.string().url().optional(),
 });
 
 export type GatewayEnv = z.infer<typeof GatewayEnvSchema>;
