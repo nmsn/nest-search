@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
@@ -7,20 +7,25 @@ import { businessLines } from './schema/business-lines';
 import { syncRecords } from '../libs/shared/index';
 
 @Injectable()
-export class DrizzleService implements OnModuleInit {
+export class DrizzleService implements OnModuleInit, OnModuleDestroy {
   public db!: ReturnType<typeof drizzle>;
+  private pool!: Pool;
 
   constructor(private readonly config: ConfigService) {}
 
   async onModuleInit() {
     const databaseUrl = this.config.getOrThrow<string>('DATABASE_URL');
-    const pool = new Pool({ connectionString: databaseUrl });
+    this.pool = new Pool({ connectionString: databaseUrl });
 
-    this.db = drizzle(pool, {
+    this.db = drizzle(this.pool, {
       schema: { ...schema, businessLines, syncRecords },
     });
 
     await this.initBusinessLines();
+  }
+
+  async onModuleDestroy() {
+    await this.pool.end();
   }
 
   private async initBusinessLines() {

@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
@@ -18,22 +18,27 @@ type Schema = {
 };
 
 @Injectable()
-export class DrizzleService implements OnModuleInit {
+export class DrizzleService implements OnModuleInit, OnModuleDestroy {
   // 用显式 NodePgDatabase<Schema>,让 db.query.* / with:* 类型推断出来
   public db!: NodePgDatabase<Schema>;
+  private pool!: Pool;
 
   constructor(private readonly config: ConfigService) {}
 
   async onModuleInit() {
     // Zod 已校验 DATABASE_URL 必填 + 是 URL,getOrThrow 保证 runtime 拿到 string
     const databaseUrl = this.config.getOrThrow<string>('DATABASE_URL');
-    const pool = new Pool({ connectionString: databaseUrl });
+    this.pool = new Pool({ connectionString: databaseUrl });
 
-    this.db = drizzle(pool, {
+    this.db = drizzle(this.pool, {
       schema: { users, casTickets, casServices, usersRelations, casTicketsRelations },
     });
 
     await this.seedServices();
+  }
+
+  async onModuleDestroy() {
+    await this.pool.end();
   }
 
   private async seedServices() {

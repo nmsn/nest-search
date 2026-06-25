@@ -1,9 +1,9 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Client } from '@elastic/elasticsearch';
 
 @Injectable()
-export class ElasticsearchService implements OnModuleInit {
+export class ElasticsearchService implements OnModuleInit, OnModuleDestroy {
   public client!: Client;
 
   constructor(private readonly config: ConfigService) {}
@@ -11,6 +11,10 @@ export class ElasticsearchService implements OnModuleInit {
   onModuleInit() {
     const esNode = this.config.getOrThrow<string>('ELASTICSEARCH_NODE');
     this.client = new Client({ node: esNode });
+  }
+
+  async onModuleDestroy() {
+    await this.client.close();
   }
 
   async createIndexIfNotExists(indexName: string, mappings: any) {
