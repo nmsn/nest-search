@@ -4,6 +4,8 @@ import { APP_FILTER } from '@nestjs/core';
 import { LoggerModule } from 'nestjs-pino';
 import { randomUUID } from 'node:crypto';
 import { SyncModule } from './sync/sync.module';
+import { QueueModule } from './queue/queue.module';
+import { BullBoardConfigModule } from './bull-board/bull-board.module';
 import { validateEnv } from './config/validate-env';
 import { AllExceptionsFilter } from './filters/all-exceptions.filter';
 
@@ -22,7 +24,9 @@ import { AllExceptionsFilter } from './filters/all-exceptions.filter';
         },
       }),
     }),
+    QueueModule,
     SyncModule,
+    BullBoardConfigModule,
   ],
   providers: [
     {

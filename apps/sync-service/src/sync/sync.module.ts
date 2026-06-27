@@ -1,7 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { BullModule } from '@nestjs/bullmq';
-import { ConfigService } from '@nestjs/config';
+import { BullBoardModule } from '@bull-board/nestjs';
+import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { SyncController } from './sync.controller';
 import { SyncService } from './sync.service';
 import { SyncFullConsumer, SyncIncrementalConsumer } from './sync.consumer';
@@ -11,18 +12,13 @@ import { SyncRecordsService } from './sync-records.service';
 @Module({
   imports: [
     ScheduleModule.forRoot(),
-    BullModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        connection: {
-          host: config.getOrThrow<string>('REDIS_HOST'),
-          port: config.getOrThrow<number>('REDIS_PORT'),
-        },
-      }),
-    }),
     BullModule.registerQueue(
       { name: 'sync-full' },
       { name: 'sync-incremental' },
+    ),
+    BullBoardModule.forFeature(
+      { name: 'sync-full', adapter: BullMQAdapter },
+      { name: 'sync-incremental', adapter: BullMQAdapter },
     ),
   ],
   controllers: [SyncController],
