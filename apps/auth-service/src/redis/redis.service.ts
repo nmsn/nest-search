@@ -50,4 +50,14 @@ export class RedisService implements OnModuleDestroy {
   async eval(script: string, keys: string[], args: string[]): Promise<any> {
     return this.client.eval(script, keys.length, ...keys, ...args);
   }
+
+  // 新增
+  pipeline() {
+    return this.client.pipeline();
+  }
+
+  // 新增
+  async publish(channel: string, message: string): Promise<number> {
+    return this.client.publish(channel, message);
+  }
 }
