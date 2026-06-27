@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
-import { BullModule } from '@nestjs/bull';
+import { BullMQModule } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
 import { SyncController } from './sync.controller';
 import { SyncService } from './sync.service';
@@ -11,7 +11,7 @@ import { SyncRecordsService } from './sync-records.service';
 @Module({
   imports: [
     ScheduleModule.forRoot(),
-    BullModule.forRootAsync({
+    BullMQModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         redis: {
@@ -20,7 +20,7 @@ import { SyncRecordsService } from './sync-records.service';
         },
       }),
     }),
-    BullModule.registerQueue(
+    BullMQModule.registerQueue(
       { name: 'sync-full' },
       { name: 'sync-incremental' },
     ),

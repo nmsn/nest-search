@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Processor, Process, WorkerHost } from '@nestjs/bull';
-import { Job } from 'bull';
+import { Processor, Process, WorkerHost } from '@nestjs/bullmq';
+import { Job } from 'bullmq';
 import { Client } from '@elastic/elasticsearch';
 import { BUSINESS_LINES, BusinessLineCode } from '../libs/shared/index';
 import { SyncService } from './sync.service';
