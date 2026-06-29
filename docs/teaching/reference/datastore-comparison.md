@@ -1,6 +1,7 @@
 # 数据存储选型对比手册
 
-> ES / PostgreSQL / MySQL / MongoDB 四大主流存储全方位对比，帮你做技术选型。
+> **PostgreSQL / MongoDB / Elasticsearch** 三大主流存储全方位对比，帮你做技术选型。
+> **关于 MySQL**：PG 和 MySQL 同为关系型，能力高度相似。本文档以 nest-search 实际使用的 **PG** 为代表展开；MySQL 与 PG 的关键差异见 §3.1。
 
 ---
 
@@ -9,59 +10,94 @@
 - [§1. 一句话总结](#1-一句话总结)
 - [§2. 全方位对比表](#2-全方位对比表)
 - [§3. 核心能力详解](#3-核心能力详解)
-  - [3.1 数据模型](#31-数据模型)
-  - [3.2 事务能力](#32-事务能力)
-  - [3.3 查询能力](#33-查询能力)
-  - [3.4 性能特点](#34-性能特点)
-  - [3.5 扩展性](#35-扩展性)
-  - [3.6 运维成本](#36-运维成本)
+  - [3.1 关系型数据库：PG vs MySQL](#31-关系型数据库pg-vs-mysql)
+  - [3.2 数据模型](#32-数据模型)
+  - [3.3 事务能力](#33-事务能力)
+  - [3.4 查询能力](#34-查询能力)
+  - [3.5 性能特点](#35-性能特点)
+  - [3.6 扩展性](#36-扩展性)
+  - [3.7 运维成本](#37-运维成本)
 - [§4. 典型使用场景](#4-典型使用场景)
 - [§5. 选型决策树](#5-选型决策树)
 - [§6. 企业级组合方案](#6-企业级组合方案)
 - [§7. nest-search 当前架构分析](#7-nest-search-当前架构分析)
+- [§8. 何时不要用某个数据库](#8-何时不要用某个数据库)
+- [§9. 性能基准参考](#9-性能基准参考)
+- [§10. 总结](#10-总结)
 
 ---
 
 ## §1. 一句话总结
 
-| 存储 | 一句话定位 |
-|------|-----------|
-| **PostgreSQL** | 功能最强的开源关系型数据库（事务、关系、扩展） |
-| **MySQL** | 最流行的开源关系型数据库（简单可靠、读性能强） |
-| **MongoDB** | 最流行的文档数据库（灵活 schema、水平扩展） |
-| **Elasticsearch** | 分布式搜索和分析引擎（全文搜索、聚合、向量） |
+| 存储 | 一句话定位 | nest-search 是否使用 |
+|------|-----------|---------------------|
+| **PostgreSQL** | 功能最强的开源关系型数据库（事务、关系、扩展） | ✅ 是（auth/form/sync-records） |
+| **MongoDB** | 最流行的文档数据库（灵活 schema、水平扩展） | ❌ 否 |
+| **Elasticsearch** | 分布式搜索和分析引擎（全文搜索、聚合、向量） | ✅ 是（产品搜索） |
 
 ---
 
 ## §2. 全方位对比表
 
-| 维度 | PostgreSQL | MySQL | MongoDB | Elasticsearch |
-|------|-----------|-------|---------|---------------|
-| **类型** | 关系型 | 关系型 | 文档型 | 搜索引擎 |
-| **数据模型** | 表 + 行 | 表 + 行 | JSON 文档 | JSON 文档 |
-| **schema** | 强 schema | 强 schema | 弱 schema | 弱 schema |
-| **事务** | ✅ 完整 ACID | ✅ ACID | ⚠️ 4.0+ 多文档事务 | ❌ 不支持 |
-| **JOIN** | ✅ 强大 | ✅ 支持 | ⚠️ $lookup（弱） | ❌ 不支持 |
-| **全文搜索** | ⭐⭐⭐ 一般 | ⭐⭐ 较弱 | ⭐⭐⭐ 中等 | ⭐⭐⭐⭐⭐ 极强 |
-| **聚合分析** | ⭐⭐⭐ SQL 聚合 | ⭐⭐⭐ SQL 聚合 | ⭐⭐⭐ 聚合管道 | ⭐⭐⭐⭐⭐ 极强 |
-| **复杂查询** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐ |
-| **读性能** | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| **写性能** | ⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
-| **水平扩展** | ⭐⭐ 复杂 | ⭐⭐ 复杂 | ⭐⭐⭐⭐⭐ 原生 | ⭐⭐⭐⭐⭐ 原生 |
-| **数据一致性** | 强一致 | 强一致 | 可调（强/最终） | 近实时（~1s） |
-| **运维复杂度** | ⭐⭐ 中等 | ⭐⭐ 中等 | ⭐⭐⭐ 中等偏高 | ⭐⭐⭐⭐ 高 |
-| **生态成熟度** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
-| **学习曲线** | 中等 | 较平 | 较平 | 较陡 |
-| **License** | BSD（宽松） | GPL（商业需授权） | SSPL（限制云厂商） | Elastic + SSPL |
-| **典型用户** | 苹果、Instagram、Notion | 淘宝、Facebook、Twitter | Uber、Adobe、Cisco | Netflix、LinkedIn、Stack Overflow |
+| 维度 | PostgreSQL | MongoDB | Elasticsearch |
+|------|-----------|---------|---------------|
+| **类型** | 关系型 | 文档型 | 搜索引擎 |
+| **数据模型** | 表 + 行 | JSON 文档 | JSON 文档 |
+| **schema** | 强 schema | 弱 schema | 弱 schema |
+| **事务** | ✅ 完整 ACID | ⚠️ 4.0+ 多文档事务 | ❌ 不支持 |
+| **JOIN** | ✅ 强大 | ⚠️ $lookup（弱） | ❌ 不支持 |
+| **全文搜索** | ⭐⭐⭐ 一般 | ⭐⭐⭐ 中等 | ⭐⭐⭐⭐⭐ 极强 |
+| **聚合分析** | ⭐⭐⭐ SQL 聚合 | ⭐⭐⭐ 聚合管道 | ⭐⭐⭐⭐⭐ 极强 |
+| **复杂查询** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐ |
+| **读性能** | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
+| **写性能** | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
+| **水平扩展** | ⭐⭐ 复杂 | ⭐⭐⭐⭐⭐ 原生 | ⭐⭐⭐⭐⭐ 原生 |
+| **数据一致性** | 强一致 | 可调（强/最终） | 近实时（~1s） |
+| **运维复杂度** | ⭐⭐ 中等 | ⭐⭐⭐ 中等偏高 | ⭐⭐⭐⭐ 高 |
+| **生态成熟度** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
+| **学习曲线** | 中等 | 较平 | 较陡 |
+| **License** | BSD（宽松） | SSPL（限制云厂商） | Elastic + SSPL |
+| **典型用户** | 苹果、Instagram、Notion、Reddit | Uber、Adobe、Cisco | Netflix、LinkedIn、Stack Overflow |
 
 ---
 
 ## §3. 核心能力详解
 
-### 3.1 数据模型
+### 3.1 关系型数据库：PG vs MySQL
 
-#### PostgreSQL / MySQL（关系型）
+PG 和 MySQL 同为关系型，能力 80% 相似。本节聚焦 PG（nest-search 实际使用），并说明与 MySQL 的关键差异。
+
+#### 共同点（PG ≈ MySQL）
+
+- 表 + 行 + 强 schema
+- SQL 语法 90% 相同
+- ACID 事务 + 4 种隔离级别
+- JOIN / 子查询 / 聚合
+- B-tree 主索引
+
+#### 关键差异
+
+| 维度 | PostgreSQL | MySQL |
+|------|-----------|-------|
+| **License** | BSD（商业友好） | GPL（商业需授权） |
+| **JSON 支持** | ⭐⭐⭐⭐⭐ JSONB（二进制，可索引） | ⭐⭐⭐ JSON（文本，需生成列） |
+| **高级索引** | GIN / BRIN / GiST / Hash | Fulltext / R-tree / Hash |
+| **扩展生态** | ⭐⭐⭐⭐⭐ PostGIS、pgvector、TimescaleDB | 较少 |
+| **复杂查询** | ⭐⭐⭐⭐⭐ CTE、窗口函数、递归 | ⭐⭐⭐ 支持但较弱 |
+| **写性能（简单场景）** | ⭐⭐⭐ | ⭐⭐⭐⭐⭐（InnoDB 简单写更快） |
+| **学习曲线** | 较陡 | 较平 |
+| **运维生态** | 中等 | 成熟（运维熟悉） |
+
+**结论**：
+- nest-search 选 **PG** 是因为：JSONB 灵活、扩展丰富、商业 License 友好
+- MySQL 在简单 OLTP（订单、用户、读多写少）也完全够用
+- 本文档**以 PG 为代表**展开
+
+---
+
+### 3.2 数据模型
+
+#### PostgreSQL（关系型）
 
 ```sql
 -- 强 schema，表结构固定
@@ -69,15 +105,21 @@ CREATE TABLE products (
   id SERIAL PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
   price DECIMAL(10,2) NOT NULL,
+  attributes JSONB,  -- PG 特色：JSONB 可索引
   category_id INT REFERENCES categories(id),
   created_at TIMESTAMP DEFAULT NOW()
 );
+
+-- JSONB 查询：属性筛选
+SELECT * FROM products
+WHERE attributes->>'颜色' = '黑色';
 ```
 
 **特点**：
 - 字段类型必须预先定义
 - 改 schema 需要 ALTER TABLE
 - 关联表通过外键 + JOIN 关联
+- **JSONB 是 PG 杀手锏**：兼顾关系型 + 文档型
 
 #### MongoDB（文档型）
 
@@ -130,19 +172,18 @@ CREATE TABLE products (
 
 ---
 
-### 3.2 事务能力
+### 3.3 事务能力
 
 | 存储 | 事务支持 | 隔离级别 | 实际能力 |
 |------|---------|---------|---------|
 | **PostgreSQL** | ✅ 完整 ACID | 4 种（RU/RC/RR/Serializable） | 最强 |
-| **MySQL (InnoDB)** | ✅ ACID | 4 种（默认 RR） | 强 |
 | **MongoDB** | ⚠️ 4.0+ 多文档 ACID | snapshot | 单文档天然，多文档 4.0+ |
 | **Elasticsearch** | ❌ 不支持 | - | 仅最终一致 |
 
 **事务对比示例**（转账）：
 
 ```sql
--- PostgreSQL / MySQL：天然支持
+-- PostgreSQL：天然支持
 BEGIN;
 UPDATE accounts SET balance = balance - 100 WHERE id = 1;
 UPDATE accounts SET balance = balance + 100 WHERE id = 2;
@@ -165,9 +206,9 @@ await session.commitTransaction();
 
 ---
 
-### 3.3 查询能力
+### 3.4 查询能力
 
-#### SQL 风格（PG / MySQL）
+#### SQL 风格（PG）
 
 ```sql
 -- 强项：复杂关系查询
@@ -224,33 +265,31 @@ db.products.aggregate([
 
 **查询能力对比**：
 
-| 场景 | PG | MySQL | MongoDB | ES |
-|------|----|----|----|----|
-| 单表查询 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
-| 多表 JOIN | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐（$lookup 弱）| ❌ |
-| 子查询 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐ |
-| 全文搜索 | ⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| 模糊匹配 | ⭐⭐（pg_trgm）| ⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| 聚合分析 | ⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| 地理空间 | ⭐⭐⭐⭐（PostGIS）| ⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| 向量搜索 | ⚠️ pgvector | ⚠️ 第三方 | ❌ | ⭐⭐⭐⭐⭐ |
+| 场景 | PG | MongoDB | ES |
+|------|----|----|----|
+| 单表查询 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
+| 多表 JOIN | ⭐⭐⭐⭐⭐ | ⭐⭐（$lookup 弱）| ❌ |
+| 子查询 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐ |
+| 全文搜索 | ⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
+| 模糊匹配 | ⭐⭐（pg_trgm）| ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
+| 聚合分析 | ⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
+| 地理空间 | ⭐⭐⭐⭐（PostGIS）| ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
+| 向量搜索 | ⚠️ pgvector | ❌ | ⭐⭐⭐⭐⭐ |
 
 ---
 
-### 3.4 性能特点
+### 3.5 性能特点
 
 #### 读性能基准（粗略量级）
 
 ```
 简单主键查询:
   PG:    ~1ms
-  MySQL: ~1ms
   Mongo: ~1ms
   ES:    ~5ms （需要先查 _id 倒排索引）
 
 复杂过滤（10 列 + 全文搜索）:
   PG:    ~50ms （走 B-tree + 全文索引）
-  MySQL: ~30ms （InnoDB 缓冲好）
   ES:    ~10ms （倒排索引 O(1) lookup）
 
 聚合分析（千万级数据）:
@@ -264,13 +303,11 @@ db.products.aggregate([
 ```
 单条写入:
   PG:    ~1ms
-  MySQL: ~0.5ms
   Mongo: ~0.3ms （无事务）
   ES:    ~5ms （refresh + translog）
 
 批量写入（1万条）:
   PG:    ~5s （事务 + WAL）
-  MySQL: ~3s
   Mongo: ~1s
   ES:    ~2s （bulk API）
 ```
@@ -280,18 +317,16 @@ db.products.aggregate([
 | 存储 | 默认索引 | 高级索引 |
 |------|---------|---------|
 | **PG** | B-tree | GIN（全文 / JSONB）、BRIN（时序）、Hash、GiST（地理） |
-| **MySQL** | B-tree | Fulltext（MyISAM/InnoDB）、Hash、R-tree |
 | **MongoDB** | B-tree | Text（全文）、2dsphere（地理）、Hash、TTL |
 | **ES** | 倒排索引 | doc_values（列存）、completion、向量索引 |
 
 ---
 
-### 3.5 扩展性
+### 3.6 扩展性
 
 | 存储 | 垂直扩展 | 水平扩展 | 难度 |
 |------|---------|---------|------|
 | **PG** | ⭐⭐⭐⭐⭐ | ⭐⭐（Citus / 分库分表）| 难 |
-| **MySQL** | ⭐⭐⭐⭐⭐ | ⭐⭐（分库分表 / 主从）| 难 |
 | **MongoDB** | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐（sharding 原生）| 易 |
 | **ES** | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐（分片 + 副本）| 易 |
 
@@ -318,17 +353,17 @@ Elasticsearch:
 
 ---
 
-### 3.6 运维成本
+### 3.7 运维成本
 
-| 维度 | PG | MySQL | MongoDB | ES |
-|------|----|----|----|----|
-| 安装部署 | 简单 | 简单 | 简单 | 中等（JVM） |
-| 监控工具 | pgAdmin / pg_stat | MySQL Workbench | Compass | Cerebro / Kibana |
-| 备份恢复 | pg_dump / WAL | mysqldump / binlog | mongodump / oplog | snapshot / reindex |
-| 升级维护 | 简单 | 简单 | 中等 | 复杂（rollover / 重建） |
-| 故障排查 | 成熟 | 成熟 | 中等 | 较复杂（GC、merge） |
-| 内存占用 | 中等 | 低 | 中等 | 高（JVM） |
-| 硬盘占用 | 低 | 低 | 中等 | 高（副本 + 倒排） |
+| 维度 | PG | MongoDB | ES |
+|------|----|----|----|
+| 安装部署 | 简单 | 简单 | 中等（JVM） |
+| 监控工具 | pgAdmin / pg_stat | Compass | Cerebro / Kibana |
+| 备份恢复 | pg_dump / WAL | mongodump / oplog | snapshot / reindex |
+| 升级维护 | 简单 | 中等 | 复杂（rollover / 重建） |
+| 故障排查 | 成熟 | 中等 | 较复杂（GC、merge） |
+| 内存占用 | 中等 | 中等 | 高（JVM） |
+| 硬盘占用 | 低 | 中等 | 高（副本 + 倒排） |
 
 ---
 
@@ -345,18 +380,6 @@ Elasticsearch:
 ✅ 报表分析（窗口函数、CTE）
 
 **代表用户**：Instagram、Notion、Discord、Apple、Reddit
-
----
-
-### MySQL 适用场景
-
-✅ 简单 Web 应用（CMS、博客、电商前台）
-✅ 读多写少（高并发读 QPS 1万+）
-✅ OLTP 场景（订单、用户、商品）
-✅ 已有 MySQL 生态（运维熟悉）
-✅ 简单报表（不需要复杂分析）
-
-**代表用户**：淘宝、Facebook、Twitter、Pinterest、GitHub（早期）
 
 ---
 
@@ -391,21 +414,21 @@ Elasticsearch:
 
 ```
 需要事务 + 关系查询？
-├── 是 → PG 或 MySQL
-│   ├── 强事务 + JSON + 高级特性 → PostgreSQL
-│   └── 简单 OLTP + 高并发读 → MySQL
+├── 是 → PostgreSQL
+│   ├── 强事务 + JSON + 高级特性 → PostgreSQL（推荐）
+│   └── 已有 MySQL 生态 → MySQL（功能 80% 相似）
 │
 └── 否 → 看数据特点
     ├── schema 多变（文档型）→ MongoDB
     │
     └── 全文搜索 / 聚合 / 向量？→ Elasticsearch
-        ├── 不需要 ES 特性 → 仍用 PG/MySQL/Mongo
+        ├── 不需要 ES 特性 → 仍用 PG/Mongo
         └── 需要 ES 特性 → 引入 ES 作为搜索层
 
 最终方案: 通常是组合
-  PG (主存储) + ES (搜索层) ← nest-search
+  PG (主存储) + ES (搜索层) ← nest-search 当前
   PG (主存储) + Mongo (文档) + ES (搜索) ← 复杂业务
-  MySQL (主存储) + ES (日志/搜索) ← 中小型项目
+  MySQL (主存储) + ES (日志/搜索) ← 传统企业
 ```
 
 ---
@@ -521,11 +544,6 @@ PG (auth-service / form-service / sync-records):
 - 简单 KV 缓存（用 Redis）
 - 时序数据（用 InfluxDB / TDengine）
 
-### 不用 MySQL
-- 复杂 JSON 操作（用 PG JSONB 或 Mongo）
-- 大文本全文搜索（用 ES）
-- 地理信息（用 PG PostGIS 或专门的地理数据库）
-
 ### 不用 MongoDB
 - 强事务需求（用 PG）
 - 复杂 JOIN（用 PG）
@@ -545,25 +563,25 @@ PG (auth-service / form-service / sync-records):
 
 ### 简单查询（10万条数据）
 
-| 操作 | PG | MySQL | Mongo | ES |
-|------|----|----|----|----|
-| 主键查询 | 1ms | 0.5ms | 0.8ms | 5ms |
-| 简单过滤 | 5ms | 3ms | 3ms | 2ms |
-| 全文搜索 | 50ms | 100ms | 20ms | 5ms |
-| 复杂聚合 | 200ms | 300ms | 150ms | 50ms |
+| 操作 | PG | Mongo | ES |
+|------|----|----|----|
+| 主键查询 | 1ms | 0.8ms | 5ms |
+| 简单过滤 | 5ms | 3ms | 2ms |
+| 全文搜索 | 50ms | 20ms | 5ms |
+| 复杂聚合 | 200ms | 150ms | 50ms |
 
 ### 大数据量（1000万条数据）
 
-| 操作 | PG | MySQL | Mongo | ES |
-|------|----|----|----|----|
-| 主键查询 | 1ms | 0.5ms | 1ms | 10ms |
-| 简单过滤 | 50ms | 30ms | 30ms | 10ms |
-| 全文搜索 | 1s | 2s | 500ms | 30ms |
-| 复杂聚合 | 5s | 10s | 3s | 200ms |
+| 操作 | PG | Mongo | ES |
+|------|----|----|----|
+| 主键查询 | 1ms | 1ms | 10ms |
+| 简单过滤 | 50ms | 30ms | 10ms |
+| 全文搜索 | 1s | 500ms | 30ms |
+| 复杂聚合 | 5s | 3s | 200ms |
 
 **结论**：
 - 数据量大时，**ES 的搜索优势越明显**
-- PG/MySQL 主键查询永远最快
+- PG 主键查询永远最快
 - 复杂分析 ES 优势明显
 
 ---
@@ -572,8 +590,8 @@ PG (auth-service / form-service / sync-records):
 
 | 业务需求 | 首选 | 备选 |
 |----------|------|------|
-| 金融/订单/支付 | **PostgreSQL** | MySQL |
-| 简单 Web 应用 | **MySQL** | PostgreSQL |
+| 金融/订单/支付 | **PostgreSQL** | - |
+| 简单 Web 应用 | **PostgreSQL** | MySQL（如果团队熟悉） |
 | 内容管理 / 博客 | **MongoDB** | PostgreSQL (JSONB) |
 | 全文搜索 | **Elasticsearch** | PostgreSQL (GIN) |
 | 日志分析 | **Elasticsearch** | ClickHouse |
@@ -590,4 +608,3 @@ PG (auth-service / form-service / sync-records):
 - [Elasticsearch 官方文档](https://www.elastic.co/guide/en/elasticsearch/reference/current/index.html)
 - [PostgreSQL 官方文档](https://www.postgresql.org/docs/)
 - [MongoDB 官方文档](https://www.mongodb.com/docs/)
-- [MySQL 官方文档](https://dev.mysql.com/doc/)
