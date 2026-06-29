@@ -125,9 +125,9 @@
 
 ---
 
-## Phase B · 全栈深度 11 节 — 30 → 41
+## Phase B · 全栈深度 19 节 — 30 → 49
 
-**目标**:用户强调的 Redis + BullMQ 深入 + Elasticsearch + 错误处理模式。
+**目标**:用户强调的 Redis + BullMQ 深入 + Elasticsearch(基础 + 企业级)+ 错误处理模式。
 
 ### 0031-0033 · Redis 深度(3 节)
 
@@ -141,13 +141,36 @@
 - **覆盖**:BullMQ 核心概念(Queue/Worker/Job)+ 重试策略(attempts + backoff)+ 延迟任务 + 优先级队列 + 限流 + 事件监听
 - **预期交付**:通用 Queue/Worker module + 重试配置 + 任务状态监控
 
-### 0037-0039 · Elasticsearch 深度(3 节)
+### 0037-0039 · Elasticsearch 基础(3 节)
 
-- **缺口**:search-service 已用 ES,但没有教学;用户要求讲解功能 / 语法 / 性能 / 对比 / 企业级用法
-- **覆盖**:ES 核心概念(Index/Document/Mapping/Analyzer)+ Query DSL(must/filter/should/aggs)+ 倒排索引原理 + 与 PostgreSQL FTS / MongoDB / Solr 对比 + 企业级模式(别名 / 分片策略 / 慢查询诊断)
+- **缺口**:search-service 已用 ES,但没有教学;用户要求讲解功能 / 语法 / 性能 / 对比
+- **覆盖**:ES 核心概念(Index/Document/Mapping/Analyzer)+ Query DSL(must/filter/should/aggs)+ 倒排索引原理 + 与 PostgreSQL FTS / MongoDB / Solr 对比 + 基础性能
 - **预期交付**:search-service 查询优化 + 1 个聚合查询 demo + 性能对比报告
 
-### 0040-0041 · 错误处理模式(2 节)
+### 0040-0047 · Elasticsearch 企业级(8 节)
+
+> **来源**:用户要求 ES 技能学到能写简历。围绕 nest-search 实际业务:**同步全量数据 → 索引 → 前端查询**。
+> **不涉及**:向量搜索 / RBAC / 多集群 / CCR(单租户 dev 项目用不到)。
+
+- **缺口**:0037-0039 只讲了基础语法,生产级能力空白
+- **覆盖**:
+  - **0040** 中文分词:IK 插件安装 + 自定义词典 + pinyin
+  - **0041** 零停机重建:Alias 切换 + reindex 蓝绿
+  - **0042** 深度分页:search_after + PIT 替代 from+size
+  - **0043** 相关性调优:BM25 explain + function_score + 多字段权重
+  - **0044** 聚合实战:date_histogram + composite + 嵌套 agg
+  - **0045** 索引生命周期:ILM policy + 滚动索引
+  - **0046** 慢查询调优:Profile API + slowlog + query 改写
+  - **0047** 高亮 + Suggest:highlight + completion/phrase suggest
+- **预期交付**:
+  - docker-compose 加 IK 插件镜像
+  - search-service: alias / search_after / function_score / highlight / suggest
+  - sync-service: 滚动索引写入
+  - 慢查询中间件 + 日志
+  - ILM policy 配置
+- **学完技能**:**中高级 ES 工程师**,能独立负责千万级搜索系统
+
+### 0048-0049 · 错误处理模式(2 节)
 
 - **缺口**:retry / circuit breaker / bulkhead 全没做
 - **覆盖**:指数退避重试 + 熔断器(hystrix/opossum 风格)+ 隔离(bulkhead)模式
@@ -155,56 +178,56 @@
 
 ---
 
-## Phase C · 加分 5 节 — 41 → 46
+## Phase C · 加分 5 节 — 49 → 54
 
 **目标**:给想往 SRE / 性能方向走的人。
 
-### 0042-0043 · 测试进阶(2 节)
+### 0050-0051 · 测试进阶(2 节)
 
 - **覆盖**:Contract testing(Pact)+ Load testing(k6 / Artillery)
 - **预期交付**:service 间 contract test 套件 + 1 个核心 endpoint 压测报告
 
-### 0044-0045 · 监控告警(2 节)
+### 0052-0053 · 监控告警(2 节)
 
 - **覆盖**:SLO / SLI / Error Budget + Prometheus metrics 导出
 - **预期交付**:每个 service 暴露 /metrics + 关键 SLI dashboard JSON
 
-### 0046 · OpenTelemetry 链路追踪(1 节)
+### 0054 · OpenTelemetry 链路追踪(1 节)
 
 - **覆盖**:OTel SDK + Jaeger / Tempo 集成
 - **预期交付**:5 个 service 全装 OTel + 1 个分布式 trace demo
 
 ---
 
-## Phase D · 全栈必须补充 7 节 — 46 → 53
+## Phase D · 全栈必须补充 7 节 — 54 → 61
 
 **目标**:nest-search 当前缺失的企业级能力(全部必修)。
 
-### 0047-0048 · 认证/授权深入(2 节)
+### 0055-0056 · 认证/授权深入(2 节)
 
 - **缺口**:CAS Guard 浅做,完整 OAuth 2.0 / OIDC flow 未实现
 - **覆盖**:OAuth 2.0 grant types + OIDC ID Token + RBAC 模型 + CAS ticket 协议完整实现
 - **预期交付**:auth-service 完整 OAuth flow + RBAC decorator + 测试
 
-### 0049-0050 · WebSocket / SSE(2 节)
+### 0057-0058 · WebSocket / SSE(2 节)
 
 - **缺口**:nest-search 0 实时能力
 - **覆盖**:@nestjs/websockets + Socket.IO + SSE 推送 + 鉴权集成
 - **预期交付**:gateway 加 WS gateway + 1 个实时通知 demo
 
-### 0051 · 文件上传 / S3 预签名(1 节)
+### 0059 · 文件上传 / S3 预签名(1 节)
 
 - **缺口**:nest-search 0 文件处理
 - **覆盖**:multipart upload + S3 SDK + 预签名 URL + 直传不落业务服务
 - **预期交付**:通用 upload module + S3 集成 + 1 个上传 demo endpoint
 
-### 0052 · 依赖注入 scope 进阶(1 节)
+### 0060 · 依赖注入 scope 进阶(1 节)
 
 - **缺口**:NestJS request scope / transient scope 用法未深入
 - **覆盖**:singleton vs request vs transient 边界 + request scope 性能代价 + AsyncLocalStorage
 - **预期交付**:文档 + 1 个 request scope 实战 + 性能对比
 
-### 0053 · API 版本控制 + 灰度发布(1 节)
+### 0061 · API 版本控制 + 灰度发布(1 节)
 
 - **缺口**:nest-search 单一版本,无版本管理
 - **覆盖**:URI / Header / Query 3 种版本策略 + NestJS 多 controller 路由 + 灰度发布
@@ -212,43 +235,43 @@
 
 ---
 
-## Phase E · 企业级数据库架构 6 节 — 53 → 59(2026-06-24 新增)
+## Phase E · 企业级数据库架构 6 节 — 61 → 67(2026-06-24 新增)
 
 > **来源**:用户要求"教企业级数据库高并发 / 分库分表 / 微服务 + 改造项目"。
 > **参考文档**:`docs/teaching/reference/enterprise-database-architecture.md`(必读前置)。
 > **目标**:把 nest-search 从"教学 demo"改造为"接近企业级生产"的样板,聚焦架构层(非 API 层)。
 
-### 0054 · 外键禁用 + 业务一致性
+### 0062 · 外键禁用 + 业务一致性
 
 - **缺口**:nest-search schema 已无 FK(0023 验证),但**应用层一致性检查缺失**;无软删除兜底
 - **覆盖**:禁用 FK 的 5 个理由(性能 / 锁 / 分库 / 微服务 / 恢复);5 种替代方案(应用层校验 / 软删除 / 定期对账 / Outbox / Saga)
 - **预期交付**:`cas_tickets.userId` 显式无 FK 注释 + service 层 `userService.exists(id)` 校验 + `users.deleted_at` 字段 + 1 个 e2e 测孤儿 ticket
 
-### 0055 · 高并发 + 连接池调优
+### 0063 · 高并发 + 连接池调优
 
 - **缺口**:pg pool 用默认值,无显式配置;没演示过 EXPLAIN ANALYZE 在高并发场景
 - **覆盖**:PostgreSQL server 端(`max_connections` / `shared_buffers` / `work_mem` / `statement_timeout`) + 应用层 pg.Pool 配置 + 实战 EXPLAIN ANALYZE
 - **预期交付**:`drizzle.service.ts` 显式 Pool config + k6 / autocannon 压测 register endpoint + 报告
 
-### 0056 · 缓存策略(Cache-Aside)
+### 0064 · 缓存策略(Cache-Aside)
 
 - **缺口**:Redis (ioredis) 已装但只用于限流;DB cache 空白
 - **覆盖**:Cache-Aside / Write-Through / Write-Behind / Read-Through 4 模式 + 3 大坑(穿透 / 雪崩 / 击穿)
 - **预期交付**:`UserService.findById` 加 Cache-Aside(Redis, TTL 5min) + 处理 3 大坑
 
-### 0057 · 分库分表(水平 + snowflake)
+### 0065 · 分库分表(水平 + snowflake)
 
 - **缺口**:5 service 已垂直分库,但无水平分表演示;auto_increment ID 在分表后不连续
 - **覆盖**:水平分表 3 策略(Hash / Range / Time) + sharding 中间件对比 + snowflake ID
 - **预期交付**:`cas_tickets` 模拟水平分表(`userId % 2` → 2 个 DB) + snowflake-like ID 生成器 + 应用层 router
 
-### 0058 · 分布式事务(Outbox 模式)
+### 0066 · 分布式事务(Outbox 模式)
 
 - **缺口**:跨 service 副作用无事务保护(0023 LR 提的"非事务性副作用"问题)
 - **覆盖**:4 种方案对比(2PC / TCC / Saga / Outbox) + Outbox 实现 + worker 处理 + 幂等性
 - **预期交付**:`outbox` 表 + `createUserWithOutboxEvent` 事务方法 + Cron worker 推 BullMQ(已有 bull)
 
-### 0059 · 微服务 Database per Service
+### 0067 · 微服务 Database per Service
 
 - **缺口**:form-service / sync-service 跟 auth 共享 DB(反模式);sync-service 通过 schema-factory 动态生成表(共享 DB 池)
 - **覆盖**:Database per Service 原则 + 5 种跨服务数据访问模式 + nest-search 现状盘点
@@ -306,11 +329,13 @@
 |---|---|---|---|
 | 已完成(主线+副线+Phase A 0019-0028) | 28 | ✅ | 2026-06-25 |
 | Phase A 余下 (0029-0030) | 2 | ⏳ | — |
-| Phase B | 11 | ⏳ | — |
-| Phase C | 5 | ⏳ | — |
-| Phase D | 7 | ⏳ | — |
-| **Phase E(企业级 DB 架构,2026-06-24 新增)** | **6** | **⏳** | — |
-| **总计** | **59** | **28/59 = 47%** | — |
+| Phase B (Redis+BullMQ+ES 基础) | 11 | 🟡 5/11 | 2026-06-28 |
+| Phase B' (ES 企业级 0040-0047) | 8 | ⏳ 新增 | — |
+| Phase B 错误处理(0048-0049) | 2 | ⏳ | — |
+| Phase C (0050-0054) | 5 | ⏳ | — |
+| Phase D (0055-0061) | 7 | ⏳ | — |
+| **Phase E(企业级 DB 架构 0062-0067,2026-06-24 新增)** | **6** | **⏳** | — |
+| **总计** | **67** | **33/67 = 49%** | — |
 
 ---
 
