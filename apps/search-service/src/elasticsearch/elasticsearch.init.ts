@@ -26,6 +26,7 @@ const PRODUCT_MAPPINGS = {
       },
     },
     category: { type: 'keyword' },
+    categoryId: { type: 'integer' },
     brand: { type: 'keyword' },
     model: { type: 'keyword' },
     spec: {

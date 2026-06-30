@@ -152,23 +152,23 @@
 > **来源**:用户要求 ES 技能学到能写简历。围绕 nest-search 实际业务:**同步全量数据 → 索引 → 前端查询**。
 > **不涉及**:向量搜索 / RBAC / 多集群 / CCR(单租户 dev 项目用不到)。
 
-- **缺口**:0037-0039 只讲了基础语法,生产级能力空白
+- **项目搜索本质**:商品目录检索（非语义搜索）。用户通过分类/brand/价格过滤出商品集合，排序以量化字段为主
 - **覆盖**:
   - **0040** 中文分词:IK 插件安装 + 自定义词典 + pinyin
   - **0041** 零停机重建:Alias 切换 + reindex 蓝绿
   - **0042** 深度分页:search_after + PIT 替代 from+size
-  - **0043** 相关性调优:BM25 explain + function_score + 多字段权重
-  - **0044** 聚合实战:date_histogram + composite + 嵌套 agg
+  - **0043** 关键词搜索调优:BM25 explain(排查搜不到/搜不准) + 多字段权重 + categoryId 目录字段
+  - **0044** 聚合实战:categoryId 子目录聚合 + terms + stats（商品目录筛选核心）
   - **0045** 索引生命周期:ILM policy + 滚动索引
   - **0046** 慢查询调优:Profile API + slowlog + query 改写
   - **0047** 高亮 + Suggest:highlight + completion/phrase suggest
 - **预期交付**:
   - docker-compose 加 IK 插件镜像
-  - search-service: alias / search_after / function_score / highlight / suggest
+  - search-service: alias / search_after / categoryId 过滤 / highlight / suggest
   - sync-service: 滚动索引写入
   - 慢查询中间件 + 日志
   - ILM policy 配置
-- **学完技能**:**中高级 ES 工程师**,能独立负责千万级搜索系统
+- **学完技能**:**中高级 ES 工程师**,能独立负责千万级商品目录搜索系统
 
 ### 0048-0049 · 错误处理模式(2 节)
 
