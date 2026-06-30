@@ -20,19 +20,26 @@ export class SearchService {
       keyword?: string;
       category?: string;
       brand?: string;
-      page: number;
+      page?: number;
       size: number;
+      searchAfter?: any[];
     },
   ) {
     const index = this.getIndex(businessLine);
     const query = buildProductSearchQuery(params);
     const result = await this.esService.search(index, query);
 
+    const hits = result.hits.hits;
+    // 如果翻到最后一页(size < 请求量),nextCursor 为 null
+    const nextCursor =
+      hits.length === params.size ? hits[hits.length - 1].sort : null;
+
     return {
       total: result.hits.total,
-      page: params.page,
+      page: params.page || null,
       size: params.size,
-      items: result.hits.hits.map((hit: any) => hit._source),
+      items: hits.map((hit: any) => hit._source),
+      nextCursor,
     };
   }
 

@@ -1,10 +1,11 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
 import { SearchService } from './search.service';
 
 @Controller('api/search/:businessLine')
 export class SearchController {
   constructor(private readonly searchService: SearchService) {}
 
+  // GET: 传统分页 (page/size)，向后兼容
   @Get('products')
   searchProducts(
     @Param('businessLine') businessLine: string,
@@ -20,6 +21,27 @@ export class SearchController {
       brand,
       page: parseInt(page, 10),
       size: parseInt(size, 10),
+    });
+  }
+
+  // POST: 深分页 (searchAfter)，前端传 cursor
+  @Post('products')
+  searchProductsDeep(
+    @Param('businessLine') businessLine: string,
+    @Body() body: {
+      keyword?: string;
+      category?: string;
+      brand?: string;
+      size?: number;
+      searchAfter?: any[];
+    },
+  ) {
+    return this.searchService.searchProducts(businessLine, {
+      keyword: body.keyword,
+      category: body.category,
+      brand: body.brand,
+      size: body.size || 20,
+      searchAfter: body.searchAfter,
     });
   }
 

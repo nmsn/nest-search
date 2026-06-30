@@ -4,8 +4,9 @@ export function buildProductSearchQuery(params: {
   keyword?: string;
   category?: string;
   brand?: string;
-  page: number;
+  page?: number;
   size: number;
+  searchAfter?: any[];
 }) {
   const must: any[] = [];
   const filter: any[] = [];
@@ -27,17 +28,29 @@ export function buildProductSearchQuery(params: {
     filter.push({ term: { brand: params.brand } });
   }
 
-  return {
+  const body: any = {
     query: {
       bool: {
         must: must.length > 0 ? must : [{ match_all: {} }],
         filter,
       },
     },
-    from: (params.page - 1) * params.size,
     size: params.size,
-    sort: [{ _score: 'desc' }, { syncedAt: 'desc' }],
+    sort: [
+      { _score: 'desc' },
+      { syncedAt: 'desc' },
+      { productId: 'asc' }, // ← 唯一字段兜底，保证 search_after 不跳数据/重复
+    ],
   };
+
+  // search_after 优先 (深分页)，回退到 from/size (浅分页)
+  if (params.searchAfter) {
+    body.search_after = params.searchAfter;
+  } else if (params.page) {
+    body.from = (params.page - 1) * params.size;
+  }
+
+  return body;
 }
 
 export function buildAggregationQuery() {
