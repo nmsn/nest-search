@@ -19,7 +19,7 @@ export class ElasticsearchService implements OnModuleInit, OnModuleDestroy {
 
   async createIndexIfNotExists(
     indexName: string,
-    body: { settings?: any; mappings: any },
+    body: { settings?: any; mappings: any; aliases?: Record<string, any> },
   ) {
     const exists = await this.client.indices.exists({ index: indexName });
     if (!exists) {
@@ -63,5 +63,43 @@ export class ElasticsearchService implements OnModuleInit, OnModuleDestroy {
 
   async deleteByQuery(indexName: string, query: any) {
     return this.client.deleteByQuery({ index: indexName, query } as any);
+  }
+
+  // ====== 零停机重建相关工具 (0041) ======
+
+  /**
+   * 复制数据: oldIndex → newIndex
+   * 调用方需先创建 newIndex
+   */
+  async reindex(oldIndex: string, newIndex: string) {
+    const result = await this.client.reindex({
+      refresh: true,
+      source: { index: oldIndex },
+      dest: { index: newIndex },
+    });
+    return {
+      total: result.total,
+      created: result.created,
+      updated: result.updated,
+      failures: result.failures,
+    };
+  }
+
+  /**
+   * 原子切换 alias 指向
+   * fromIndex: 旧索引, toIndex: 新索引
+   * ES 内部用事务保证 remove + add 同时生效
+   */
+  async switchAlias(
+    aliasName: string,
+    fromIndex: string,
+    toIndex: string,
+  ) {
+    await this.client.indices.updateAliases({
+      actions: [
+        { remove: { index: fromIndex, alias: aliasName } },
+        { add: { index: toIndex, alias: aliasName } },
+      ],
+    });
   }
 }

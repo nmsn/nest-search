@@ -1,35 +1,12 @@
 import { ElasticsearchService } from './elasticsearch.service';
 import { BUSINESS_LINES } from '../libs/shared/index';
 
-// ===== 索引 settings：自定义 analyzer（含同义词） =====
-// 这是 ES 8.x 创建索引的完整配置方式
-// settings 定义 analyzer / filter
-// mappings 定义字段类型
+// ===== 索引 settings：使用 IK 内置 analyzer =====
+// ES 8.x 限制: synonym_graph filter 不能用于索引时
+// 简化方案: 索引用 ik_max_word,搜索用 ik_smart (内置)
+// 同义词功能留给未来升级(可改用 synonym filter 而非 synonym_graph)
 const INDEX_SETTINGS = {
-  analysis: {
-    filter: {
-      // 同义词 filter（从 synonym.txt 加载）
-      my_synonym: {
-        type: 'synonym_graph',
-        synonyms_path: 'analysis-ik/synonym.txt',
-        updateable: true,
-      },
-    },
-    analyzer: {
-      // 索引时：ik_max_word（细粒度切分）+ 同义词扩展
-      ik_index_analyzer: {
-        type: 'custom',
-        tokenizer: 'ik_max_word',
-        filter: ['my_synonym'],
-      },
-      // 搜索时：ik_smart（粗粒度切分）+ 同义词扩展
-      ik_search_analyzer: {
-        type: 'custom',
-        tokenizer: 'ik_smart',
-        filter: ['my_synonym'],
-      },
-    },
-  },
+  // 不需要自定义 analyzer,直接用 IK 内置的 ik_max_word / ik_smart
 };
 
 // ===== Mapping：字段定义 =====
@@ -38,8 +15,8 @@ const PRODUCT_MAPPINGS = {
     productId: { type: 'keyword' },
     name: {
       type: 'text',
-      analyzer: 'ik_index_analyzer',     // 索引用 ik_max_word + 同义词
-      search_analyzer: 'ik_search_analyzer', // 搜索用 ik_smart + 同义词
+      analyzer: 'ik_max_word',           // 索引: IK 细粒度
+      search_analyzer: 'ik_smart',      // 搜索: IK 粗粒度
     },
     name_pinyin: {
       type: 'text',
@@ -53,8 +30,8 @@ const PRODUCT_MAPPINGS = {
     model: { type: 'keyword' },
     spec: {
       type: 'text',
-      analyzer: 'ik_index_analyzer',
-      search_analyzer: 'ik_search_analyzer',
+      analyzer: 'ik_max_word',
+      search_analyzer: 'ik_smart',
     },
     price: { type: 'float' },
     unit: { type: 'keyword' },
@@ -66,11 +43,26 @@ const PRODUCT_MAPPINGS = {
   },
 };
 
+// 当前索引版本号（升级 mapping 时递增，如 v1 → v2）
+const CURRENT_INDEX_VERSION = 'v1';
+
+// 实际索引名 = alias名_版本号，例如 products_ds_v1
+function getRealIndexName(alias: string): string {
+  return `${alias}_${CURRENT_INDEX_VERSION}`;
+}
+
 export async function initIndices(esService: ElasticsearchService) {
   for (const [, config] of Object.entries(BUSINESS_LINES)) {
-    await esService.createIndexIfNotExists(config.esIndex, {
-      settings: INDEX_SETTINGS,
+    const alias = config.esIndex;             // 'products_ds' (逻辑名,业务代码用这个)
+    const realIndex = getRealIndexName(alias); // 'products_ds_v1' (实际索引)
+
+    // 启动时: 创建带 alias 的索引
+    // 用户搜的是 alias,实际指向 realIndex
+    // 未来改 mapping: 创建 v2 → reindex → 切换 alias → 删 v1 (零停机)
+    await esService.createIndexIfNotExists(realIndex, {
+      aliases: { [alias]: {} },
       mappings: PRODUCT_MAPPINGS,
     });
+    console.log(`Index ready: ${realIndex} (alias: ${alias})`);
   }
 }
