@@ -5,6 +5,23 @@ import { buildProductSearchQuery, buildAggregationQuery } from './search.queries
 
 @Injectable()
 export class SearchService {
+  // 目录 ID → 中文名映射（与 mock 数据 categoryId 一致）
+  private readonly CATEGORY_NAME_MAP: Record<number, string> = {
+    1001: '商用显示屏',
+    1002: '广告机',
+    1003: '拼接屏',
+    1004: '教学一体机',
+    1005: '数字标牌',
+    1006: '触控一体机',
+    2001: '智能道闸',
+    2002: '道闸配件',
+    2003: '广告道闸',
+    2004: '高速道闸',
+    2005: '升降柱',
+    3001: '会议平板',
+    3002: '智能交互平板',
+  };
+
   constructor(private readonly esService: ElasticsearchService) {}
 
   private getIndex(businessLine: string): string {
@@ -19,7 +36,10 @@ export class SearchService {
     params: {
       keyword?: string;
       category?: string;
+      categoryId?: number;
       brand?: string;
+      minPrice?: number;
+      maxPrice?: number;
       page?: number;
       size: number;
       searchAfter?: any[];
@@ -59,8 +79,14 @@ export class SearchService {
 
     return {
       categories: result.aggregations.categories.buckets,
+      categoryIds: result.aggregations.categoryIds.buckets.map((b: any) => ({
+        id: b.key,
+        name: this.CATEGORY_NAME_MAP[b.key] || '未分类',
+        count: b.doc_count,
+      })),
       brands: result.aggregations.brands.buckets,
       priceStats: result.aggregations.price_stats,
+      priceRanges: result.aggregations.price_ranges.buckets,
     };
   }
 }

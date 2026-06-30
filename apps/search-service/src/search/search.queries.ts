@@ -101,6 +101,18 @@ export function buildAggregationQuery() {
       price_stats: {
         stats: { field: 'price' },
       },
+      // 价格区间
+      price_ranges: {
+        range: {
+          field: 'price',
+          ranges: [
+            { key: '0-2000', to: 2000 },
+            { key: '2000-5000', from: 2000, to: 5000 },
+            { key: '5000-10000', from: 5000, to: 10000 },
+            { key: '10000+', from: 10000 },
+          ],
+        },
+      },
     },
   };
 }
