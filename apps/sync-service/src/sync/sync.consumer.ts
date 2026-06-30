@@ -41,10 +41,15 @@ export class SyncFullConsumer extends WorkerHost {
       query: { match_all: {} } as any,
     });
 
-    const operations = filtered.flatMap((doc: any) => [
-      { index: { _index: index, _id: doc.productId } },
-      doc,
-    ]);
+    const operations = filtered.flatMap((doc: any) => {
+      // 双写 name_pinyin 字段,值与 name 相同
+      // ES pinyin analyzer 会自动把中文转拼音
+      const docWithPinyin = { ...doc, name_pinyin: doc.name };
+      return [
+        { index: { _index: index, _id: doc.productId } },
+        docWithPinyin,
+      ];
+    });
 
     await this.esClient.bulk({ operations });
     this.logger.info(`Full sync complete for ${businessLine}: ${filtered.length} products indexed`);
@@ -80,10 +85,15 @@ export class SyncIncrementalConsumer extends WorkerHost {
 
     const index = BUSINESS_LINES[businessLine].esIndex;
 
-    const operations = filtered.flatMap((doc: any) => [
-      { index: { _index: index, _id: doc.productId } },
-      doc,
-    ]);
+    const operations = filtered.flatMap((doc: any) => {
+      // 双写 name_pinyin 字段,值与 name 相同
+      // ES pinyin analyzer 会自动把中文转拼音
+      const docWithPinyin = { ...doc, name_pinyin: doc.name };
+      return [
+        { index: { _index: index, _id: doc.productId } },
+        docWithPinyin,
+      ];
+    });
 
     await this.esClient.bulk({ operations });
     this.logger.info(`Incremental sync complete for ${businessLine}: ${filtered.length} products`);

@@ -17,14 +17,17 @@ export class ElasticsearchService implements OnModuleInit, OnModuleDestroy {
     await this.client.close();
   }
 
-  async createIndexIfNotExists(indexName: string, mappings: any) {
+  async createIndexIfNotExists(
+    indexName: string,
+    body: { settings?: any; mappings: any },
+  ) {
     const exists = await this.client.indices.exists({ index: indexName });
     if (!exists) {
       await this.client.indices.create({
         index: indexName,
-        mappings,
+        ...body,
       } as any);
-      console.log(`Created ES index: ${indexName}`);
+      console.log(`Created ES index: ${indexName} (with IK analyzer)`);
     }
   }
 
