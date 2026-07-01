@@ -58,7 +58,11 @@ export class SearchService {
       total: result.hits.total,
       page: params.page || null,
       size: params.size,
-      items: hits.map((hit: any) => hit._source),
+      items: hits.map((hit: any) => ({
+        ...hit._source,
+        // 嵌套高亮: 跟 _source 同级,前端用 ._highlight.name 拿高亮后的 HTML
+        _highlight: hit.highlight || {},
+      })),
       nextCursor,
     };
   }

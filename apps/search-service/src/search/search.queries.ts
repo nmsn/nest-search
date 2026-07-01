@@ -65,6 +65,23 @@ export function buildProductSearchQuery(params: {
       { syncedAt: 'desc' },
       { productId: 'asc' }, // 唯一字段兜底
     ],
+    // 关键词高亮（仅在有关键词时返回）
+    ...(params.keyword && {
+      highlight: {
+        fields: {
+          name: {
+            pre_tags: ['<em>'],
+            post_tags: ['</em>'],
+            number_of_fragments: 0, // 返回完整字段
+          },
+          spec: {
+            pre_tags: ['<em>'],
+            post_tags: ['</em>'],
+            number_of_fragments: 0,
+          },
+        },
+      },
+    }),
   };
 
   // 分页
