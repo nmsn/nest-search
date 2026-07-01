@@ -1,10 +1,18 @@
-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Client } from '@elastic/elasticsearch';
+import { retry, CircuitBreaker } from '../libs/shared/index';
 
 @Injectable()
 export class ElasticsearchService implements OnModuleInit, OnModuleDestroy {
   public client!: Client;
+  private readonly logger = new Logger(ElasticsearchService.name);
+
+  // 搜索熔断器: 5 次连续失败 → 熔断 30s
+  private searchBreaker = new CircuitBreaker(5, 30000);
+
+  // 写操作熔断器: 阈值更低,写失败说明 ES 严重问题
+  private writeBreaker = new CircuitBreaker(3, 30000);
 
   constructor(private readonly config: ConfigService) {}
 
@@ -21,13 +29,14 @@ export class ElasticsearchService implements OnModuleInit, OnModuleDestroy {
     indexName: string,
     body: { settings?: any; mappings: any; aliases?: Record<string, any> },
   ) {
+    // 创建索引: 不重试（永久错误,重试浪费）
     const exists = await this.client.indices.exists({ index: indexName });
     if (!exists) {
       await this.client.indices.create({
         index: indexName,
         ...body,
       } as any);
-      console.log(`Created ES index: ${indexName} (with IK analyzer)`);
+      this.logger.log(`Created ES index: ${indexName} (with IK analyzer)`);
     }
   }
 
@@ -39,30 +48,56 @@ export class ElasticsearchService implements OnModuleInit, OnModuleDestroy {
       doc,
     ]);
 
-    const result = await this.client.bulk({ operations });
+    // bulk 写入: 熔断器 + retry（productId 幂等,可重试）
+    const result = await this.writeBreaker.execute(() =>
+      retry(() => this.client.bulk({ operations }), {
+        maxRetries: 3,
+        baseDelay: 1000,
+      }),
+    );
+
     if (result.errors) {
-      console.error('Bulk index errors:', result.items.filter((i) => i.index?.error));
+      this.logger.error(
+        'Bulk index errors:',
+        result.items.filter((i: any) => i.index?.error),
+      );
     }
 
     return { indexed: documents.length, errors: result.errors };
   }
 
   async search(indexName: string, body: any) {
-    return this.client.search({ index: indexName, body });
+    // 搜索: 熔断器 + retry（快重试,baseDelay 短）
+    return this.searchBreaker.execute(() =>
+      retry(() => this.client.search({ index: indexName, body }), {
+        maxRetries: 2,
+        baseDelay: 500,
+      }),
+    );
   }
 
   async getDocument(indexName: string, id: string) {
-    try {
-      const result = await this.client.get({ index: indexName, id });
-      return result._source;
-    } catch (error: any) {
-      if (error.meta?.statusCode === 404) return null;
-      throw error;
-    }
+    // 读单文档: 熔断器 + retry
+    return this.searchBreaker.execute(() =>
+      retry(async () => {
+        try {
+          const result = await this.client.get({ index: indexName, id });
+          return result._source;
+        } catch (error: any) {
+          if (error.meta?.statusCode === 404) return null;
+          throw error;
+        }
+      }),
+    );
   }
 
   async deleteByQuery(indexName: string, query: any) {
-    return this.client.deleteByQuery({ index: indexName, query } as any);
+    return this.writeBreaker.execute(() =>
+      retry(() => this.client.deleteByQuery({ index: indexName, query } as any), {
+        maxRetries: 3,
+        baseDelay: 1000,
+      }),
+    );
   }
 
   // ====== 零停机重建相关工具 (0041) ======
@@ -101,5 +136,15 @@ export class ElasticsearchService implements OnModuleInit, OnModuleDestroy {
         { add: { index: toIndex, alias: aliasName } },
       ],
     });
+  }
+
+  // ====== 熔断器状态查询 (用于健康检查 / 监控) ======
+
+  getSearchBreakerState() {
+    return this.searchBreaker.currentState;
+  }
+
+  getWriteBreakerState() {
+    return this.writeBreaker.currentState;
   }
 }
