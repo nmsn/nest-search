@@ -6,3 +6,5 @@ export * from './interfaces/product.interface';
 export * from './interfaces/user.interface';
 export * from './dto/pagination.dto';
 export * from './schemas/sync-records';
+export * from './utils/retry';
+export * from './utils/circuit-breaker';

@@ -4,7 +4,11 @@ import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { Client } from '@elastic/elasticsearch';
-import { BUSINESS_LINES, BusinessLineCode } from '../libs/shared/index';
+import {
+  BUSINESS_LINES,
+  BusinessLineCode,
+  retry,
+} from '../libs/shared/index';
 import { SyncService } from './sync.service';
 
 @Injectable()
@@ -24,10 +28,14 @@ export class SyncFullConsumer extends WorkerHost {
 
   async process(job: Job) {
     const businessLine = job.data.businessLine as BusinessLineCode;
-    this.logger.info(`Processing full sync for ${businessLine} (attempt ${job.attemptsMade + 1})`);
+    this.logger.info(
+      `Processing full sync for ${businessLine} (attempt ${job.attemptsMade + 1})`,
+    );
 
     const products = this.syncService.loadMockData('full');
-    const filtered = products.filter((p: any) => p.businessLine === businessLine);
+    const filtered = products.filter(
+      (p: any) => p.businessLine === businessLine,
+    );
 
     if (filtered.length === 0) {
       this.logger.warn(`No products found for business line: ${businessLine}`);
@@ -36,10 +44,13 @@ export class SyncFullConsumer extends WorkerHost {
 
     const index = BUSINESS_LINES[businessLine].esIndex;
 
-    await this.esClient.deleteByQuery({
-      index,
-      query: { match_all: {} } as any,
-    });
+    // deleteByQuery 包 retry（处理瞬时网络抖动）
+    await retry(() =>
+      this.esClient.deleteByQuery({
+        index,
+        query: { match_all: {} } as any,
+      }),
+    );
 
     const operations = filtered.flatMap((doc: any) => {
       // 双写 name_pinyin 字段,值与 name 相同
@@ -51,8 +62,15 @@ export class SyncFullConsumer extends WorkerHost {
       ];
     });
 
-    await this.esClient.bulk({ operations });
-    this.logger.info(`Full sync complete for ${businessLine}: ${filtered.length} products indexed`);
+    // bulk 也包 retry
+    await retry(() => this.esClient.bulk({ operations }), {
+      maxRetries: 3,
+      baseDelay: 1000,
+    });
+
+    this.logger.info(
+      `Full sync complete for ${businessLine}: ${filtered.length} products indexed`,
+    );
   }
 }
 
@@ -64,7 +82,8 @@ export class SyncIncrementalConsumer extends WorkerHost {
   constructor(
     private readonly syncService: SyncService,
     config: ConfigService,
-    @InjectPinoLogger(SyncIncrementalConsumer.name) private readonly logger: PinoLogger,
+    @InjectPinoLogger(SyncIncrementalConsumer.name)
+    private readonly logger: PinoLogger,
   ) {
     super();
     const esNode = config.getOrThrow<string>('ELASTICSEARCH_NODE');
@@ -73,10 +92,14 @@ export class SyncIncrementalConsumer extends WorkerHost {
 
   async process(job: Job) {
     const businessLine = job.data.businessLine as BusinessLineCode;
-    this.logger.info(`Processing incremental sync for ${businessLine} (attempt ${job.attemptsMade + 1})`);
+    this.logger.info(
+      `Processing incremental sync for ${businessLine} (attempt ${job.attemptsMade + 1})`,
+    );
 
     const products = this.syncService.loadMockData('incremental');
-    const filtered = products.filter((p: any) => p.businessLine === businessLine);
+    const filtered = products.filter(
+      (p: any) => p.businessLine === businessLine,
+    );
 
     if (filtered.length === 0) {
       this.logger.info(`No incremental data for ${businessLine}`);
@@ -86,8 +109,6 @@ export class SyncIncrementalConsumer extends WorkerHost {
     const index = BUSINESS_LINES[businessLine].esIndex;
 
     const operations = filtered.flatMap((doc: any) => {
-      // 双写 name_pinyin 字段,值与 name 相同
-      // ES pinyin analyzer 会自动把中文转拼音
       const docWithPinyin = { ...doc, name_pinyin: doc.name };
       return [
         { index: { _index: index, _id: doc.productId } },
@@ -95,7 +116,14 @@ export class SyncIncrementalConsumer extends WorkerHost {
       ];
     });
 
-    await this.esClient.bulk({ operations });
-    this.logger.info(`Incremental sync complete for ${businessLine}: ${filtered.length} products`);
+    // bulk 也包 retry
+    await retry(() => this.esClient.bulk({ operations }), {
+      maxRetries: 3,
+      baseDelay: 1000,
+    });
+
+    this.logger.info(
+      `Incremental sync complete for ${businessLine}: ${filtered.length} products`,
+    );
   }
 }
