@@ -2,6 +2,7 @@ import { Module, OnModuleInit, MiddlewareConsumer, NestModule } from '@nestjs/co
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_FILTER } from '@nestjs/core';
 import { LoggerModule } from 'nestjs-pino';
+import { PrometheusModule } from '@willsoto/nestjs-prometheus';
 import { randomUUID } from 'node:crypto';
 import { ElasticsearchModule } from './elasticsearch/elasticsearch.module';
 import { ElasticsearchService } from './elasticsearch/elasticsearch.service';
@@ -25,6 +26,11 @@ import { SlowQueryMiddleware } from './middleware/slow-query.middleware';
           autoLogging: false,
         },
       }),
+    }),
+    // 0053 Prometheus 集成
+    PrometheusModule.register({
+      defaultMetrics: { enabled: true },
+      defaultLabels: { service: 'search-service' },
     }),
     ElasticsearchModule,
     SearchModule,
