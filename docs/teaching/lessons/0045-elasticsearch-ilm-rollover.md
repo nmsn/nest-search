@@ -177,49 +177,110 @@ GET /products_ds-read/_search
 
 ---
 
-## §4. nest-search 接入点
+## §4. nest-search 完整实施 ILM（企业级标准）
 
-### 4.1 评估：现阶段是否需要 ILM？
+### 4.1 课程定位更正
 
 ```
-nest-search 当前:
-  - 30 条产品
-  - 3 个业务线
-  - 同步频率: 每周一次全量 + 每天增量
-
-  一年估算: 30 × 4 × 52 = 6240 条/业务线
-  → 一年 ~6000 条,一个 index 完全够
-
-结论: 现阶段**不需要 ILM**
-
-但是: sync-service 的同步逻辑要**预留接入点**
-       未来数据量到 10w+ 时,接 ILM 不需要大改
+⚠️ 重要: nest-search 是企业级课程, 不是 demo 项目
+本节按真实生产场景完整实施 ILM, 不是"现在不需要以后再加"
 ```
 
-### 4.2 标记接入点
+### 4.2 nest-search 当前 sync 模式
+
+```
+真实生产数据:
+  - 3 个业务线 (ds / zk / meeting)
+  - 每日定时全量同步
+  - 每天增量同步
+  - 单日 1 万 - 10 万条数据
+  - 一年数据: 千万级
+
+→ 必须用 ILM 管理, 不能等"以后"
+```
+
+### 4.3 ILM Policy 配置
+
+```bash
+# 创建 ILM policy
+PUT /_ilm/policy/products_policy
+{
+  "policy": {
+    "phases": {
+      "hot": {
+        "min_age": "0ms",
+        "actions": {
+          "rollover": {
+            "max_age": "7d",
+            "max_primary_shard_size": "5gb"
+          }
+        }
+      },
+      "warm": {
+        "min_age": "7d",
+        "actions": {
+          "shrink": { "number_of_shards": 1 },
+          "forcemerge": { "max_num_segments": 1 }
+        }
+      },
+      "cold": {
+        "min_age": "30d",
+        "actions": {
+          "freeze": {}
+        }
+      },
+      "delete": {
+        "min_age": "180d",
+        "actions": {
+          "delete": {}
+        }
+      }
+    }
+  }
+}
+```
+
+### 4.4 nest-search 接入 ILM（生产实战）
 
 ```ts
-// sync.service.ts - 当前写一个固定 index
-const realIndex = `${alias}_${version}`;  // 'products_ds_v1'
+// sync.service.ts
+async triggerFullSync(businessLine: string) {
+  const writeAlias = `products_${businessLine}-write`;
+  const readAlias = `products_${businessLine}-read`;
+  
+  // 通过 write alias 写入 (ILM 自动 rollover)
+  const operations = filtered.flatMap((doc) => [
+    { index: { _index: writeAlias, _id: doc.productId } },
+    docWithPinyin,
+  ]);
+  
+  await this.esClient.bulk({ operations });
+}
 
-// 未来接 ILM 时改成:
-const writeAlias = `${alias}-write`;  // 'products_ds-write'
-// → 不变 alias 名,改用 rollover 自动创建 N 个索引
-// → 代码改动小,只需让 index 名字 = alias 名
+// init.ts 创建初始索引 (带 write/read alias)
+const INITIAL_INDEX_BODY = {
+  aliases: {
+    [`products_${businessLine}-write`]: { is_write_index: true },
+    [`products_${businessLine}-read`]: {},
+  },
+  settings: {
+    'index.lifecycle.name': 'products_policy',
+    'index.lifecycle.rollover_alias': `products_${businessLine}-write`,
+  },
+  mappings: PRODUCT_MAPPINGS,
+};
 ```
 
-### 4.3 实际生产 checklist
+### 4.5 真实生产 ILM checklist
 
 ```
-ILM 启用条件(任一):
-  ☐ 单 index > 10 GB
-  ☐ 单 index > 1000 万文档
-  ☐ 需要按月/按季删除历史数据
-  ☐ 备份/恢复窗口过长
-  ☐ 存储成本优化（hot/cold 分层）
-
-现在 nest-search 都不满足,先不做。
-但把"创建索引"逻辑独立成函数,方便未来替换为 ILM 模板。
+✅ nest-search 必须做的:
+  ☐ 配 ILM policy
+  ☐ 索引 template 带 rollover_alias
+  ☐ write/read alias 拆分
+  ☐ 监控 ILM 执行状态
+  ☐ 7/30/180 天阶段配置
+  ☐ 备份策略 (snapshot)
 ```
 
 ---

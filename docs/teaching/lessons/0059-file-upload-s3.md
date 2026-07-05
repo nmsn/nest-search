@@ -352,23 +352,39 @@ await fetch('/api/upload/confirm', {
 
 ---
 
-## §7. nest-search 当前决策
+## §7. nest-search 当前决策（企业级完整）
 
 ```
+⚠️ 课程定位更正: nest-search 是企业级课程, 必须完整实施
+
 要不要现在加 S3 上传?
 
-✅ 适合加 (最小 demo):
-  - 30 分钟工作
-  - 简历亮点: "S3 预签名 URL 上传"
-  - nest-search 30 条产品的图片可以真存
-
-⚠️ 实际业务价值:
-  - nest-search 是教学项目
-  - 上传后, sync 仍然覆盖 (因为是定时同步)
-  - 临时存储可以, 长期不会保留
+✅ 适合加 (企业级完整):
+  - 1-2 小时工作
+  - 简历亮点: "S3 预签名 URL 上传 + 完整集成"
+  - nest-search 是企业级项目, 不能"最小 demo"
+  - 必须实施:
+    - MinIO 启动 (docker compose)
+    - StorageService 封装 (AWS SDK)
+    - /api/upload/sign endpoint
+    - /api/upload/confirm endpoint
+    - 前端集成
+    - 鉴权 + 权限控制 (仅 admin 可上传)
+    - 大小限制 + Content-Type 限制
+    - 异常处理 (上传失败回滚)
 ```
 
-**建议**：加**最小 demo**（30 分钟），不接 sync 流程，专注 endpoint + MinIO 集成。
+**真实生产场景**：
+
+```
+产品图片: 商家上传 (10w+ 产品, 每张 1-5MB)
+用户头像: 用户注册时上传
+表单附件: 商家提报资料
+订单截图: 售后凭证
+
+→ nest-search 必须支持文件上传
+→ 企业级必备能力
+```
 
 ---
 

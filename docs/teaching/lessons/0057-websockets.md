@@ -353,29 +353,39 @@ WebSocket 可以复用:
 
 ## §7. nest-search 实时场景
 
-### 7.1 推荐场景
+### 7.1 nest-search 实时场景（企业级完整）
 
 ```
-✅ 适合 nest-search:
-  - 同步进度推送 (用户友好)
+⚠️ 课程定位更正: nest-search 是企业级课程, 必须完整实施
+
+✅ 适合 nest-search 的实时场景:
+  - sync-service 同步进度推送 (千万级产品)
   - 订单状态变更 (业务核心)
-  - 系统告警 (运维需要)
+  - 系统告警 (SRE 需要)
+  - 协同编辑 (未来扩展)
+  - 实时通知 (评论/点赞/消息)
 
-❌ 不适合:
-  - 高频消息 (游戏帧同步) - nest-search 不是这个
-  - 大量并发连接 (百万级) - nest-search 用户量不大
+❌ 不适合 nest-search:
+  - 游戏帧同步 (nest-search 不是游戏)
+  - 视频直播 (业务场景不匹配)
 ```
 
-### 7.2 实际改造成本
+### 7.2 nest-search 完整改造 (企业级实战)
 
 ```
-实现 sync 进度推送:
-  - 1 小时装依赖
-  - 30 分钟写 Gateway
-  - 30 分钟改 sync.service
-  - 30 分钟前端 demo
-  - 1 小时测试
-  总计: 3-4 小时
+必须实施:
+  - 1 小时装依赖 (@nestjs/websockets, socket.io)
+  - 2 小时写 sync.gateway.ts (NestJS 装饰器风格)
+  - 1 小时改 sync.service.ts (集成推送)
+  - 1 小时鉴权 (handleConnection 验证 JWT)
+  - 1 小时房间设计 (按业务线分 room)
+  - 1 小时前端集成 (socket.io-client)
+  - 1 小时 reconnect / heartbeat 处理
+  - 1 小时生产部署 (Redis adapter for 集群)
+  总计: 8-10 小时
+  
+  投入看似大, 但企业级项目必备
+  → 简历: "完整 WebSocket 实时通信集成 + 多房间设计 + 集群部署"
 ```
 
 ---
