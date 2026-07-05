@@ -8,6 +8,15 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres123
       POSTGRES_DB: nest_search
+      # 0063 PG server 调优 - 企业级配置
+      POSTGRES_MAX_CONNECTIONS: 200
+      POSTGRES_SHARED_BUFFERS: 256MB
+      POSTGRES_EFFECTIVE_CACHE_SIZE: 1GB
+      POSTGRES_WORK_MEM: 16MB
+      POSTGRES_MAINTENANCE_WORK_MEM: 256MB
+      POSTGRES_STATEMENT_TIMEOUT: 30s
+      POSTGRES_LOG_MIN_DURATION_STATEMENT: 1000
+    command: ["postgres", "-c", "max_connections=200", "-c", "shared_buffers=256MB"]
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

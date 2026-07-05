@@ -15,7 +15,19 @@ export class DrizzleService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit() {
     const databaseUrl = this.config.getOrThrow<string>('DATABASE_URL');
-    this.pool = new Pool({ connectionString: databaseUrl });
+    this.pool = new Pool({
+      connectionString: databaseUrl,
+      // 0063 连接池调优 - 企业级配置
+      max: this.config.get<number>('DB_POOL_MAX') || 20,
+      min: 2,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 5000,
+      statement_timeout: 30000,
+      query_timeout: 30000,
+      idle_in_transaction_session_timeout: 60000,
+      maxLifetimeSeconds: 3600,
+      application_name: 'nest-search-form',
+    });
 
     this.db = drizzle(this.pool, {
       schema: { ...schema, businessLines, syncRecords },
