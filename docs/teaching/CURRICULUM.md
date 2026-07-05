@@ -192,10 +192,17 @@
 - **覆盖**:SLO / SLI / Error Budget + Prometheus metrics 导出
 - **预期交付**:每个 service 暴露 /metrics + 关键 SLI dashboard JSON
 
-### 0054 · OpenTelemetry 链路追踪(1 节)
+### 0053a · Grafana Dashboard (扩展 1 节)
+
+- **缺口**:0053 讲了 Prometheus, 但没讲可视化
+- **覆盖**:Grafana 安装 + 数据源接入 + nest-search Dashboard 设计 (4 Panel: 可用性/QPS/错误率/P95)
+- **预期交付**:docker-compose.monitoring.yml + Dashboard JSON + PromQL 实战
+
+### 0054 · OpenTelemetry 链路追踪(1 节) 【跳过】
 
 - **覆盖**:OTel SDK + Jaeger / Tempo 集成
 - **预期交付**:5 个 service 全装 OTel + 1 个分布式 trace demo
+- **跳过原因**: nest-search 现阶段不需要分布式追踪
 
 ---
 
@@ -332,7 +339,7 @@
 | Phase B (Redis+BullMQ+ES 基础) | 11 | 🟡 5/11 | 2026-06-28 |
 | Phase B' (ES 企业级 0040-0047) | 8 | ⏳ 新增 | — |
 | Phase B 错误处理(0048-0049) | 2 | ⏳ | — |
-| Phase C (0050-0054) | 5 | ⏳ | — |
+| Phase C (0051-0053a 选修 4 节) | 4 | ⏳ 新增 (0050/0054 跳过) | — |
 | Phase D (0055-0061) | 7 | ⏳ | — |
 | **Phase E(企业级 DB 架构 0062-0067,2026-06-24 新增)** | **6** | **⏳** | — |
 | **总计** | **67** | **33/67 = 49%** | — |

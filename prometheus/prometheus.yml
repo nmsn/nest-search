@@ -1,0 +1,26 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'nest-search-prometheus'
+
+rule_files:
+  - "alert.rules.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+scrape_configs:
+  - job_name: 'nest-search'
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - 'host.docker.internal:3000'   # gateway
+          - 'host.docker.internal:3000'   # auth-service
+          - 'host.docker.internal:3002'   # search-service
+          - 'host.docker.internal:3004'   # form-service
+          - 'host.docker.internal:3005'   # sync-service
+        labels:
+          project: 'nest-search'
