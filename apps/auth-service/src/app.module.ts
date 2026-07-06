@@ -7,6 +7,7 @@ import { UserModule } from "./user/user.module";
 import { CasModule } from "./cas/cas.module";
 import { AuthModule } from "./auth/auth.module";
 import { RedisModule } from "./redis/redis.module";
+import { CacheModule } from "./cache/cache.module";
 import { validateEnv } from "./config/validate-env";
 import { AllExceptionsFilter } from "./filters/all-exceptions.filter";
 import { HealthModule } from "./health/health.module";
@@ -30,6 +31,7 @@ import { APP_FILTER } from "@nestjs/core";
     }),
     DrizzleModule,
     RedisModule,
+    CacheModule,
     UserModule,
     CasModule,
     AuthModule,

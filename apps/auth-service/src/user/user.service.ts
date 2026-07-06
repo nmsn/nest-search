@@ -9,13 +9,13 @@ import { eq } from "drizzle-orm";
 import * as bcrypt from "bcrypt";
 // 方案 B:DTO 单一 source of truth 在 database/dto/
 import { RegisterApi as CreateUserDto } from "../database/dto/users.dto";
-import { RedisService } from "../redis/redis.service";
+import { CacheService } from "../cache/cache.service";
 
 @Injectable()
 export class UserService {
   constructor(
     private readonly drizzle: DrizzleService,
-    private readonly redis: RedisService,
+    private readonly cache: CacheService,
   ) {}
 
   async create(dto: CreateUserDto) {
@@ -35,26 +35,32 @@ export class UserService {
     return this.findById(inserted.id);
   }
 
+  /**
+   * 查用户 — 通用 Cache-Aside 封装
+   *
+   * 之前手写 20 行(查 cache → miss → 查 DB → 写 cache → 防穿透)
+   * 现在 7 行,3 大坑由 CacheService 自动处理
+   */
   async findById(id: number) {
-    // 1. 查缓存
-    const cached = await this.redis.get(`user:${id}`);
-    if (cached) return JSON.parse(cached);
+    const user = await this.cache.getOrSet(
+      `user:${id}`,
+      async () => {
+        const [result] = await this.drizzle.db
+          .select()
+          .from(users)
+          .where(eq(users.id, id))
+          .limit(1);
+        return result || null;
+      },
+      {
+        ttl: 300, // 正常数据 5 分钟
+        nullTtl: 60, // 空值 1 分钟(防穿透)
+        enableLock: true, // 用户信息是热点,开击穿防护
+      },
+    );
 
-    // 2. 查 DB
-    const [result] = await this.drizzle.db
-      .select()
-      .from(users)
-      .where(eq(users.id, id))
-      .limit(1);
-    if (!result) {
-      // 缓存空值(防穿透)
-      await this.redis.set(`user:${id}`, "", 60);
-      throw new UserNotFoundException(id);
-    }
-
-    // 3. 写缓存
-    await this.redis.set(`user:${id}`, JSON.stringify(result), 300); // 5min
-    return result;
+    if (!user) throw new UserNotFoundException(id);
+    return user;
   }
 
   async findByUsername(username: string) {

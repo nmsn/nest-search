@@ -29,6 +29,24 @@ export class RedisMemoryService implements OnModuleDestroy {
     this.store.delete(key);
   }
 
+  /**
+   * 镜像 RedisService.setnx — SET key value EX ttl NX
+   * 返回 true = 抢到锁(原本不存在),false = 锁已被占用
+   * 内存版用"key 不存在才设"模拟
+   */
+  async setnx(
+    key: string,
+    value: string,
+    ttlSeconds: number,
+  ): Promise<boolean> {
+    if (this.store.has(key)) return false;
+    this.store.set(key, {
+      value,
+      expiresAt: Date.now() + ttlSeconds * 1000,
+    });
+    return true;
+  }
+
   /** 给测试用:每个 it 之间清空,避免状态泄漏 */
   clear(): void {
     this.store.clear();
