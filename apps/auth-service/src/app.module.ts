@@ -8,7 +8,6 @@ import { CasModule } from "./cas/cas.module";
 import { AuthModule } from "./auth/auth.module";
 import { RedisModule } from "./redis/redis.module";
 import { CacheModule } from "./cache/cache.module";
-import { AuthTrpcModule } from "./trpc/auth.trpc.module";
 import { validateEnv } from "./config/validate-env";
 import { AllExceptionsFilter } from "./filters/all-exceptions.filter";
 import { HealthModule } from "./health/health.module";
@@ -37,7 +36,6 @@ import { APP_FILTER } from "@nestjs/core";
     CasModule,
     AuthModule,
     HealthModule,
-    AuthTrpcModule,  // 0069: 暴露 /trpc/auth.*
   ],
   providers: [
     {

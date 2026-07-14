@@ -138,15 +138,6 @@ export class AuthService {
     } as any);
   }
 
-  /**
-   * 公开的 AT 签发入口(0069 tRPC 用)
-   * 跟 login() 的区别:不创建 refresh token,不写 Redis
-   * gateway 收到 AT 后自己用 cookie / header 返回给客户端
-   */
-  async issueAccessToken(user: { id: number; username: string; role: string }): Promise<string> {
-    return this.generateAccessToken(user);
-  }
-
   private async createRefreshToken(userId: number): Promise<string> {
     const tokenId = randomUUID();
 
