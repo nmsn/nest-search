@@ -17,6 +17,7 @@ import { HttpClientModule } from "./common/http-client/http-client.module";
 import { RolesGuard } from "./guards/roles.guard";
 import { ProxyModule } from "./proxy/proxy.module";
 import { AuthProxyModule } from "./auth-proxy/auth-proxy.module";
+import { TrpcClientModule } from "./trpc/trpc-client.module";
 import { validateEnv } from "./config/validate-env";
 
 @Module({
@@ -42,6 +43,7 @@ import { validateEnv } from "./config/validate-env";
     ]),
     ProxyModule, // ← 0012 新加,@Global,export ProxyService
     AuthProxyModule, // ← 0012 新拆,/api/auth/* 5 个 routes
+    TrpcClientModule, // ← 0069 新加,提供 typed tRPC client
   ],
   controllers: [AppController],
   providers: [

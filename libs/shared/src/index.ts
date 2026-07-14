@@ -8,3 +8,4 @@ export * from './dto/pagination.dto';
 export * from './schemas/sync-records';
 export * from './utils/retry';
 export * from './utils/circuit-breaker';
+export * from './contracts';
